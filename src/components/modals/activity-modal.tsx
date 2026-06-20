@@ -1,0 +1,121 @@
+"use client";
+
+import { ActivityDetailView } from "@/components/details/activity-detail-view";
+import { DailyActivityForm } from "@/components/forms/daily-activity-form";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import type { DailyActivity } from "@/lib/types";
+import type { DailyActivityFormValues } from "@/lib/validation/daily-activity-form";
+
+export type ActivityModalMode = "create" | "edit" | "view";
+
+type ActivityModalProps = {
+  open: boolean;
+  mode: ActivityModalMode;
+  activity?: DailyActivity | null;
+  onOpenChange: (open: boolean) => void;
+  onCreate?: (values: DailyActivityFormValues) => void;
+  onEdit?: (values: DailyActivityFormValues) => void;
+};
+
+const FORM_ID = "daily-activity-form";
+
+function getDefaultValues(
+  activity?: DailyActivity | null,
+): DailyActivityFormValues | undefined {
+  if (!activity) {
+    return undefined;
+  }
+
+  return {
+    date: activity.date,
+    carrier: activity.carrierName,
+    status: activity.status,
+    notes: activity.notes ?? "",
+    origin: activity.origin ?? "",
+    destination: activity.destination ?? "",
+    totalMiles: activity.miles ?? undefined,
+    loadAmount: activity.loadAmount ?? undefined,
+    reason: activity.reason ?? "",
+  };
+}
+
+export function ActivityModal({
+  open,
+  mode,
+  activity,
+  onOpenChange,
+  onCreate,
+  onEdit,
+}: ActivityModalProps) {
+  const titles: Record<ActivityModalMode, string> = {
+    create: "Add Activity",
+    edit: "Edit Activity",
+    view: "View Activity",
+  };
+
+  const descriptions: Record<ActivityModalMode, string> = {
+    create: "Log a daily activity using mock frontend validation only.",
+    edit: "Update activity details. Changes stay in local mock state.",
+    view: "Read-only activity details preview.",
+  };
+
+  function handleSubmit(values: DailyActivityFormValues) {
+    if (mode === "create") {
+      onCreate?.(values);
+      onOpenChange(false);
+      return;
+    }
+
+    if (mode === "edit") {
+      onEdit?.(values);
+      onOpenChange(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{titles[mode]}</DialogTitle>
+          <DialogDescription>{descriptions[mode]}</DialogDescription>
+        </DialogHeader>
+
+        {mode === "view" && activity ? (
+          <ActivityDetailView activity={activity} />
+        ) : (
+          <DailyActivityForm
+            formId={FORM_ID}
+            defaultValues={getDefaultValues(mode === "create" ? null : activity)}
+            onSubmit={handleSubmit}
+          />
+        )}
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+
+          {mode === "create" ? (
+            <Button type="submit" form={FORM_ID}>
+              Add Activity
+            </Button>
+          ) : null}
+
+          {mode === "edit" ? (
+            <Button type="submit" form={FORM_ID}>
+              Save Changes
+            </Button>
+          ) : null}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

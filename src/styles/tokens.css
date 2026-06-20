@@ -1,0 +1,6 @@
+/* Design tokens placeholder for future theme extensions. */
+
+:root {
+  --app-content-max-width: 80rem;
+  --app-sidebar-width: 16rem;
+}
