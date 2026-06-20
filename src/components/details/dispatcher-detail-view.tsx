@@ -1,6 +1,11 @@
+"use client";
+
+import { useCallback, useMemo } from "react";
+
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { mockActivities, mockCarriers } from "@/lib/mock-data";
+import { useApiData } from "@/hooks/use-api-data";
+import { fetchActivities, fetchCarriers } from "@/lib/api/resources";
 import type { Dispatcher } from "@/lib/types";
 import { TEAM_STATUS_ACTIVE } from "@/lib/constants/team-statuses";
 import { formatDateShort } from "@/lib/utils/format-date";
@@ -10,12 +15,23 @@ type DispatcherDetailViewProps = {
 };
 
 export function DispatcherDetailView({ dispatcher }: DispatcherDetailViewProps) {
-  const assignedCarriers = mockCarriers.filter(
-    (carrier) => carrier.assignedDispatcherName === dispatcher.fullName,
+  const loadCarriers = useCallback(() => fetchCarriers(), []);
+  const loadActivities = useCallback(
+    () => fetchActivities({ dispatcherId: dispatcher.id }),
+    [dispatcher.id],
   );
-  const recentActivities = mockActivities
-    .filter((activity) => activity.dispatcherName === dispatcher.fullName)
-    .slice(0, 3);
+
+  const { data: carriers = [] } = useApiData(loadCarriers, []);
+  const { data: activities = [] } = useApiData(loadActivities, [dispatcher.id]);
+
+  const assignedCarriers = useMemo(
+    () =>
+      carriers.filter(
+        (carrier) => carrier.assignedDispatcherName === dispatcher.fullName,
+      ),
+    [carriers, dispatcher.fullName],
+  );
+  const recentActivities = useMemo(() => activities.slice(0, 3), [activities]);
 
   return (
     <div className="space-y-4">
@@ -34,7 +50,8 @@ export function DispatcherDetailView({ dispatcher }: DispatcherDetailViewProps) 
             <span className="text-muted-foreground">Team:</span> {dispatcher.teamName}
           </p>
           <p>
-            <span className="text-muted-foreground">Role:</span> {dispatcher.role.replaceAll("_", " ")}
+            <span className="text-muted-foreground">Role:</span>{" "}
+            {dispatcher.role.replaceAll("_", " ")}
           </p>
           <p>
             <span className="text-muted-foreground">Status:</span>{" "}

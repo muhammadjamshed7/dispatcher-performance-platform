@@ -97,12 +97,12 @@ export function CarrierModal({
   };
 
   const descriptions: Record<CarrierModalMode, string> = {
-    create: "Add a new carrier using mock frontend validation only.",
-    edit: "Update carrier details. Changes stay in local mock state.",
-    view: "Read-only carrier details preview.",
-    reassign: "Change team and dispatcher assignment in mock state only.",
-    activate: "Mark this carrier as active in mock state only.",
-    deactivate: "Mark this carrier as inactive in mock state only.",
+    create: "Add a new carrier and assign it to a team and dispatcher.",
+    edit: "Update carrier profile details.",
+    view: "Carrier profile and recent activity.",
+    reassign: "Change team and dispatcher assignment.",
+    activate: "Mark this carrier as active.",
+    deactivate: "Mark this carrier as inactive.",
   };
 
   function handleSubmit(values: CarrierFormValues) {
@@ -149,8 +149,7 @@ export function CarrierModal({
               {carrier?.carrierName}
             </span>
             ? This will set the status to{" "}
-            {mode === "activate" ? TEAM_STATUS_ACTIVE : TEAM_STATUS_INACTIVE}{" "}
-            in mock state only.
+            {mode === "activate" ? TEAM_STATUS_ACTIVE : TEAM_STATUS_INACTIVE}.
           </p>
         ) : null}
 

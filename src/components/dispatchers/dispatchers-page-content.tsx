@@ -3,7 +3,8 @@
 import { useCallback, useMemo, useState } from "react";
 
 import { PageContentGate } from "@/components/feedback/page-content-gate";
-import { MockToast } from "@/components/feedback/mock-toast";
+import type { PageContentState } from "@/components/feedback/page-content-gate";
+import { AppToast } from "@/components/feedback/app-toast";
 import { EntityFilterBar } from "@/components/filters/entity-filter-bar";
 import { RoleScopeBanner } from "@/components/layout/role-scope-banner";
 import {
@@ -16,33 +17,57 @@ import {
 } from "@/components/tables/dispatchers-table";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
-import { useMockPageState } from "@/hooks/use-mock-page-state";
+import { useApiData } from "@/hooks/use-api-data";
 import { useRoleScope } from "@/hooks/use-role-scope";
+import { ApiClientError } from "@/lib/api/client";
+import {
+  createDispatcherRequest,
+  fetchDispatchers,
+  fetchTeams,
+  toggleDispatcherStatusRequest,
+  updateDispatcherRequest,
+} from "@/lib/api/resources";
 import {
   TEAM_STATUS_ACTIVE,
-  TEAM_STATUS_INACTIVE,
 } from "@/lib/constants/team-statuses";
-import { mockDispatchers as initialMockDispatchers } from "@/lib/mock-data";
 import type { Dispatcher } from "@/lib/types";
 import type { DispatcherFormValues } from "@/lib/validation/dispatcher-form";
 
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof ApiClientError ? error.message : fallback;
+}
+
 export function DispatchersPageContent() {
   const { filterDispatchers } = useRoleScope();
-  const [dispatchers, setDispatchers] = useState<Dispatcher[]>(
-    initialMockDispatchers,
-  );
-  const visibleDispatchers = useMemo(
-    () => filterDispatchers(dispatchers),
-    [dispatchers, filterDispatchers],
-  );
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<DispatcherModalMode>("create");
   const [selectedDispatcher, setSelectedDispatcher] =
     useState<Dispatcher | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const isEmpty = visibleDispatchers.length === 0;
-  const { state, retry } = useMockPageState({ isEmpty });
+  const loadDispatchers = useCallback(() => fetchDispatchers(), []);
+  const loadTeams = useCallback(() => fetchTeams(), []);
+  const {
+    data: dispatchers = [],
+    error,
+    isLoading,
+    isEmpty,
+    reload,
+  } = useApiData(loadDispatchers, []);
+  const { data: teams = [] } = useApiData(loadTeams, []);
+
+  const visibleDispatchers = useMemo(
+    () => filterDispatchers(dispatchers),
+    [dispatchers, filterDispatchers],
+  );
+
+  const pageState: PageContentState = isLoading
+    ? "loading"
+    : error
+      ? "error"
+      : isEmpty || visibleDispatchers.length === 0
+        ? "empty"
+        : "ready";
 
   const showToast = useCallback((message: string) => {
     setToastMessage(message);
@@ -58,7 +83,7 @@ export function DispatchersPageContent() {
   }
 
   function handleRowAction(
-    dispatcher : Dispatcher,
+    dispatcher: Dispatcher,
     action: DispatcherRowAction,
   ) {
     if (action === "toggle-status") {
@@ -72,71 +97,78 @@ export function DispatchersPageContent() {
     openModal(action, dispatcher);
   }
 
-  function handleCreate(values: DispatcherFormValues) {
-    const newDispatcher : Dispatcher = {
-      id: `disp-${crypto.randomUUID()}`,
-      fullName: values.fullName,
-      email: values.email,
-      phoneNumber: values.phoneNumber ?? "",
-      teamName: values.team,
-      role: values.role,
-      status: values.status,
-      assignedCarriersCount: 0,
-      createdAt: new Date().toISOString(),
-    };
+  async function handleCreate(values: DispatcherFormValues) {
+    const teamId = teams.find((team) => team.name === values.team)?.id;
+    if (!teamId) {
+      showToast("Selected team not found.");
+      return;
+    }
 
-    setDispatchers((current) => [newDispatcher, ...current]);
-    showToast(`Dispatcher "${values.fullName}" created successfully (mock).`);
+    try {
+      await createDispatcherRequest({
+        fullName: values.fullName,
+        email: values.email,
+        phoneNumber: values.phoneNumber,
+        teamId,
+        role: values.role,
+        status: values.status,
+      });
+      showToast(`Dispatcher "${values.fullName}" created successfully.`);
+      await reload();
+    } catch (err) {
+      showToast(getErrorMessage(err, "Failed to create dispatcher."));
+    }
   }
 
-  function handleEdit(values: DispatcherFormValues) {
+  async function handleEdit(values: DispatcherFormValues) {
     if (!selectedDispatcher) {
       return;
     }
 
-    setDispatchers((current) =>
-      current.map((dispatcher) =>
-        dispatcher.id === selectedDispatcher.id
-          ? {
-              ...dispatcher,
-              fullName: values.fullName,
-              email: values.email,
-              phoneNumber: values.phoneNumber ?? "",
-              teamName: values.team,
-              role: values.role,
-              status: values.status,
-            }
-          : dispatcher,
-      ),
-    );
+    const teamId = teams.find((team) => team.name === values.team)?.id;
+    if (!teamId) {
+      showToast("Selected team not found.");
+      return;
+    }
 
-    showToast(`Dispatcher "${values.fullName}" updated successfully (mock).`);
+    try {
+      await updateDispatcherRequest(selectedDispatcher.id, {
+        fullName: values.fullName,
+        email: values.email,
+        phoneNumber: values.phoneNumber,
+        teamId,
+        role: values.role,
+        status: values.status,
+      });
+      showToast(`Dispatcher "${values.fullName}" updated successfully.`);
+      await reload();
+    } catch (err) {
+      showToast(getErrorMessage(err, "Failed to update dispatcher."));
+    }
   }
 
-  function handleToggleStatus(dispatcher : Dispatcher) {
-    const nextStatus =
-      dispatcher.status === TEAM_STATUS_ACTIVE
-        ? TEAM_STATUS_INACTIVE
-        : TEAM_STATUS_ACTIVE;
+  async function handleToggleStatus(dispatcher: Dispatcher) {
+    const action =
+      dispatcher.status === TEAM_STATUS_ACTIVE ? "deactivate" : "activate";
 
-    setDispatchers((current) =>
-      current.map((item) =>
-        item.id === dispatcher.id ? { ...item, status: nextStatus } : item,
-      ),
-    );
-
-    showToast(
-      `Dispatcher "${dispatcher.fullName}" ${
-        nextStatus === TEAM_STATUS_ACTIVE ? "activated" : "deactivated"
-      } (mock).`,
-    );
+    try {
+      await toggleDispatcherStatusRequest(dispatcher.id, action);
+      showToast(
+        `Dispatcher "${dispatcher.fullName}" ${
+          action === "activate" ? "activated" : "deactivated"
+        }.`,
+      );
+      await reload();
+    } catch (err) {
+      showToast(getErrorMessage(err, "Failed to update dispatcher status."));
+    }
   }
 
   return (
     <>
       <PageShell
         title="Dispatchers"
-        description="Manage dispatcher profiles, team assignments, and carrier ownership. Mock data only — no backend persistence."
+        description="Manage dispatcher profiles, team assignments, and carrier ownership."
       >
         <RoleScopeBanner />
 
@@ -149,15 +181,17 @@ export function DispatchersPageContent() {
         <EntityFilterBar />
 
         <PageContentGate
-          state={state}
-          onRetry={retry}
+          state={pageState}
+          onRetry={reload}
           loadingTitle="Loading dispatchers"
           emptyTitle="No dispatchers found"
           emptyDescription="Create a dispatcher profile to manage carrier assignments."
           emptyActionLabel="Create Dispatcher"
           onEmptyAction={() => openModal("create")}
           errorTitle="Unable to load dispatchers"
-          errorDescription="Dispatcher records could not be loaded. Try again in a moment."
+          errorDescription={
+            error ?? "Dispatcher records could not be loaded. Try again in a moment."
+          }
         >
           <DispatchersTable dispatchers={visibleDispatchers} onAction={handleRowAction} />
         </PageContentGate>
@@ -173,7 +207,7 @@ export function DispatchersPageContent() {
         onToggleStatus={handleToggleStatus}
       />
 
-      <MockToast message={toastMessage} onDismiss={() => setToastMessage(null)} />
+      <AppToast message={toastMessage} onDismiss={() => setToastMessage(null)} />
     </>
   );
 }

@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { mockTeams } from "@/lib/mock-data";
+import { useEntityOptions } from "@/hooks/use-entity-options";
 import {
   DISPATCHER_ROLES,
   defaultDispatcherFormValues,
@@ -35,6 +35,7 @@ export function DispatcherForm({
   readOnly = false,
   onSubmit,
 }: DispatcherFormProps) {
+  const { teams } = useEntityOptions();
   const {
     register,
     handleSubmit,
@@ -117,7 +118,7 @@ export function DispatcherForm({
             <SelectValue placeholder="Select team" />
           </SelectTrigger>
           <SelectContent>
-            {mockTeams.map((item) => (
+            {teams.map((item) => (
               <SelectItem key={item.id} value={item.name}>
                 {item.name}
               </SelectItem>

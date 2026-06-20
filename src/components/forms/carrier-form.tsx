@@ -14,9 +14,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useEntityOptions } from "@/hooks/use-entity-options";
 import { TRUCK_TYPES } from "@/lib/constants/truck-types";
 import { TEAM_STATUSES } from "@/lib/constants/team-statuses";
-import { mockDispatchers, mockTeams } from "@/lib/mock-data";
 import {
   carrierFormSchema,
   defaultCarrierFormValues,
@@ -36,6 +36,7 @@ export function CarrierForm({
   readOnly = false,
   onSubmit,
 }: CarrierFormProps) {
+  const { teams, dispatchers } = useEntityOptions();
   const {
     register,
     handleSubmit,
@@ -55,10 +56,10 @@ export function CarrierForm({
 
   const teamDispatchers = useMemo(
     () =>
-      mockDispatchers.filter(
+      dispatchers.filter(
         (dispatcher) => dispatcher.teamName === assignedTeam,
       ),
-    [assignedTeam],
+    [assignedTeam, dispatchers],
   );
 
   useEffect(() => {
@@ -194,7 +195,7 @@ export function CarrierForm({
               <SelectValue placeholder="Select team" />
             </SelectTrigger>
             <SelectContent>
-              {mockTeams.map((team) => (
+              {teams.map((team) => (
                 <SelectItem key={team.id} value={team.name}>
                   {team.name}
                 </SelectItem>

@@ -36,7 +36,6 @@ function getDefaultValues(team?: Team | null): TeamFormValues | undefined {
 
   return {
     name: team.name,
-    teamLead: team.teamLeadName,
     status: team.status,
   };
 }
@@ -58,10 +57,10 @@ export function TeamModal({
   };
 
   const descriptions: Record<TeamModalMode, string> = {
-    create: "Add a new team using mock frontend validation only.",
-    edit: "Update team details. Changes stay in local mock state.",
-    view: "Read-only team details preview.",
-    deactivate: "Mark this team as inactive in mock state only.",
+    create: "Create a new dispatcher team.",
+    edit: "Update team name and status.",
+    view: "Team details and assignment preview.",
+    deactivate: "Deactivate this team and mark it inactive.",
   };
 
   function handleSubmit(values: TeamFormValues) {
@@ -97,7 +96,7 @@ export function TeamModal({
         ) : mode === "deactivate" ? (
           <p className="text-sm text-muted-foreground">
             Deactivate <span className="font-medium text-foreground">{team?.name}</span>?
-            This will set the team status to {TEAM_STATUS_INACTIVE} in mock state only.
+            This will set the team status to {TEAM_STATUS_INACTIVE}.
           </p>
         ) : (
           <TeamForm

@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { STATUSES } from "@/lib/constants/statuses";
-import { MOCK_FILTER_ALL } from "@/lib/mock-data";
+import { FILTER_ALL } from "@/lib/constants/filters";
 
 type StatusFilterProps = {
   value?: string;
@@ -18,7 +18,7 @@ type StatusFilterProps = {
 };
 
 export function StatusFilter({
-  value = MOCK_FILTER_ALL,
+  value = FILTER_ALL,
   onValueChange,
   disabled = false,
 }: StatusFilterProps) {
@@ -33,7 +33,7 @@ export function StatusFilter({
           <SelectValue placeholder="Status" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value={MOCK_FILTER_ALL}>All statuses</SelectItem>
+          <SelectItem value={FILTER_ALL}>All statuses</SelectItem>
           {STATUSES.map((status) => (
             <SelectItem key={status} value={status}>
               {status.replaceAll("_", " ")}

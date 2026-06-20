@@ -8,7 +8,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MOCK_FILTER_ALL, mockFilterDispatchers } from "@/lib/mock-data";
+import { useEntityOptions } from "@/hooks/use-entity-options";
+import { FILTER_ALL } from "@/lib/constants/filters";
 
 type DispatcherFilterProps = {
   value?: string;
@@ -17,25 +18,23 @@ type DispatcherFilterProps = {
 };
 
 export function DispatcherFilter({
-  value = MOCK_FILTER_ALL,
+  value = FILTER_ALL,
   onValueChange,
   disabled = false,
 }: DispatcherFilterProps) {
+  const { dispatchers } = useEntityOptions();
+
   return (
     <FilterField label="Dispatcher">
-      <Select
-        value={value}
-        onValueChange={onValueChange}
-        disabled={disabled}
-      >
+      <Select value={value} onValueChange={onValueChange} disabled={disabled}>
         <SelectTrigger className="w-full" size="sm">
           <SelectValue placeholder="Dispatcher" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value={MOCK_FILTER_ALL}>All dispatchers</SelectItem>
-          {mockFilterDispatchers.map((dispatcher) => (
+          <SelectItem value={FILTER_ALL}>All dispatchers</SelectItem>
+          {dispatchers.map((dispatcher) => (
             <SelectItem key={dispatcher.id} value={dispatcher.id}>
-              {dispatcher.label}
+              {dispatcher.fullName}
             </SelectItem>
           ))}
         </SelectContent>

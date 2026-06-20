@@ -1,46 +1,13 @@
-import { ADMIN, DISPATCHER, TEAM_LEAD, type Role } from "@/lib/constants/roles";
+import type { Role } from "@/lib/constants/roles";
 import {
-  ACTIVE,
   INACTIVE,
   INVITED,
   PENDING_APPROVAL,
-  type UserStatus,
 } from "@/lib/auth/user-statuses";
-import type { MockSession } from "@/lib/auth/mock-session";
-
-export function isSessionActive(session: MockSession | null): session is MockSession {
-  return session !== null && session.status === ACTIVE;
-}
-
-export function canLoginWithStatus(status: UserStatus): boolean {
-  return status === ACTIVE;
-}
-
-export function canAccessAdminRoutes(session: MockSession | null): boolean {
-  return isSessionActive(session) && session.role === ADMIN;
-}
-
-export function canAccessTeamLeadRoutes(session: MockSession | null): boolean {
-  return isSessionActive(session) && session.role === TEAM_LEAD;
-}
-
-export function canAccessDispatcherRoutes(session: MockSession | null): boolean {
-  return isSessionActive(session) && session.role === DISPATCHER;
-}
-
-export function canAccessRoleRoute(
-  session: MockSession | null,
-  requiredRole: Role,
-): boolean {
-  if (!isSessionActive(session)) {
-    return false;
-  }
-
-  return session.role === requiredRole;
-}
+import type { SessionUser } from "@/lib/auth/session-types";
 
 export function getAccessDeniedMessage(
-  session: MockSession | null,
+  session: SessionUser | null,
   requiredRole: Role,
 ): string {
   if (!session) {
@@ -64,28 +31,4 @@ export function getAccessDeniedMessage(
   }
 
   return "You do not have access to this page.";
-}
-
-export function canApproveUsers(session: MockSession | null): boolean {
-  return canAccessAdminRoutes(session);
-}
-
-export function canManageTeams(session: MockSession | null): boolean {
-  return canAccessAdminRoutes(session);
-}
-
-export function canViewReports(session: MockSession | null): boolean {
-  return (
-    isSessionActive(session) &&
-    (session.role === ADMIN || session.role === TEAM_LEAD)
-  );
-}
-
-export function canLogDailyActivity(session: MockSession | null): boolean {
-  return (
-    isSessionActive(session) &&
-    (session.role === ADMIN ||
-      session.role === TEAM_LEAD ||
-      session.role === DISPATCHER)
-  );
 }

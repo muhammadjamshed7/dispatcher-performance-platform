@@ -1,11 +1,3 @@
-/** Demo data seed script placeholder. */
-async function seedDemoData() {
-  console.log("seed-demo-data: not implemented");
-}
+import "dotenv/config";
 
-seedDemoData().catch((error: unknown) => {
-  console.error(error);
-  process.exit(1);
-});
-
-export {};
+console.log("seed-demo-data: use ENABLE_DEMO_DATA=true with scripts/bootstrap.ts or extend this script.");

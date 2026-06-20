@@ -72,6 +72,15 @@ const serverEnvSchema = z.object({
     emptyToUndefined,
     z.enum(["debug", "info", "warn", "error"]).default("info"),
   ),
+  INITIAL_ADMIN_EMAILS: z.preprocess(emptyToUndefined, z.string().default("")),
+  ENABLE_DEMO_DATA: z.preprocess(
+    emptyToUndefined,
+    z.enum(["true", "false"]).default("false"),
+  ),
+  BOOTSTRAP_ADMIN_PASSWORD: z.preprocess(
+    emptyToUndefined,
+    z.string().min(8).default("ChangeMe123!"),
+  ),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
@@ -103,5 +112,8 @@ export function getServerEnv(): ServerEnv {
     FROM_EMAIL: process.env.FROM_EMAIL,
     SENTRY_DSN: process.env.SENTRY_DSN,
     LOG_LEVEL: process.env.LOG_LEVEL,
+    INITIAL_ADMIN_EMAILS: process.env.INITIAL_ADMIN_EMAILS,
+    ENABLE_DEMO_DATA: process.env.ENABLE_DEMO_DATA,
+    BOOTSTRAP_ADMIN_PASSWORD: process.env.BOOTSTRAP_ADMIN_PASSWORD,
   });
 }

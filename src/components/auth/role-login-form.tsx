@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useState } from "react";
 
-import { useMockSession } from "@/components/auth/mock-session-provider";
+import { useSession } from "@/components/auth/session-provider";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -15,7 +15,9 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { mockLogin } from "@/lib/auth/mock-session";
+import { PasswordInput } from "@/components/ui/password-input";
+import { ApiClientError } from "@/lib/api/client";
+import { loginRequest } from "@/lib/api/resources";
 import {
   getDashboardPathForRole,
   ROLE_REGISTER_PATH,
@@ -31,7 +33,7 @@ type RoleLoginFormProps = {
 function RoleLoginFormContent({ role, title, description }: RoleLoginFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { refreshSession } = useMockSession();
+  const { refreshSession, setSession } = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -40,21 +42,20 @@ function RoleLoginFormContent({ role, title, description }: RoleLoginFormProps) 
   const registerPath = ROLE_REGISTER_PATH[role];
   const loggedOut = searchParams.get("loggedOut") === "1";
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
     setIsSubmitting(true);
 
-    const result = mockLogin(email, password, role);
-
-    if (!result.success) {
-      setError(result.error);
+    try {
+      const session = await loginRequest({ email, password, expectedRole: role });
+      setSession(session);
+      await refreshSession();
+      router.replace(getDashboardPathForRole(role));
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : "Unable to sign in.");
       setIsSubmitting(false);
-      return;
     }
-
-    refreshSession();
-    router.replace(getDashboardPathForRole(role));
   };
 
   return (
@@ -73,7 +74,7 @@ function RoleLoginFormContent({ role, title, description }: RoleLoginFormProps) 
               You have been signed out successfully.
             </p>
           ) : null}
-          <form className="space-y-4" onSubmit={handleSubmit}>
+          <form className="space-y-4" onSubmit={(event) => void handleSubmit(event)}>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -88,13 +89,11 @@ function RoleLoginFormContent({ role, title, description }: RoleLoginFormProps) 
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 autoComplete="current-password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                placeholder="Any value for mock login"
                 required
               />
             </div>
@@ -118,9 +117,6 @@ function RoleLoginFormContent({ role, title, description }: RoleLoginFormProps) 
               </Link>
             </p>
           ) : null}
-          <p className="mt-4 text-center text-xs text-muted-foreground">
-            Mock login only — Supabase Auth will replace this flow later.
-          </p>
         </CardContent>
       </Card>
     </main>

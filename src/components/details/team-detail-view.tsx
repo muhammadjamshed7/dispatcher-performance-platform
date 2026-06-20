@@ -1,10 +1,15 @@
+"use client";
+
+import { useCallback, useMemo } from "react";
+
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useApiData } from "@/hooks/use-api-data";
 import {
-  mockActivities,
-  mockCarriers,
-  mockDispatchers,
-} from "@/lib/mock-data";
+  fetchActivities,
+  fetchCarriers,
+  fetchDispatchers,
+} from "@/lib/api/resources";
 import type { Team } from "@/lib/types";
 import { TEAM_STATUS_ACTIVE } from "@/lib/constants/team-statuses";
 import { formatDateShort } from "@/lib/utils/format-date";
@@ -14,15 +19,26 @@ type TeamDetailViewProps = {
 };
 
 export function TeamDetailView({ team }: TeamDetailViewProps) {
-  const teamDispatchers = mockDispatchers.filter(
-    (dispatcher) => dispatcher.teamName === team.name,
+  const loadDispatchers = useCallback(() => fetchDispatchers(), []);
+  const loadCarriers = useCallback(() => fetchCarriers(), []);
+  const loadActivities = useCallback(
+    () => fetchActivities({ teamId: team.id }),
+    [team.id],
   );
-  const teamCarriers = mockCarriers.filter(
-    (carrier) => carrier.assignedTeamName === team.name,
+
+  const { data: dispatchers = [] } = useApiData(loadDispatchers, []);
+  const { data: carriers = [] } = useApiData(loadCarriers, []);
+  const { data: activities = [] } = useApiData(loadActivities, [team.id]);
+
+  const teamDispatchers = useMemo(
+    () => dispatchers.filter((dispatcher) => dispatcher.teamName === team.name),
+    [dispatchers, team.name],
   );
-  const teamActivities = mockActivities
-    .filter((activity) => activity.teamName === team.name)
-    .slice(0, 3);
+  const teamCarriers = useMemo(
+    () => carriers.filter((carrier) => carrier.assignedTeamName === team.name),
+    [carriers, team.name],
+  );
+  const teamActivities = useMemo(() => activities.slice(0, 3), [activities]);
 
   return (
     <div className="space-y-4">

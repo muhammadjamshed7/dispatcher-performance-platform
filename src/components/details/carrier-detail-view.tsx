@@ -1,6 +1,11 @@
+"use client";
+
+import { useCallback, useMemo } from "react";
+
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { mockActivities } from "@/lib/mock-data";
+import { useApiData } from "@/hooks/use-api-data";
+import { fetchActivities } from "@/lib/api/resources";
 import { DELIVERED } from "@/lib/constants/statuses";
 import type { Carrier } from "@/lib/types";
 import { TEAM_STATUS_ACTIVE } from "@/lib/constants/team-statuses";
@@ -12,9 +17,13 @@ type CarrierDetailViewProps = {
 };
 
 export function CarrierDetailView({ carrier }: CarrierDetailViewProps) {
-  const recentActivities = mockActivities
-    .filter((activity) => activity.carrierName === carrier.carrierName)
-    .slice(0, 3);
+  const loadActivities = useCallback(
+    () => fetchActivities({ carrierId: carrier.id }),
+    [carrier.id],
+  );
+  const { data: activities = [] } = useApiData(loadActivities, [carrier.id]);
+
+  const recentActivities = useMemo(() => activities.slice(0, 3), [activities]);
   const deliveredCount = recentActivities.filter(
     (activity) => activity.status === DELIVERED,
   ).length;

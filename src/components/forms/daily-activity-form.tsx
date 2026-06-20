@@ -15,11 +15,11 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
+import { useEntityOptions } from "@/hooks/use-entity-options";
 import {
   DELIVERED,
   STATUSES,
 } from "@/lib/constants/statuses";
-import { mockCarriers } from "@/lib/mock-data";
 import { calculateDispatchFee } from "@/lib/utils/calculate-dispatch-fee";
 import { calculateRatePerMile } from "@/lib/utils/calculate-rate-per-mile";
 import {
@@ -45,9 +45,10 @@ export function DailyActivityForm({
   onSubmit,
 }: DailyActivityFormProps) {
   const { filterCarriers } = useRoleScope();
+  const { carriers: allCarriers } = useEntityOptions();
   const availableCarriers = useMemo(
-    () => filterCarriers(mockCarriers),
-    [filterCarriers],
+    () => filterCarriers(allCarriers),
+    [allCarriers, filterCarriers],
   );
 
   const {

@@ -3,7 +3,8 @@
 import { useCallback, useMemo, useState } from "react";
 
 import { PageContentGate } from "@/components/feedback/page-content-gate";
-import { MockToast } from "@/components/feedback/mock-toast";
+import type { PageContentState } from "@/components/feedback/page-content-gate";
+import { AppToast } from "@/components/feedback/app-toast";
 import { EntityFilterBar } from "@/components/filters/entity-filter-bar";
 import { RoleScopeBanner } from "@/components/layout/role-scope-banner";
 import {
@@ -16,52 +17,91 @@ import {
 } from "@/components/tables/carriers-table";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
-import { useMockPageState } from "@/hooks/use-mock-page-state";
+import { useApiData } from "@/hooks/use-api-data";
+import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { useRoleScope } from "@/hooks/use-role-scope";
+import { ApiClientError } from "@/lib/api/client";
+import {
+  createCarrierRequest,
+  fetchCarriers,
+  fetchDispatchers,
+  fetchTeams,
+  reassignCarrierRequest,
+  updateCarrierRequest,
+} from "@/lib/api/resources";
 import {
   TEAM_STATUS_ACTIVE,
   TEAM_STATUS_INACTIVE,
 } from "@/lib/constants/team-statuses";
-import {
-  mockCarriers as initialMockCarriers,
-} from "@/lib/mock-data";
 import type { Carrier } from "@/lib/types";
 import type {
   CarrierFormValues,
   CarrierReassignValues,
 } from "@/lib/validation/carrier-form";
 
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof ApiClientError ? error.message : fallback;
+}
+
 export function CarriersPageContent() {
   const { filterCarriers } = useRoleScope();
-  const [carriers, setCarriers] = useState<Carrier[]>(initialMockCarriers);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<CarrierModalMode>("create");
+  const [selectedCarrier, setSelectedCarrier] = useState<Carrier | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const loadCarriers = useCallback(() => fetchCarriers(), []);
+  const loadTeams = useCallback(() => fetchTeams(), []);
+  const loadDispatchers = useCallback(() => fetchDispatchers(), []);
+
+  const {
+    data: carriers = [],
+    error,
+    isLoading,
+    isEmpty,
+    reload,
+  } = useApiData(loadCarriers, []);
+  const { data: teams = [] } = useApiData(loadTeams, []);
+  const { data: dispatchers = [] } = useApiData(loadDispatchers, []);
+
+  useRealtimeRefresh(["Carrier"], reload);
+
   const visibleCarriers = useMemo(
     () => filterCarriers(carriers),
     [carriers, filterCarriers],
   );
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<CarrierModalMode>("create");
-  const [selectedCarrier, setSelectedCarrier] = useState<Carrier | null>(
-    null,
-  );
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const isEmpty = visibleCarriers.length === 0;
-  const { state, retry } = useMockPageState({ isEmpty });
+  const pageState: PageContentState = isLoading
+    ? "loading"
+    : error
+      ? "error"
+      : isEmpty || visibleCarriers.length === 0
+        ? "empty"
+        : "ready";
 
   const showToast = useCallback((message: string) => {
     setToastMessage(message);
   }, []);
 
-  function openModal(
-    mode: CarrierModalMode,
-    carrier: Carrier | null = null,
-  ) {
+  function resolveTeamAndDispatcher(values: {
+    assignedTeam: string;
+    assignedDispatcher: string;
+  }) {
+    const teamId = teams.find((team) => team.name === values.assignedTeam)?.id;
+    const dispatcherId = dispatchers.find(
+      (dispatcher) => dispatcher.fullName === values.assignedDispatcher,
+    )?.id;
+
+    return { teamId, dispatcherId };
+  }
+
+  function openModal(mode: CarrierModalMode, carrier: Carrier | null = null) {
     setSelectedCarrier(carrier);
     setModalMode(mode);
     setModalOpen(true);
   }
 
-  function handleRowAction(carrier : Carrier, action: CarrierRowAction) {
+  function handleRowAction(carrier: Carrier, action: CarrierRowAction) {
     if (action === "toggle-status") {
       openModal(
         carrier.status === TEAM_STATUS_ACTIVE ? "deactivate" : "activate",
@@ -73,98 +113,100 @@ export function CarriersPageContent() {
     openModal(action, carrier);
   }
 
-  function handleCreate(values: CarrierFormValues) {
-    const newCarrier : Carrier = {
-      id: `car-${crypto.randomUUID()}`,
-      carrierName: values.carrierName,
-      driverName: values.driverName,
-      mcNumber: values.mcNumber,
-      truckType: values.truckType,
-      assignedTeamName: values.assignedTeam,
-      assignedDispatcherName: values.assignedDispatcher,
-      dispatchFeePercentage: values.dispatchFeePercentage,
-      status: values.status,
-      notes: values.notes,
-      createdAt: new Date().toISOString(),
-    };
+  async function handleCreate(values: CarrierFormValues) {
+    const { teamId, dispatcherId } = resolveTeamAndDispatcher(values);
+    if (!teamId || !dispatcherId) {
+      showToast("Selected team or dispatcher not found.");
+      return;
+    }
 
-    setCarriers((current) => [newCarrier, ...current]);
-    showToast(`Carrier "${values.carrierName}" created successfully (mock).`);
+    try {
+      await createCarrierRequest({
+        carrierName: values.carrierName,
+        driverName: values.driverName,
+        mcNumber: values.mcNumber,
+        dispatchFeePercentage: values.dispatchFeePercentage,
+        truckType: values.truckType,
+        teamId,
+        dispatcherId,
+        status: values.status,
+        notes: values.notes,
+      });
+      showToast(`Carrier "${values.carrierName}" created successfully.`);
+      await reload();
+    } catch (err) {
+      showToast(getErrorMessage(err, "Failed to create carrier."));
+    }
   }
 
-  function handleEdit(values: CarrierFormValues) {
+  async function handleEdit(values: CarrierFormValues) {
     if (!selectedCarrier) {
       return;
     }
 
-    setCarriers((current) =>
-      current.map((carrier) =>
-        carrier.id === selectedCarrier.id
-          ? {
-              ...carrier,
-              carrierName: values.carrierName,
-              driverName: values.driverName,
-              mcNumber: values.mcNumber,
-              truckType: values.truckType,
-              assignedTeamName: values.assignedTeam,
-              assignedDispatcherName: values.assignedDispatcher,
-              dispatchFeePercentage: values.dispatchFeePercentage,
-              status: values.status,
-              notes: values.notes,
-            }
-          : carrier,
-      ),
-    );
-
-    showToast(`Carrier "${values.carrierName}" updated successfully (mock).`);
+    try {
+      await updateCarrierRequest(selectedCarrier.id, {
+        carrierName: values.carrierName,
+        driverName: values.driverName,
+        mcNumber: values.mcNumber,
+        dispatchFeePercentage: values.dispatchFeePercentage,
+        truckType: values.truckType,
+        status: values.status,
+        notes: values.notes,
+      });
+      showToast(`Carrier "${values.carrierName}" updated successfully.`);
+      await reload();
+    } catch (err) {
+      showToast(getErrorMessage(err, "Failed to update carrier."));
+    }
   }
 
-  function handleReassign(values: CarrierReassignValues) {
+  async function handleReassign(values: CarrierReassignValues) {
     if (!selectedCarrier) {
       return;
     }
 
-    setCarriers((current) =>
-      current.map((carrier) =>
-        carrier.id === selectedCarrier.id
-          ? {
-              ...carrier,
-              assignedTeamName: values.assignedTeam,
-              assignedDispatcherName: values.assignedDispatcher,
-            }
-          : carrier,
-      ),
-    );
+    const { teamId, dispatcherId } = resolveTeamAndDispatcher(values);
+    if (!teamId || !dispatcherId) {
+      showToast("Selected team or dispatcher not found.");
+      return;
+    }
 
-    showToast(
-      `Carrier "${selectedCarrier.carrierName}" reassigned to ${values.assignedDispatcher} (mock).`,
-    );
+    try {
+      await reassignCarrierRequest(selectedCarrier.id, { teamId, dispatcherId });
+      showToast(
+        `Carrier "${selectedCarrier.carrierName}" reassigned to ${values.assignedDispatcher}.`,
+      );
+      await reload();
+    } catch (err) {
+      showToast(getErrorMessage(err, "Failed to reassign carrier."));
+    }
   }
 
-  function handleToggleStatus(carrier : Carrier) {
+  async function handleToggleStatus(carrier: Carrier) {
     const nextStatus =
       carrier.status === TEAM_STATUS_ACTIVE
         ? TEAM_STATUS_INACTIVE
         : TEAM_STATUS_ACTIVE;
 
-    setCarriers((current) =>
-      current.map((item) =>
-        item.id === carrier.id ? { ...item, status: nextStatus } : item,
-      ),
-    );
-
-    showToast(
-      `Carrier "${carrier.carrierName}" ${
-        nextStatus === TEAM_STATUS_ACTIVE ? "activated" : "deactivated"
-      } (mock).`,
-    );
+    try {
+      await updateCarrierRequest(carrier.id, { status: nextStatus });
+      showToast(
+        `Carrier "${carrier.carrierName}" ${
+          nextStatus === TEAM_STATUS_ACTIVE ? "activated" : "deactivated"
+        }.`,
+      );
+      await reload();
+    } catch (err) {
+      showToast(getErrorMessage(err, "Failed to update carrier status."));
+    }
   }
 
   return (
     <>
       <PageShell
         title="Carriers"
-        description="Manage carrier profiles, assignments, and dispatch fees. Mock data only — no backend persistence."
+        description="Manage carrier profiles, assignments, and dispatch fees."
       >
         <RoleScopeBanner />
 
@@ -177,15 +219,17 @@ export function CarriersPageContent() {
         <EntityFilterBar />
 
         <PageContentGate
-          state={state}
-          onRetry={retry}
+          state={pageState}
+          onRetry={reload}
           loadingTitle="Loading carriers"
           emptyTitle="No carriers found"
           emptyDescription="Create a carrier profile to manage assignments and dispatch fees."
           emptyActionLabel="Create Carrier"
           onEmptyAction={() => openModal("create")}
           errorTitle="Unable to load carriers"
-          errorDescription="Carrier records could not be loaded. Try again in a moment."
+          errorDescription={
+            error ?? "Carrier records could not be loaded. Try again in a moment."
+          }
         >
           <CarriersTable carriers={visibleCarriers} onAction={handleRowAction} />
         </PageContentGate>
@@ -202,7 +246,7 @@ export function CarriersPageContent() {
         onToggleStatus={handleToggleStatus}
       />
 
-      <MockToast message={toastMessage} onDismiss={() => setToastMessage(null)} />
+      <AppToast message={toastMessage} onDismiss={() => setToastMessage(null)} />
     </>
   );
 }

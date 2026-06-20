@@ -6,7 +6,7 @@ export default function AdminLoginPage() {
     <RoleLoginForm
       role={ADMIN}
       title="Admin Sign In"
-      description="Sign in to the company admin portal (mock session)."
+      description="Sign in to the company admin portal."
     />
   );
 }

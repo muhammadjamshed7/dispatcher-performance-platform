@@ -1,11 +1,3 @@
-/** Admin user creation script placeholder. */
-async function createAdminUser() {
-  console.log("create-admin-user: not implemented");
-}
+import "dotenv/config";
 
-createAdminUser().catch((error: unknown) => {
-  console.error(error);
-  process.exit(1);
-});
-
-export {};
+console.log("create-admin-user: use INITIAL_ADMIN_EMAILS with scripts/bootstrap.ts");

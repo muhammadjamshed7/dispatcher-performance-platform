@@ -6,7 +6,7 @@ export default function DispatcherLoginPage() {
     <RoleLoginForm
       role={DISPATCHER}
       title="Dispatcher Sign In"
-      description="Sign in to your dispatcher portal (mock session)."
+      description="Sign in to your dispatcher portal."
     />
   );
 }

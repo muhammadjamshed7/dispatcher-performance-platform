@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TRUCK_TYPES } from "@/lib/constants/truck-types";
-import { MOCK_FILTER_ALL } from "@/lib/mock-data";
+import { FILTER_ALL } from "@/lib/constants/filters";
 
 type TruckTypeFilterProps = {
   value?: string;
@@ -18,7 +18,7 @@ type TruckTypeFilterProps = {
 };
 
 export function TruckTypeFilter({
-  value = MOCK_FILTER_ALL,
+  value = FILTER_ALL,
   onValueChange,
   disabled = false,
 }: TruckTypeFilterProps) {
@@ -33,7 +33,7 @@ export function TruckTypeFilter({
           <SelectValue placeholder="Truck type" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value={MOCK_FILTER_ALL}>All types</SelectItem>
+          <SelectItem value={FILTER_ALL}>All types</SelectItem>
           {TRUCK_TYPES.map((truckType) => (
             <SelectItem key={truckType} value={truckType}>
               {truckType.replaceAll("_", " ")}

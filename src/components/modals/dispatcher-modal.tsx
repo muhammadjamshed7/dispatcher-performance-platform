@@ -72,11 +72,11 @@ export function DispatcherModal({
   };
 
   const descriptions: Record<DispatcherModalMode, string> = {
-    create: "Add a new dispatcher using mock frontend validation only.",
-    edit: "Update dispatcher details. Changes stay in local mock state.",
-    view: "Read-only dispatcher details preview.",
-    activate: "Mark this dispatcher as active in mock state only.",
-    deactivate: "Mark this dispatcher as inactive in mock state only.",
+    create: "Create a dispatcher profile and assign them to a team.",
+    edit: "Update dispatcher profile details.",
+    view: "Dispatcher profile and assignment preview.",
+    activate: "Mark this dispatcher as active.",
+    deactivate: "Mark this dispatcher as inactive.",
   };
 
   function handleSubmit(values: DispatcherFormValues) {
@@ -118,8 +118,7 @@ export function DispatcherModal({
               {dispatcher?.fullName}
             </span>
             ? This will set the status to{" "}
-            {mode === "activate" ? TEAM_STATUS_ACTIVE : TEAM_STATUS_INACTIVE}{" "}
-            in mock state only.
+            {mode === "activate" ? TEAM_STATUS_ACTIVE : TEAM_STATUS_INACTIVE}.
           </p>
         ) : (
           <DispatcherForm

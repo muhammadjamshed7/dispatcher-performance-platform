@@ -18,7 +18,7 @@ export function RoleScopeBanner({ message }: RoleScopeBannerProps) {
       <CardContent className="flex flex-wrap items-center gap-2 py-3 text-sm">
         <Info className="size-4 shrink-0 text-muted-foreground" />
         <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
-          Mock session
+          Session
         </Badge>
         <Badge variant="secondary">{role.replaceAll("_", " ")}</Badge>
         <span className="text-muted-foreground">

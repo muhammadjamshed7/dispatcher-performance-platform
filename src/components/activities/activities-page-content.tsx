@@ -3,7 +3,8 @@
 import { useCallback, useMemo, useState } from "react";
 
 import { PageContentGate } from "@/components/feedback/page-content-gate";
-import { MockToast } from "@/components/feedback/mock-toast";
+import type { PageContentState } from "@/components/feedback/page-content-gate";
+import { AppToast } from "@/components/feedback/app-toast";
 import { EntityFilterBar } from "@/components/filters/entity-filter-bar";
 import { RoleScopeBanner } from "@/components/layout/role-scope-banner";
 import { ActivityModal, type ActivityModalMode } from "@/components/modals/activity-modal";
@@ -13,70 +14,76 @@ import {
 } from "@/components/tables/activities-table";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
-import { useMockPageState } from "@/hooks/use-mock-page-state";
+import { useApiData } from "@/hooks/use-api-data";
+import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { useRoleScope } from "@/hooks/use-role-scope";
-import { DELIVERED } from "@/lib/constants/statuses";
-import { DRY_VAN } from "@/lib/constants/truck-types";
+import { ApiClientError } from "@/lib/api/client";
 import {
-  mockActivities as initialMockActivities,
-  mockCarriers,
-} from "@/lib/mock-data";
+  createActivityRequest,
+  fetchActivities,
+  fetchCarriers,
+  updateActivityRequest,
+} from "@/lib/api/resources";
+import { DELIVERED } from "@/lib/constants/statuses";
 import type { DailyActivity } from "@/lib/types";
-import { calculateDispatchFee } from "@/lib/utils/calculate-dispatch-fee";
-import { calculateRatePerMile } from "@/lib/utils/calculate-rate-per-mile";
 import type { DailyActivityFormValues } from "@/lib/validation/daily-activity-form";
 
-function buildActivityFromForm(
-  values: DailyActivityFormValues,
-  existingId?: string,
-) : DailyActivity {
-  const carrier = mockCarriers.find(
-    (item) => item.carrierName === values.carrier,
-  );
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof ApiClientError ? error.message : fallback;
+}
 
-  const isDelivered = values.status === DELIVERED;
-  const miles =
-    isDelivered && values.totalMiles && values.totalMiles > 0
-      ? values.totalMiles
-      : null;
-  const loadAmount =
-    isDelivered && values.loadAmount && values.loadAmount > 0
-      ? values.loadAmount
-      : null;
-  const dispatchFeePercentage = carrier?.dispatchFeePercentage ?? 0;
+function toCreateActivityPayload(
+  values: DailyActivityFormValues,
+  carrierId: string,
+) {
+  const base = {
+    activityDate: values.date,
+    carrierId,
+    status: values.status,
+    notes: values.notes?.trim() ? values.notes : undefined,
+  };
+
+  if (values.status === DELIVERED) {
+    return {
+      ...base,
+      origin: values.origin,
+      destination: values.destination,
+      totalMiles: values.totalMiles,
+      loadAmount: values.loadAmount,
+    };
+  }
 
   return {
-    id: existingId ?? `act-${crypto.randomUUID()}`,
-    date: values.date,
-    carrierName: values.carrier,
-    dispatcherName: carrier?.assignedDispatcherName ?? "Unassigned",
-    teamName: carrier?.assignedTeamName ?? "Unassigned",
-    truckType: carrier?.truckType ?? DRY_VAN,
+    ...base,
+    reason: values.reason,
+  };
+}
+
+function toUpdateActivityPayload(values: DailyActivityFormValues) {
+  const base = {
+    activityDate: values.date,
     status: values.status,
-    origin: isDelivered ? values.origin ?? null : null,
-    destination: isDelivered ? values.destination ?? null : null,
-    miles,
-    loadAmount,
-    ratePerMile:
-      miles && loadAmount ? calculateRatePerMile(loadAmount, miles) : null,
-    dispatchFee:
-      loadAmount && isDelivered
-        ? calculateDispatchFee(loadAmount, dispatchFeePercentage)
-        : null,
-    reason: !isDelivered ? values.reason ?? null : null,
-    notes: values.notes?.trim() ? values.notes : null,
+    notes: values.notes?.trim() ? values.notes : undefined,
+  };
+
+  if (values.status === DELIVERED) {
+    return {
+      ...base,
+      origin: values.origin,
+      destination: values.destination,
+      totalMiles: values.totalMiles,
+      loadAmount: values.loadAmount,
+    };
+  }
+
+  return {
+    ...base,
+    reason: values.reason,
   };
 }
 
 export function ActivitiesPageContent() {
   const { filterActivities } = useRoleScope();
-  const [activities, setActivities] = useState<DailyActivity[]>(
-    initialMockActivities,
-  );
-  const visibleActivities = useMemo(
-    () => filterActivities(activities),
-    [activities, filterActivities],
-  );
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<ActivityModalMode>("create");
   const [selectedActivity, setSelectedActivity] = useState<DailyActivity | null>(
@@ -84,8 +91,32 @@ export function ActivitiesPageContent() {
   );
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const isEmpty = visibleActivities.length === 0;
-  const { state, retry } = useMockPageState({ isEmpty });
+  const loadActivities = useCallback(() => fetchActivities(), []);
+  const loadCarriers = useCallback(() => fetchCarriers(), []);
+
+  const {
+    data: activities = [],
+    error,
+    isLoading,
+    isEmpty,
+    reload,
+  } = useApiData(loadActivities, []);
+  const { data: carriers = [] } = useApiData(loadCarriers, []);
+
+  useRealtimeRefresh(["DailyActivity"], reload);
+
+  const visibleActivities = useMemo(
+    () => filterActivities(activities),
+    [activities, filterActivities],
+  );
+
+  const pageState: PageContentState = isLoading
+    ? "loading"
+    : error
+      ? "error"
+      : isEmpty || visibleActivities.length === 0
+        ? "empty"
+        : "ready";
 
   const showToast = useCallback((message: string) => {
     setToastMessage(message);
@@ -100,36 +131,51 @@ export function ActivitiesPageContent() {
     setModalOpen(true);
   }
 
-  function handleRowAction(activity : DailyActivity, action: ActivityRowAction) {
+  function handleRowAction(activity: DailyActivity, action: ActivityRowAction) {
     openModal(action, activity);
   }
 
-  function handleCreate(values: DailyActivityFormValues) {
-    const activity = buildActivityFromForm(values);
-    setActivities((current) => [activity, ...current]);
-    showToast(`Activity for "${values.carrier}" added successfully (mock).`);
+  async function handleCreate(values: DailyActivityFormValues) {
+    const carrierId = carriers.find(
+      (carrier) => carrier.carrierName === values.carrier,
+    )?.id;
+
+    if (!carrierId) {
+      showToast("Selected carrier not found.");
+      return;
+    }
+
+    try {
+      await createActivityRequest(toCreateActivityPayload(values, carrierId));
+      showToast(`Activity for "${values.carrier}" added successfully.`);
+      await reload();
+    } catch (err) {
+      showToast(getErrorMessage(err, "Failed to create activity."));
+    }
   }
 
-  function handleEdit(values: DailyActivityFormValues) {
+  async function handleEdit(values: DailyActivityFormValues) {
     if (!selectedActivity) {
       return;
     }
 
-    const updated = buildActivityFromForm(values, selectedActivity.id);
-    setActivities((current) =>
-      current.map((activity) =>
-        activity.id === selectedActivity.id ? updated : activity,
-      ),
-    );
-
-    showToast(`Activity for "${values.carrier}" updated successfully (mock).`);
+    try {
+      await updateActivityRequest(
+        selectedActivity.id,
+        toUpdateActivityPayload(values),
+      );
+      showToast(`Activity for "${values.carrier}" updated successfully.`);
+      await reload();
+    } catch (err) {
+      showToast(getErrorMessage(err, "Failed to update activity."));
+    }
   }
 
   return (
     <>
       <PageShell
         title="Daily Activity"
-        description="Log and review daily carrier activity by status. Mock data only — no backend persistence."
+        description="Log and review daily carrier activity by status."
       >
         <RoleScopeBanner />
 
@@ -142,15 +188,17 @@ export function ActivitiesPageContent() {
         <EntityFilterBar />
 
         <PageContentGate
-          state={state}
-          onRetry={retry}
+          state={pageState}
+          onRetry={reload}
           loadingTitle="Loading activities"
           emptyTitle="No activities logged"
           emptyDescription="Add a daily activity to start tracking carrier performance."
           emptyActionLabel="Add Activity"
           onEmptyAction={() => openModal("create")}
           errorTitle="Unable to load activities"
-          errorDescription="Daily activities could not be loaded. Try again in a moment."
+          errorDescription={
+            error ?? "Daily activities could not be loaded. Try again in a moment."
+          }
         >
           <ActivitiesTable activities={visibleActivities} onAction={handleRowAction} />
         </PageContentGate>
@@ -165,7 +213,7 @@ export function ActivitiesPageContent() {
         onEdit={handleEdit}
       />
 
-      <MockToast message={toastMessage} onDismiss={() => setToastMessage(null)} />
+      <AppToast message={toastMessage} onDismiss={() => setToastMessage(null)} />
     </>
   );
 }

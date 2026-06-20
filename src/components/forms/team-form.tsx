@@ -73,20 +73,6 @@ export function TeamForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor={`${formId}-team-lead`}>Team Lead</Label>
-        <Input
-          id={`${formId}-team-lead`}
-          placeholder="Enter team lead name"
-          disabled={readOnly}
-          aria-invalid={Boolean(errors.teamLead)}
-          {...register("teamLead")}
-        />
-        {errors.teamLead ? (
-          <p className="text-sm text-destructive">{errors.teamLead.message}</p>
-        ) : null}
-      </div>
-
-      <div className="space-y-2">
         <Label htmlFor={`${formId}-status`}>Status</Label>
         <Select
           value={status}

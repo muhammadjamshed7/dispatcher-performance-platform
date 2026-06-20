@@ -62,9 +62,9 @@ export function ActivityModal({
   };
 
   const descriptions: Record<ActivityModalMode, string> = {
-    create: "Log a daily activity using mock frontend validation only.",
-    edit: "Update activity details. Changes stay in local mock state.",
-    view: "Read-only activity details preview.",
+    create: "Log daily carrier activity for your assigned carriers.",
+    edit: "Update activity details for this carrier and date.",
+    view: "Activity details and financial summary.",
   };
 
   function handleSubmit(values: DailyActivityFormValues) {

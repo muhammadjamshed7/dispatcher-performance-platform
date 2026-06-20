@@ -5,12 +5,11 @@ import { UserCircle } from "lucide-react";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { PageShell } from "@/components/layout/page-shell";
 import { StatusBadge } from "@/components/status-badge";
-import { useMockSession } from "@/components/auth/mock-session-provider";
+import { useSession } from "@/components/auth/session-provider";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { getLoginPathForRole } from "@/lib/auth/roles";
-import { mockTeams } from "@/lib/mock-data";
 import { ADMIN } from "@/lib/constants/roles";
 
 function DetailRow({ label, value }: { label: string; value: string }) {
@@ -22,27 +21,19 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function resolveTeamName(teamId: string | null): string | null {
-  if (!teamId) {
-    return null;
-  }
-
-  return mockTeams.find((team) => team.id === teamId)?.name ?? null;
-}
-
 export function AccountPageContent() {
-  const { session } = useMockSession();
+  const { session } = useSession();
 
   if (!session) {
     return null;
   }
 
-  const teamName = resolveTeamName(session.teamId);
+  const teamName = session.teamName;
 
   return (
     <PageShell
       title="Account"
-      description="Your profile and mock session details."
+      description="Your profile and session details."
     >
       <Card>
         <CardHeader className="flex flex-row items-center gap-3 space-y-0">
@@ -54,7 +45,7 @@ export function AccountPageContent() {
             <p className="text-sm text-muted-foreground">{session.email}</p>
           </div>
           <Badge variant="outline" className="ml-auto hidden sm:inline-flex">
-            Mock session
+            Live session
           </Badge>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -71,7 +62,7 @@ export function AccountPageContent() {
             {session.role !== ADMIN ? (
               <DetailRow label="Team" value={teamName ?? "Not assigned"} />
             ) : null}
-            <DetailRow label="Last Login" value="Not tracked in mock session" />
+            <DetailRow label="Last Login" value="Managed by Supabase Auth" />
           </dl>
 
           <Separator />

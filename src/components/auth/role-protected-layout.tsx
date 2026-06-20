@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { MockSessionProvider } from "@/components/auth/mock-session-provider";
+import { SessionProvider } from "@/components/auth/session-provider";
 import { RoleGuard } from "@/components/auth/role-guard";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import {
@@ -24,14 +24,14 @@ export function RoleProtectedLayout({ role, children }: RoleProtectedLayoutProps
     pathname.startsWith(`/${prefix}`) && isPublicAuthPath(pathname);
 
   if (isAuthPage) {
-    return <MockSessionProvider>{children}</MockSessionProvider>;
+    return <SessionProvider>{children}</SessionProvider>;
   }
 
   return (
-    <MockSessionProvider>
+    <SessionProvider>
       <RoleGuard requiredRole={role}>
         <DashboardShell>{children}</DashboardShell>
       </RoleGuard>
-    </MockSessionProvider>
+    </SessionProvider>
   );
 }

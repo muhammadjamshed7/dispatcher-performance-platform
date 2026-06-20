@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 
 import { PageContentGate } from "@/components/feedback/page-content-gate";
+import type { PageContentState } from "@/components/feedback/page-content-gate";
 import { EntityFilterBar } from "@/components/filters/entity-filter-bar";
 import { DataTablePlaceholder } from "@/components/data-table-placeholder";
 import { RoleScopeBanner } from "@/components/layout/role-scope-banner";
@@ -10,15 +11,14 @@ import { MetricCard } from "@/components/metric-card";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useMockPageState } from "@/hooks/use-mock-page-state";
-import { useRoleScope } from "@/hooks/use-role-scope";
-import {
-  mockCarrierRankings,
-  mockDispatcherRankings,
-  mockDispatchers,
-  mockTeamRankings,
-} from "@/lib/mock-data";
+import { useApiData } from "@/hooks/use-api-data";
+import { fetchDispatchers, fetchRankings } from "@/lib/api/resources";
 import { TEAM_STATUS_ACTIVE } from "@/lib/constants/team-statuses";
+import type {
+  CarrierRanking,
+  DispatcherRanking,
+  TeamRanking,
+} from "@/lib/types";
 import { formatCurrencyCompact } from "@/lib/utils/format-currency";
 
 type RankingTab = "dispatchers" | "carriers" | "teams";
@@ -29,77 +29,81 @@ const RANKING_TABS: { id: RankingTab; label: string }[] = [
   { id: "teams", label: "Team Rankings" },
 ];
 
+function isDispatcherRanking(row: unknown): row is DispatcherRanking {
+  return typeof row === "object" && row !== null && "name" in row && "team" in row;
+}
+
+function isCarrierRanking(row: unknown): row is CarrierRanking {
+  return (
+    typeof row === "object" &&
+    row !== null &&
+    "carrierName" in row &&
+    "dispatcherName" in row
+  );
+}
+
+function isTeamRanking(row: unknown): row is TeamRanking {
+  return typeof row === "object" && row !== null && "teamName" in row;
+}
+
 export function RankingsPageContent() {
   const [activeTab, setActiveTab] = useState<RankingTab>("dispatchers");
-  const { filterDispatchers, isCompanyWide, teamName, dispatcherName } =
-    useRoleScope();
 
-  const scopedDispatchers = useMemo(
-    () => filterDispatchers(mockDispatchers),
-    [filterDispatchers],
+  const rankingType =
+    activeTab === "dispatchers"
+      ? "dispatcher"
+      : activeTab === "carriers"
+        ? "carrier"
+        : "team";
+
+  const loadRankings = useCallback(
+    () => fetchRankings(rankingType),
+    [rankingType],
   );
+  const loadDispatchers = useCallback(() => fetchDispatchers(), []);
 
-  const scopedDispatcherRankings = useMemo(() => {
-    const names = new Set(scopedDispatchers.map((item) => item.fullName));
-    return mockDispatcherRankings.filter((row) => names.has(row.name));
-  }, [scopedDispatchers]);
+  const {
+    data: rankings = [],
+    error,
+    isLoading,
+    isEmpty,
+    reload,
+  } = useApiData(loadRankings, [activeTab]);
+  const { data: dispatchers = [] } = useApiData(loadDispatchers, []);
 
-  const scopedCarrierRankings = useMemo(() => {
-    if (isCompanyWide) {
-      return mockCarrierRankings;
-    }
-
-    if (dispatcherName) {
-      return mockCarrierRankings.filter(
-        (row) => row.dispatcherName === dispatcherName,
-      );
-    }
-
-    if (teamName) {
-      return mockCarrierRankings.filter((row) =>
-        scopedDispatchers.some(
-          (dispatcher) => dispatcher.fullName === row.dispatcherName,
-        ),
-      );
-    }
-
-    return mockCarrierRankings;
-  }, [dispatcherName, isCompanyWide, scopedDispatchers, teamName]);
-
-  const scopedTeamRankings = useMemo(() => {
-    if (isCompanyWide) {
-      return mockTeamRankings;
-    }
-
-    if (teamName) {
-      return mockTeamRankings.filter((row) => row.teamName === teamName);
-    }
-
-    return mockTeamRankings;
-  }, [isCompanyWide, teamName]);
+  const dispatcherRankings = useMemo(
+    () => rankings.filter(isDispatcherRanking),
+    [rankings],
+  );
+  const carrierRankings = useMemo(
+    () => rankings.filter(isCarrierRanking),
+    [rankings],
+  );
+  const teamRankings = useMemo(() => rankings.filter(isTeamRanking), [rankings]);
 
   const activeRows =
     activeTab === "dispatchers"
-      ? scopedDispatcherRankings
+      ? dispatcherRankings
       : activeTab === "carriers"
-        ? scopedCarrierRankings
-        : scopedTeamRankings;
+        ? carrierRankings
+        : teamRankings;
 
-  const isEmpty = activeRows.length === 0;
-  const { state, retry } = useMockPageState({ isEmpty, resetKey: activeTab });
+  const pageState: PageContentState = isLoading
+    ? "loading"
+    : error
+      ? "error"
+      : isEmpty
+        ? "empty"
+        : "ready";
 
-  const handleEmptyAction = useCallback(() => {
-    retry();
-  }, [retry]);
-
-  const activeCount = scopedDispatchers.filter(
+  const activeCount = dispatchers.filter(
     (dispatcher) => dispatcher.status === TEAM_STATUS_ACTIVE,
   ).length;
 
   return (
     <PageShell
       title="Rankings"
-      description="Performance rankings preview using mock data and role-based scope."
+      description="Performance rankings scoped to your role and team access."
     >
       <RoleScopeBanner />
 
@@ -121,15 +125,17 @@ export function RankingsPageContent() {
       <EntityFilterBar />
 
       <PageContentGate
-        state={state}
-        onRetry={retry}
+        state={pageState}
+        onRetry={reload}
         loadingTitle="Loading rankings"
         emptyTitle="No rankings available"
         emptyDescription="There are no rankings for the selected scope and filters."
         emptyActionLabel="Refresh preview"
-        onEmptyAction={handleEmptyAction}
+        onEmptyAction={reload}
         errorTitle="Unable to load rankings"
-        errorDescription="Rankings could not be loaded. Try again in a moment."
+        errorDescription={
+          error ?? "Rankings could not be loaded. Try again in a moment."
+        }
       >
         <>
           <div className="grid gap-4 sm:grid-cols-3">
@@ -137,27 +143,21 @@ export function RankingsPageContent() {
               label="Top Performer"
               value={
                 activeTab === "dispatchers"
-                  ? (scopedDispatcherRankings[0]?.name ?? "—")
+                  ? (dispatcherRankings[0]?.name ?? "—")
                   : activeTab === "carriers"
-                    ? (scopedCarrierRankings[0]?.carrierName ?? "—")
-                    : (scopedTeamRankings[0]?.teamName ?? "—")
+                    ? (carrierRankings[0]?.carrierName ?? "—")
+                    : (teamRankings[0]?.teamName ?? "—")
               }
             />
-            <MetricCard
-              label="Ranked Items"
-              value={activeRows.length.toString()}
-            />
-            <MetricCard
-              label="Active Dispatchers"
-              value={activeCount.toString()}
-            />
+            <MetricCard label="Ranked Items" value={activeRows.length.toString()} />
+            <MetricCard label="Active Dispatchers" value={activeCount.toString()} />
           </div>
 
           {activeTab === "dispatchers" ? (
             <DataTablePlaceholder
               title="Dispatcher Rankings"
               columns={["Rank", "Dispatcher", "Team", "Assigned Carriers"]}
-              rows={scopedDispatcherRankings.map((row) => [
+              rows={dispatcherRankings.map((row) => [
                 row.rank.toString(),
                 row.name,
                 row.team,
@@ -170,7 +170,7 @@ export function RankingsPageContent() {
             <DataTablePlaceholder
               title="Carrier Rankings"
               columns={["Rank", "Carrier", "Dispatcher", "Activity Score"]}
-              rows={scopedCarrierRankings.map((row) => [
+              rows={carrierRankings.map((row) => [
                 row.rank.toString(),
                 row.carrierName,
                 row.dispatcherName,
@@ -183,7 +183,7 @@ export function RankingsPageContent() {
             <DataTablePlaceholder
               title="Team Rankings"
               columns={["Rank", "Team", "Team Lead", "Revenue"]}
-              rows={scopedTeamRankings.map((row) => [
+              rows={teamRankings.map((row) => [
                 row.rank.toString(),
                 row.teamName,
                 row.teamLeadName,

@@ -4,7 +4,7 @@ import { useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 import { AccessDenied } from "@/components/auth/access-denied";
-import { useMockSession } from "@/components/auth/mock-session-provider";
+import { useSession } from "@/components/auth/session-provider";
 import { PendingApprovalScreen } from "@/components/auth/pending-approval-screen";
 import { LoadingState } from "@/components/feedback/loading-state";
 import {
@@ -27,7 +27,7 @@ type RoleGuardProps = {
 
 export function RoleGuard({ requiredRole, children }: RoleGuardProps) {
   const router = useRouter();
-  const { session, isLoading } = useMockSession();
+  const { session, isLoading } = useSession();
 
   useEffect(() => {
     if (isLoading) {

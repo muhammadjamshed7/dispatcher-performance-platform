@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { FormEvent, useCallback, useState } from "react";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -14,8 +14,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { mockRegisterDispatcher } from "@/lib/auth/mock-session";
-import { mockTeams } from "@/lib/mock-data";
+import { useApiData } from "@/hooks/use-api-data";
+import { ApiClientError } from "@/lib/api/client";
+import { fetchPublicTeams, registerDispatcherRequest } from "@/lib/api/resources";
 import {
   Select,
   SelectContent,
@@ -23,6 +24,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof ApiClientError ? error.message : fallback;
+}
 
 export function DispatcherRegisterForm() {
   const [fullName, setFullName] = useState("");
@@ -32,27 +37,38 @@ export function DispatcherRegisterForm() {
   const [notes, setNotes] = useState("");
   const [submittedMessage, setSubmittedMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const loadTeams = useCallback(() => fetchPublicTeams(), []);
+  const { data: teams = [] } = useApiData(loadTeams, []);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSubmitting(true);
+    setErrorMessage(null);
 
-    const result = mockRegisterDispatcher({
-      fullName,
-      email,
-      phoneNumber,
-      preferredTeam: preferredTeam || undefined,
-      notes: notes || undefined,
-    });
+    const selectedTeam = teams.find((team) => team.name === preferredTeam);
 
-    setSubmittedMessage(result.message);
-    setIsSubmitting(false);
+    try {
+      const result = await registerDispatcherRequest({
+        fullName,
+        email,
+        phoneNumber,
+        preferredTeamId: selectedTeam?.id,
+        preferredTeamName: preferredTeam || undefined,
+        notes: notes || undefined,
+      });
+      setSubmittedMessage(result.message);
+    } catch (err) {
+      setErrorMessage(getErrorMessage(err, "Unable to submit registration request."));
+      setIsSubmitting(false);
+    }
   };
 
   if (submittedMessage) {
     return (
-    <main className="flex min-h-screen items-center justify-center bg-muted/30 p-6">
-      <Card className="w-full max-w-md text-center shadow-sm">
+      <main className="flex min-h-screen items-center justify-center bg-muted/30 p-6">
+        <Card className="w-full max-w-md text-center shadow-sm">
           <CardHeader>
             <CardTitle>Request Submitted</CardTitle>
             <CardDescription>{submittedMessage}</CardDescription>
@@ -82,6 +98,9 @@ export function DispatcherRegisterForm() {
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={handleSubmit}>
+            {errorMessage ? (
+              <p className="text-sm text-destructive">{errorMessage}</p>
+            ) : null}
             <div className="space-y-2">
               <Label htmlFor="fullName">Full Name</Label>
               <Input
@@ -121,7 +140,7 @@ export function DispatcherRegisterForm() {
                   <SelectValue placeholder="Select a team" />
                 </SelectTrigger>
                 <SelectContent>
-                  {mockTeams.map((team) => (
+                  {teams.map((team) => (
                     <SelectItem key={team.id} value={team.name}>
                       {team.name}
                     </SelectItem>

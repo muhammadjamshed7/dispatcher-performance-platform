@@ -35,7 +35,7 @@ export default function HomePage() {
           Dispatcher Performance Platform
         </h1>
         <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-          Choose your portal to sign in. Mock session only until Supabase Auth is connected.
+          Choose your portal to sign in.
         </p>
       </div>
       <div className="grid w-full max-w-4xl gap-4 md:grid-cols-3">

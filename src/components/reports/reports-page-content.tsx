@@ -4,7 +4,8 @@ import { useCallback, useState } from "react";
 import { Download } from "lucide-react";
 
 import { PageContentGate } from "@/components/feedback/page-content-gate";
-import { MockToast } from "@/components/feedback/mock-toast";
+import type { PageContentState } from "@/components/feedback/page-content-gate";
+import { AppToast } from "@/components/feedback/app-toast";
 import { ReportFilterBar } from "@/components/filters/report-filter-bar";
 import { RoleScopeBanner } from "@/components/layout/role-scope-banner";
 import { PageShell } from "@/components/layout/page-shell";
@@ -14,61 +15,109 @@ import { DailyReportTable } from "@/components/tables/daily-report-table";
 import { DispatcherReportTable } from "@/components/tables/dispatcher-report-table";
 import { TeamReportTable } from "@/components/tables/team-report-table";
 import { Button } from "@/components/ui/button";
-import { useMockPageState } from "@/hooks/use-mock-page-state";
+import { useApiData } from "@/hooks/use-api-data";
+import { ApiClientError } from "@/lib/api/client";
+import { exportReportRequest, fetchReports } from "@/lib/api/resources";
+import type { ReportPeriod } from "@/lib/constants/report-periods";
 import { cn } from "@/lib/utils";
-import {
-  mockDailyReport,
-  mockHistoricalReport,
-  mockMonthlyReport,
-  mockWeeklyReport,
-  type ReportBundle,
-} from "@/lib/mock-data";
 import { formatCurrencyCompact } from "@/lib/utils/format-currency";
 
 type ReportTab = "daily" | "weekly" | "monthly" | "historical";
 
-const REPORT_TABS: { id: ReportTab; label: string; data: ReportBundle }[] = [
-  { id: "daily", label: "Daily Report", data: mockDailyReport },
-  { id: "weekly", label: "Weekly Report", data: mockWeeklyReport },
-  { id: "monthly", label: "Monthly Report", data: mockMonthlyReport },
-  {
-    id: "historical",
-    label: "Historical Report",
-    data: mockHistoricalReport,
-  },
+const REPORT_TABS: { id: ReportTab; label: string; period: ReportPeriod }[] = [
+  { id: "daily", label: "Daily Report", period: "DAILY" },
+  { id: "weekly", label: "Weekly Report", period: "WEEKLY" },
+  { id: "monthly", label: "Monthly Report", period: "MONTHLY" },
+  { id: "historical", label: "Historical Report", period: "HISTORICAL" },
 ];
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof ApiClientError ? error.message : fallback;
+}
+
+function isReportEmpty(report: {
+  daily: unknown[];
+  dispatchers: unknown[];
+  carriers: unknown[];
+  teams: unknown[];
+}) {
+  return (
+    report.daily.length === 0 &&
+    report.dispatchers.length === 0 &&
+    report.carriers.length === 0 &&
+    report.teams.length === 0
+  );
+}
 
 export function ReportsPageContent() {
   const [activeTab, setActiveTab] = useState<ReportTab>("daily");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const activeReport =
-    REPORT_TABS.find((tab) => tab.id === activeTab)?.data ?? mockDailyReport;
-  const activeLabel =
-    REPORT_TABS.find((tab) => tab.id === activeTab)?.label ?? "Daily Report";
+  const activeConfig =
+    REPORT_TABS.find((tab) => tab.id === activeTab) ?? REPORT_TABS[0];
+
+  const loadReport = useCallback(
+    () => fetchReports({ period: activeConfig.period }),
+    [activeConfig.period],
+  );
+
+  const { data: activeReport, error, isLoading, reload } = useApiData(
+    loadReport,
+    [activeTab],
+  );
 
   const isEmpty =
-    activeReport.daily.length === 0 &&
-    activeReport.dispatchers.length === 0 &&
-    activeReport.carriers.length === 0 &&
-    activeReport.teams.length === 0;
+    !isLoading && !error && activeReport ? isReportEmpty(activeReport) : false;
 
-  const { state, retry } = useMockPageState({
-    isEmpty,
-    resetKey: activeTab,
-  });
+  const pageState: PageContentState = isLoading
+    ? "loading"
+    : error
+      ? "error"
+      : isEmpty
+        ? "empty"
+        : "ready";
 
   const showToast = useCallback((message: string) => {
     setToastMessage(message);
   }, []);
 
+  async function handleExport() {
+    try {
+      const result = await exportReportRequest({ period: activeConfig.period });
+      const blob = new Blob([result.csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = result.fileName;
+      link.click();
+      URL.revokeObjectURL(url);
+      showToast(`Exported ${result.rowCount} rows to ${result.fileName}.`);
+    } catch (err) {
+      showToast(getErrorMessage(err, "Failed to export report."));
+    }
+  }
+
+  const report = activeReport ?? {
+    summary: {
+      revenue: 0,
+      dispatchFees: 0,
+      deliveredLoads: 0,
+      cancelledLoads: 0,
+      activeCarriers: 0,
+    },
+    daily: [],
+    dispatchers: [],
+    carriers: [],
+    teams: [],
+  };
+
   return (
     <>
       <PageShell
         title="Reports"
-        description="Preview daily, weekly, monthly, and historical performance reports using mock data only."
+        description="Daily, weekly, monthly, and historical performance reports."
       >
-        <RoleScopeBanner message="Reports use mock data. Team Lead view is scoped to your team when filters are connected." />
+        <RoleScopeBanner message="Reports are scoped to your role and team access." />
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap gap-2">
@@ -86,65 +135,61 @@ export function ReportsPageContent() {
             ))}
           </div>
 
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => showToast("CSV export will be connected later.")}
-          >
+          <Button type="button" variant="outline" onClick={handleExport}>
             <Download className="size-4" />
             Export CSV
           </Button>
         </div>
 
         <PageContentGate
-          state={state}
-          onRetry={retry}
-          loadingTitle={`Loading ${activeLabel.toLowerCase()}`}
+          state={pageState}
+          onRetry={reload}
+          loadingTitle={`Loading ${activeConfig.label.toLowerCase()}`}
           emptyTitle="No report data"
-          emptyDescription="There is no mock report data for the selected period and filters."
+          emptyDescription="There is no report data for the selected period and filters."
           errorTitle="Unable to load report"
-          errorDescription="The report preview could not be loaded. Try again or switch tabs."
+          errorDescription={
+            error ?? "The report preview could not be loaded. Try again or switch tabs."
+          }
         >
           <>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
               <MetricCard
                 label="Revenue"
-                value={formatCurrencyCompact(activeReport.summary.revenue)}
+                value={formatCurrencyCompact(report.summary.revenue)}
               />
               <MetricCard
                 label="Dispatch Fees"
-                value={formatCurrencyCompact(activeReport.summary.dispatchFees)}
+                value={formatCurrencyCompact(report.summary.dispatchFees)}
               />
               <MetricCard
                 label="Delivered Loads"
-                value={activeReport.summary.deliveredLoads.toString()}
+                value={report.summary.deliveredLoads.toString()}
               />
               <MetricCard
                 label="Cancelled Loads"
-                value={activeReport.summary.cancelledLoads.toString()}
+                value={report.summary.cancelledLoads.toString()}
               />
               <MetricCard
                 label="Active Carriers"
-                value={activeReport.summary.activeCarriers.toString()}
+                value={report.summary.activeCarriers.toString()}
               />
             </div>
 
-            <ReportFilterBar
-              onApply={() => showToast("Filters will be connected later.")}
-            />
+            <ReportFilterBar onApply={() => void reload()} />
 
             <DailyReportTable
-              rows={activeReport.daily}
-              title={`${activeLabel} — Activity Detail`}
+              rows={report.daily}
+              title={`${activeConfig.label} — Activity Detail`}
             />
-            <DispatcherReportTable rows={activeReport.dispatchers} />
-            <CarrierReportTable rows={activeReport.carriers} />
-            <TeamReportTable rows={activeReport.teams} />
+            <DispatcherReportTable rows={report.dispatchers} />
+            <CarrierReportTable rows={report.carriers} />
+            <TeamReportTable rows={report.teams} />
           </>
         </PageContentGate>
       </PageShell>
 
-      <MockToast message={toastMessage} onDismiss={() => setToastMessage(null)} />
+      <AppToast message={toastMessage} onDismiss={() => setToastMessage(null)} />
     </>
   );
 }

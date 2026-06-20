@@ -8,7 +8,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MOCK_FILTER_ALL, mockFilterCarriers } from "@/lib/mock-data";
+import { useEntityOptions } from "@/hooks/use-entity-options";
+import { FILTER_ALL } from "@/lib/constants/filters";
 
 type CarrierFilterProps = {
   value?: string;
@@ -17,25 +18,23 @@ type CarrierFilterProps = {
 };
 
 export function CarrierFilter({
-  value = MOCK_FILTER_ALL,
+  value = FILTER_ALL,
   onValueChange,
   disabled = false,
 }: CarrierFilterProps) {
+  const { carriers } = useEntityOptions();
+
   return (
     <FilterField label="Carrier">
-      <Select
-        value={value}
-        onValueChange={onValueChange}
-        disabled={disabled}
-      >
+      <Select value={value} onValueChange={onValueChange} disabled={disabled}>
         <SelectTrigger className="w-full" size="sm">
           <SelectValue placeholder="Carrier" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value={MOCK_FILTER_ALL}>All carriers</SelectItem>
-          {mockFilterCarriers.map((carrier) => (
+          <SelectItem value={FILTER_ALL}>All carriers</SelectItem>
+          {carriers.map((carrier) => (
             <SelectItem key={carrier.id} value={carrier.id}>
-              {carrier.label}
+              {carrier.carrierName}
             </SelectItem>
           ))}
         </SelectContent>

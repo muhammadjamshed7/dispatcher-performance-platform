@@ -8,7 +8,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MOCK_FILTER_ALL, mockFilterTeams } from "@/lib/mock-data";
+import { useEntityOptions } from "@/hooks/use-entity-options";
+import { FILTER_ALL } from "@/lib/constants/filters";
 
 type TeamFilterProps = {
   value?: string;
@@ -17,25 +18,23 @@ type TeamFilterProps = {
 };
 
 export function TeamFilter({
-  value = MOCK_FILTER_ALL,
+  value = FILTER_ALL,
   onValueChange,
   disabled = false,
 }: TeamFilterProps) {
+  const { teams } = useEntityOptions();
+
   return (
     <FilterField label="Team">
-      <Select
-        value={value}
-        onValueChange={onValueChange}
-        disabled={disabled}
-      >
+      <Select value={value} onValueChange={onValueChange} disabled={disabled}>
         <SelectTrigger className="w-full" size="sm">
           <SelectValue placeholder="Team" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value={MOCK_FILTER_ALL}>All teams</SelectItem>
-          {mockFilterTeams.map((team) => (
+          <SelectItem value={FILTER_ALL}>All teams</SelectItem>
+          {teams.map((team) => (
             <SelectItem key={team.id} value={team.id}>
-              {team.label}
+              {team.name}
             </SelectItem>
           ))}
         </SelectContent>

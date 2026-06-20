@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MOCK_DATE_RANGE_OPTIONS } from "@/lib/mock-data";
+import { DATE_RANGE_OPTIONS } from "@/lib/constants/date-ranges";
 
 type DateRangeFilterProps = {
   value?: string;
@@ -17,7 +17,7 @@ type DateRangeFilterProps = {
 };
 
 export function DateRangeFilter({
-  value = MOCK_DATE_RANGE_OPTIONS[0]?.value,
+  value = DATE_RANGE_OPTIONS[0]?.value,
   onValueChange,
   disabled = false,
 }: DateRangeFilterProps) {
@@ -32,7 +32,7 @@ export function DateRangeFilter({
           <SelectValue placeholder="Date range" />
         </SelectTrigger>
         <SelectContent>
-          {MOCK_DATE_RANGE_OPTIONS.map((option) => (
+          {DATE_RANGE_OPTIONS.map((option) => (
             <SelectItem key={option.value} value={option.value}>
               {option.label}
             </SelectItem>

@@ -18,7 +18,7 @@ export function SessionExpiredScreen({
       icon={Clock3}
       iconClassName="bg-amber-500/10 text-amber-600"
       title="Session Expired"
-      description="Your session has expired. Sign in again to continue. (Placeholder — real expiry will come from Supabase Auth.)"
+      description="Your session has expired. Sign in again to continue."
     >
       <Link href={loginHref} className={buttonVariants({ variant: "default" })}>
         Sign in again

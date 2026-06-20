@@ -14,7 +14,10 @@
     "format:check": "prettier --check .",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "bootstrap": "tsx scripts/bootstrap.ts",
+    "reset-password": "tsx scripts/reset-user-password.ts",
+    "seed:demo": "tsx scripts/seed-demo-data.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

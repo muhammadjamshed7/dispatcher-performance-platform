@@ -1,9 +1,3 @@
-export type CurrentUser = {
-  id: string;
-  email: string;
-  role: string;
-} | null;
+import "server-only";
 
-export async function getCurrentUser(): Promise<CurrentUser> {
-  return null;
-}
+export { getCurrentUser, touchLastLogin } from "@/server/auth/session";

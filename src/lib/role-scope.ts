@@ -1,11 +1,5 @@
-import { ADMIN, DISPATCHER, TEAM_LEAD, type Role } from "@/lib/constants/roles";
-import type { MockSession } from "@/lib/auth/mock-session";
-import {
-  mockDispatchers,
-  mockTeams,
-  mockUsers,
-  getMockUserForRole,
-} from "@/lib/mock-data";
+import { ADMIN, DISPATCHER, TEAM_LEAD } from "@/lib/constants/roles";
+import type { SessionUser } from "@/lib/auth/session-types";
 import type {
   Carrier,
   DailyActivity,
@@ -15,24 +9,23 @@ import type {
   User,
 } from "@/lib/types";
 
-function resolveUserFromSession(session: MockSession): User {
-  return (
-    mockUsers.find((user) => user.id === session.userId) ??
-    getMockUserForRole(session.role)
-  );
+function userFromSession(session: SessionUser): User {
+  return {
+    id: session.userId,
+    fullName: session.fullName,
+    email: session.email,
+    role: session.role,
+    status: session.status,
+    teamId: session.teamId,
+    teamName: session.teamName ?? undefined,
+    dispatcherId: session.dispatcherId,
+  };
 }
 
-export function buildRoleScopeFromSession(session: MockSession): RoleScope {
-  const user = resolveUserFromSession(session);
-  const teamName =
-    user.teamName ??
-    mockTeams.find((team) => team.id === session.teamId)?.name ??
-    null;
-  const dispatcherName =
-    session.role === DISPATCHER
-      ? (mockDispatchers.find((dispatcher) => dispatcher.id === session.dispatcherId)
-          ?.fullName ?? user.fullName)
-      : null;
+export function buildRoleScopeFromSession(session: SessionUser): RoleScope {
+  const user = userFromSession(session);
+  const teamName = session.teamName ?? null;
+  const dispatcherName = session.role === DISPATCHER ? session.fullName : null;
 
   if (session.role === ADMIN) {
     return {
@@ -68,37 +61,21 @@ export function buildRoleScopeFromSession(session: MockSession): RoleScope {
   };
 }
 
-export function buildRoleScope(role: Role): RoleScope {
-  const user = getMockUserForRole(role);
-
-  if (role === ADMIN) {
-    return {
-      role,
-      user,
-      teamName: null,
-      dispatcherName: null,
-      scopeLabel: "Company-wide view",
-      isCompanyWide: true,
-    };
-  }
-
-  if (role === TEAM_LEAD) {
-    return {
-      role,
-      user,
-      teamName: user.teamName ?? null,
-      dispatcherName: null,
-      scopeLabel: user.teamName ? `${user.teamName} team view` : "Team view",
-      isCompanyWide: false,
-    };
-  }
-
+export function emptyRoleScope(): RoleScope {
   return {
-    role,
-    user,
-    teamName: user.teamName ?? null,
-    dispatcherName: user.fullName,
-    scopeLabel: `${user.fullName} personal view`,
+    role: ADMIN,
+    user: {
+      id: "",
+      fullName: "",
+      email: "",
+      role: ADMIN,
+      status: "INACTIVE",
+      teamId: null,
+      dispatcherId: null,
+    },
+    teamName: null,
+    dispatcherName: null,
+    scopeLabel: "Loading…",
     isCompanyWide: false,
   };
 }
@@ -174,16 +151,4 @@ export function filterActivitiesByScope(
   }
 
   return activities;
-}
-
-export function canManageTeams(role: Role): boolean {
-  return role === ADMIN;
-}
-
-export function canManageDispatchers(role: Role): boolean {
-  return role === ADMIN || role === TEAM_LEAD;
-}
-
-export function canViewReports(role: Role): boolean {
-  return role === ADMIN || role === TEAM_LEAD;
 }

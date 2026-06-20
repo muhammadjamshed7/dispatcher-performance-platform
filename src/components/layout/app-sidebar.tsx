@@ -16,7 +16,7 @@ import {
   Users,
 } from "lucide-react";
 
-import { useMockSession } from "@/components/auth/mock-session-provider";
+import { useSession } from "@/components/auth/session-provider";
 import { Badge } from "@/components/ui/badge";
 import {
   getAccountPathForRole,
@@ -41,7 +41,7 @@ const NAV_ICONS: Record<string, typeof LayoutDashboard> = {
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { session } = useMockSession();
+  const { session } = useSession();
   const navItems = session ? getNavItemsForRole(session.role) : [];
   const accountPath = session ? getAccountPathForRole(session.role) : null;
 
@@ -79,7 +79,7 @@ export function AppSidebar() {
         <div className="space-y-2 border-t p-4">
           <div className="flex flex-wrap items-center gap-1.5">
             <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
-              Mock session
+              Session
             </Badge>
             <Badge variant="secondary" className="text-[10px]">
               {session.role.replaceAll("_", " ")}

@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Search, UserCircle } from "lucide-react";
+import { Bell, UserCircle } from "lucide-react";
 
 import { LogoutButton } from "@/components/auth/logout-button";
-import { useMockSession } from "@/components/auth/mock-session-provider";
+import { useSession } from "@/components/auth/session-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { publicEnv } from "@/lib/env";
@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 
 export function TopNav() {
   const pathname = usePathname();
-  const { session } = useMockSession();
+  const { session } = useSession();
   const navItems = session ? getNavItemsForRole(session.role) : [];
   const accountPath = session ? getAccountPathForRole(session.role) : null;
 
@@ -39,18 +39,13 @@ export function TopNav() {
                 {session.role.replaceAll("_", " ")}
               </Badge>
               <Badge variant="outline" className="text-xs font-normal text-muted-foreground">
-                Mock
+                Live
               </Badge>
             </div>
           ) : null}
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2">
-          <div className="hidden items-center gap-2 rounded-lg border bg-muted/40 px-2.5 py-1.5 md:flex">
-            <Search className="size-3.5 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">Search placeholder</span>
-          </div>
-
           {session && accountPath ? (
             <Link
               href={accountPath}

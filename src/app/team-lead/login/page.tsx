@@ -6,7 +6,7 @@ export default function TeamLeadLoginPage() {
     <RoleLoginForm
       role={TEAM_LEAD}
       title="Team Lead Sign In"
-      description="Sign in to your team lead portal (mock session)."
+      description="Sign in to your team lead portal."
     />
   );
 }

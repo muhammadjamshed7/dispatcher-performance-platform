@@ -2,11 +2,10 @@
 
 import { useMemo } from "react";
 
-import { ADMIN } from "@/lib/constants/roles";
-import { useMockSession } from "@/components/auth/mock-session-provider";
+import { useSession } from "@/components/auth/session-provider";
 import {
-  buildRoleScope,
   buildRoleScopeFromSession,
+  emptyRoleScope,
   filterActivitiesByScope,
   filterCarriersByScope,
   filterDispatchersByScope,
@@ -26,12 +25,10 @@ export function useRoleScope(): RoleScope & {
   filterCarriers: (carriers: Carrier[]) => Carrier[];
   filterActivities: (activities: DailyActivity[]) => DailyActivity[];
 } {
-  const { session } = useMockSession();
+  const { session } = useSession();
 
   return useMemo(() => {
-    const scope = session
-      ? buildRoleScopeFromSession(session)
-      : buildRoleScope(ADMIN);
+    const scope = session ? buildRoleScopeFromSession(session) : emptyRoleScope();
 
     return {
       ...scope,

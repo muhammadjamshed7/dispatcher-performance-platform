@@ -6,3 +6,380 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum UserRole {
+  ADMIN
+  TEAM_LEAD
+  DISPATCHER
+}
+
+enum UserStatus {
+  ACTIVE
+  PENDING_APPROVAL
+  INACTIVE
+  INVITED
+}
+
+enum TeamStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum CarrierStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum LoadActivityStatus {
+  DELIVERED
+  CANCELLED
+  NOT_BOOKED
+  NOT_WORKING
+}
+
+enum TruckType {
+  DRY_VAN
+  REEFER
+  FLATBED
+  BOX_TRUCK
+  HOTSHOT
+  POWER_ONLY
+  CARGO_VAN
+}
+
+enum RegistrationRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ReportExportStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum AuditAction {
+  USER_APPROVED
+  USER_REJECTED
+  USER_ROLE_ASSIGNED
+  USER_TEAM_ASSIGNED
+  TEAM_CREATED
+  TEAM_UPDATED
+  TEAM_DEACTIVATED
+  DISPATCHER_CREATED
+  DISPATCHER_UPDATED
+  DISPATCHER_DEACTIVATED
+  CARRIER_CREATED
+  CARRIER_UPDATED
+  CARRIER_DEACTIVATED
+  CARRIER_REASSIGNED
+  ACTIVITY_CREATED
+  ACTIVITY_UPDATED
+  SETTINGS_UPDATED
+  REPORT_EXPORTED
+}
+
+model Organization {
+  id        String    @id @default(cuid())
+  name      String
+  slug      String    @unique
+  timezone  String    @default("America/Chicago")
+  currency  String    @default("USD")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  users                User[]
+  teams                Team[]
+  dispatchers          Dispatcher[]
+  carriers             Carrier[]
+  dailyActivities      DailyActivity[]
+  dailySubmissions     DailySubmission[]
+  statusReasons        StatusReason[]
+  settings             OrganizationSettings?
+  registrationRequests RegistrationRequest[]
+  auditLogs            AuditLog[]
+  reportExports        ReportExport[]
+  carrierAssignments   CarrierAssignmentHistory[]
+
+  @@index([deletedAt])
+}
+
+model User {
+  id             String     @id @default(cuid())
+  organizationId String
+  supabaseUserId String?    @unique
+  email          String
+  fullName       String
+  phoneNumber    String?
+  role           UserRole
+  status         UserStatus @default(PENDING_APPROVAL)
+  teamId         String?
+  lastLoginAt    DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  deletedAt      DateTime?
+
+  organization       Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  team               Team?                      @relation("TeamMembers", fields: [teamId], references: [id], onDelete: SetNull)
+  ledTeams           Team[]                     @relation("TeamLead")
+  dispatcher         Dispatcher?
+  auditLogs          AuditLog[]                 @relation("AuditActor")
+  reviewedRequests   RegistrationRequest[]      @relation("ReviewedBy")
+  reportExports      ReportExport[]
+  carrierAssignments CarrierAssignmentHistory[] @relation("AssignmentActor")
+
+  @@unique([organizationId, email])
+  @@index([organizationId, role, status])
+  @@index([teamId])
+  @@index([deletedAt])
+}
+
+model Team {
+  id             String     @id @default(cuid())
+  organizationId String
+  name           String
+  teamLeadUserId String?
+  status         TeamStatus @default(ACTIVE)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  deletedAt      DateTime?
+
+  organization      Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  teamLead          User?                      @relation("TeamLead", fields: [teamLeadUserId], references: [id], onDelete: SetNull)
+  members           User[]                     @relation("TeamMembers")
+  dispatchers       Dispatcher[]
+  carriers          Carrier[]
+  dailyActivities   DailyActivity[]
+  dailySubmissions  DailySubmission[]
+  assignmentHistory CarrierAssignmentHistory[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, status])
+  @@index([deletedAt])
+}
+
+model Dispatcher {
+  id             String     @id @default(cuid())
+  organizationId String
+  userId         String     @unique
+  teamId         String
+  status         TeamStatus @default(ACTIVE)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  deletedAt      DateTime?
+
+  organization      Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user              User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team              Team                       @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  carriers          Carrier[]
+  dailyActivities   DailyActivity[]
+  dailySubmissions  DailySubmission[]
+  assignmentHistory CarrierAssignmentHistory[]
+
+  @@index([organizationId, teamId, status])
+  @@index([deletedAt])
+}
+
+model Carrier {
+  id                    String        @id @default(cuid())
+  organizationId        String
+  carrierName           String
+  driverName            String
+  mcNumber              String
+  truckType             TruckType
+  teamId                String
+  dispatcherId          String?
+  dispatchFeePercentage Decimal       @db.Decimal(5, 2)
+  status                CarrierStatus @default(ACTIVE)
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  deletedAt             DateTime?
+
+  organization      Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  team              Team                       @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  dispatcher        Dispatcher?                @relation(fields: [dispatcherId], references: [id], onDelete: SetNull)
+  dailyActivities   DailyActivity[]
+  assignmentHistory CarrierAssignmentHistory[]
+
+  @@unique([organizationId, mcNumber])
+  @@index([organizationId, teamId, status])
+  @@index([dispatcherId])
+  @@index([deletedAt])
+}
+
+model CarrierAssignmentHistory {
+  id                     String    @id @default(cuid())
+  organizationId         String
+  carrierId              String
+  teamId                 String
+  dispatcherId           String?
+  teamNameSnapshot       String
+  dispatcherNameSnapshot String?
+  assignedAt             DateTime  @default(now())
+  unassignedAt           DateTime?
+  assignedByUserId       String
+  notes                  String?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  carrier      Carrier      @relation(fields: [carrierId], references: [id], onDelete: Cascade)
+  team         Team         @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  dispatcher   Dispatcher?  @relation(fields: [dispatcherId], references: [id], onDelete: SetNull)
+  assignedBy   User         @relation("AssignmentActor", fields: [assignedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([carrierId, assignedAt])
+  @@index([organizationId])
+}
+
+model DailyActivity {
+  id                            String             @id @default(cuid())
+  organizationId                String
+  activityDate                  DateTime           @db.Date
+  carrierId                     String
+  dispatcherId                  String
+  teamId                        String
+  status                        LoadActivityStatus
+  carrierNameSnapshot           String
+  driverNameSnapshot            String
+  dispatcherNameSnapshot        String
+  teamNameSnapshot              String
+  truckTypeSnapshot             TruckType
+  dispatchFeePercentageSnapshot Decimal            @db.Decimal(5, 2)
+  origin                        String?
+  destination                   String?
+  totalMiles                    Decimal?           @db.Decimal(10, 2)
+  loadAmount                    Decimal?           @db.Decimal(12, 2)
+  ratePerMile                   Decimal?           @db.Decimal(10, 4)
+  dispatchFee                   Decimal?           @db.Decimal(12, 2)
+  reason                        String?
+  notes                         String?
+  createdAt                     DateTime           @default(now())
+  updatedAt                     DateTime           @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  carrier      Carrier      @relation(fields: [carrierId], references: [id], onDelete: Restrict)
+  dispatcher   Dispatcher   @relation(fields: [dispatcherId], references: [id], onDelete: Restrict)
+  team         Team         @relation(fields: [teamId], references: [id], onDelete: Restrict)
+
+  @@unique([carrierId, activityDate])
+  @@index([organizationId, activityDate])
+  @@index([dispatcherId, activityDate])
+  @@index([teamId, activityDate])
+  @@index([status])
+}
+
+model DailySubmission {
+  id             String   @id @default(cuid())
+  organizationId String
+  dispatcherId   String
+  teamId         String
+  submissionDate DateTime @db.Date
+  submittedAt    DateTime @default(now())
+  carrierCount   Int      @default(0)
+  activityCount  Int      @default(0)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  dispatcher   Dispatcher   @relation(fields: [dispatcherId], references: [id], onDelete: Cascade)
+  team         Team         @relation(fields: [teamId], references: [id], onDelete: Restrict)
+
+  @@unique([dispatcherId, submissionDate])
+  @@index([organizationId, submissionDate])
+  @@index([teamId, submissionDate])
+}
+
+model StatusReason {
+  id             String   @id @default(cuid())
+  organizationId String
+  label          String
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, label])
+  @@index([organizationId, isActive])
+}
+
+model OrganizationSettings {
+  id                        String      @id @default(cuid())
+  organizationId            String      @unique
+  dispatchFeeMethod         String      @default("percentage")
+  defaultDispatchFeePercent Decimal     @default(12) @db.Decimal(5, 2)
+  minimumDispatchFee        Decimal     @default(0) @db.Decimal(12, 2)
+  roundToNearestDollar      Boolean     @default(true)
+  allowedTruckTypes         TruckType[]
+  timezone                  String      @default("America/Chicago")
+  csvIncludeHeaders         Boolean     @default(true)
+  csvDateFormat             String      @default("yyyy-MM-dd")
+  csvMaxRows                Int         @default(10000)
+  csvFileNamePrefix         String      @default("dpp-report")
+  createdAt                 DateTime    @default(now())
+  updatedAt                 DateTime    @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model RegistrationRequest {
+  id                String                    @id @default(cuid())
+  organizationId    String
+  fullName          String
+  email             String
+  phoneNumber       String
+  requestedRole     UserRole                  @default(DISPATCHER)
+  preferredTeamId   String?
+  preferredTeamName String?
+  notes             String?
+  status            RegistrationRequestStatus @default(PENDING)
+  submittedAt       DateTime                  @default(now())
+  reviewedAt        DateTime?
+  reviewedByUserId  String?
+  rejectionReason   String?
+  assignedTeamId    String?
+  assignedRole      UserRole?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reviewedBy   User?        @relation("ReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status, submittedAt])
+  @@index([email])
+}
+
+model AuditLog {
+  id             String      @id @default(cuid())
+  organizationId String
+  actorUserId    String?
+  action         AuditAction
+  entityType     String
+  entityId       String?
+  metadata       Json?
+  createdAt      DateTime    @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor        User?        @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([entityType, entityId])
+}
+
+model ReportExport {
+  id             String             @id @default(cuid())
+  organizationId String
+  requestedById  String
+  reportType     String
+  period         String
+  filters        Json               @default("{}")
+  status         ReportExportStatus @default(PENDING)
+  fileName       String?
+  rowCount       Int?
+  errorMessage   String?
+  createdAt      DateTime           @default(now())
+  completedAt    DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  requestedBy  User         @relation(fields: [requestedById], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, createdAt])
+}

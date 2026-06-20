@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 
-import { useMockSession } from "@/components/auth/mock-session-provider";
+import { useSession } from "@/components/auth/session-provider";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -22,10 +22,10 @@ export function LogoutButton({
   showLoggedOutNotice = true,
 }: LogoutButtonProps) {
   const router = useRouter();
-  const { signOut } = useMockSession();
+  const { signOut } = useSession();
 
-  const handleLogout = () => {
-    signOut();
+  const handleLogout = async () => {
+    await signOut();
     const target = showLoggedOutNotice
       ? `${redirectTo}${redirectTo.includes("?") ? "&" : "?"}loggedOut=1`
       : redirectTo;
@@ -38,7 +38,7 @@ export function LogoutButton({
       variant={variant}
       size={size}
       className={cn(className)}
-      onClick={handleLogout}
+      onClick={() => void handleLogout()}
     >
       Sign out
     </Button>

@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { mockDispatchers, mockTeams } from "@/lib/mock-data";
+import { useEntityOptions } from "@/hooks/use-entity-options";
 import {
   carrierReassignSchema,
   type CarrierReassignValues,
@@ -29,6 +29,7 @@ export function CarrierReassignForm({
   defaultValues,
   onSubmit,
 }: CarrierReassignFormProps) {
+  const { teams, dispatchers } = useEntityOptions();
   const {
     handleSubmit,
     reset,
@@ -45,10 +46,10 @@ export function CarrierReassignForm({
 
   const teamDispatchers = useMemo(
     () =>
-      mockDispatchers.filter(
+      dispatchers.filter(
         (dispatcher) => dispatcher.teamName === assignedTeam,
       ),
-    [assignedTeam],
+    [assignedTeam, dispatchers],
   );
 
   useEffect(() => {
@@ -90,7 +91,7 @@ export function CarrierReassignForm({
             <SelectValue placeholder="Select team" />
           </SelectTrigger>
           <SelectContent>
-            {mockTeams.map((team) => (
+            {teams.map((team) => (
               <SelectItem key={team.id} value={team.name}>
                 {team.name}
               </SelectItem>
