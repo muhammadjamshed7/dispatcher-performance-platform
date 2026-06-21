@@ -17,6 +17,9 @@ function createPgPool(connectionString: string): pg.Pool {
   return new pg.Pool({
     connectionString: url.toString(),
     ssl: { rejectUnauthorized: false },
+    max: process.env.VERCEL ? 1 : 10,
+    idleTimeoutMillis: 20_000,
+    connectionTimeoutMillis: 10_000,
   });
 }
 
@@ -24,18 +27,12 @@ function createPrismaClient(): PrismaClient {
   const { DATABASE_URL } = getServerEnv();
   const pool = globalForPrisma.pgPool ?? createPgPool(DATABASE_URL);
   const adapter = new PrismaPg(pool);
-
-  if (process.env.NODE_ENV !== "production") {
-    globalForPrisma.pgPool = pool;
-  }
+  globalForPrisma.pgPool = pool;
 
   return new PrismaClient({ adapter });
 }
 
 export const db = globalForPrisma.prisma ?? createPrismaClient();
-
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = db;
-}
+globalForPrisma.prisma = db;
 
 export type DatabaseClient = typeof db;

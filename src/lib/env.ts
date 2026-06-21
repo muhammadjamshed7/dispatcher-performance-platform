@@ -1,7 +1,20 @@
 import { z } from "zod";
 
+import { ConfigurationError } from "@/lib/errors/configuration-error";
+
 const emptyToUndefined = (value: unknown) =>
   value === "" || value === undefined ? undefined : value;
+
+function isProductionRuntime() {
+  return process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
+}
+
+function resolveSupabaseAnonKey(): string | undefined {
+  return (
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  );
+}
 
 export const publicEnvSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.preprocess(
@@ -22,25 +35,31 @@ export const publicEnvSchema = z.object({
 export type PublicEnv = z.infer<typeof publicEnvSchema>;
 
 export function getPublicEnv(): PublicEnv {
-  return publicEnvSchema.parse({
+  const env = publicEnvSchema.parse({
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     NEXT_PUBLIC_APP_NAME: process.env.NEXT_PUBLIC_APP_NAME,
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: resolveSupabaseAnonKey(),
   });
+
+  if (isProductionRuntime()) {
+    if (!env.NEXT_PUBLIC_SUPABASE_URL || !env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      throw new ConfigurationError(
+        "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY on your deployment.",
+      );
+    }
+  }
+
+  return env;
 }
 
 export const publicEnv = getPublicEnv();
 
+const localDatabaseUrl = "postgresql://localhost:5432/postgres";
+
 const serverEnvSchema = z.object({
-  DATABASE_URL: z.preprocess(
-    emptyToUndefined,
-    z.string().min(1).default("postgresql://localhost:5432/postgres"),
-  ),
-  DIRECT_URL: z.preprocess(
-    emptyToUndefined,
-    z.string().min(1).default("postgresql://localhost:5432/postgres"),
-  ),
+  DATABASE_URL: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
+  DIRECT_URL: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
   SUPABASE_SERVICE_ROLE_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
   SESSION_COOKIE_NAME: z.preprocess(
     emptyToUndefined,
@@ -83,7 +102,13 @@ const serverEnvSchema = z.object({
   ),
 });
 
-export type ServerEnv = z.infer<typeof serverEnvSchema>;
+export type ServerEnv = Omit<
+  z.infer<typeof serverEnvSchema>,
+  "DATABASE_URL" | "DIRECT_URL"
+> & {
+  DATABASE_URL: string;
+  DIRECT_URL: string;
+};
 
 function assertServerRuntime() {
   if (typeof window !== "undefined") {
@@ -96,7 +121,7 @@ function assertServerRuntime() {
 export function getServerEnv(): ServerEnv {
   assertServerRuntime();
 
-  return serverEnvSchema.parse({
+  const parsed = serverEnvSchema.parse({
     DATABASE_URL: process.env.DATABASE_URL,
     DIRECT_URL: process.env.DIRECT_URL,
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -116,4 +141,21 @@ export function getServerEnv(): ServerEnv {
     ENABLE_DEMO_DATA: process.env.ENABLE_DEMO_DATA,
     BOOTSTRAP_ADMIN_PASSWORD: process.env.BOOTSTRAP_ADMIN_PASSWORD,
   });
+
+  const databaseUrl = parsed.DATABASE_URL ?? parsed.DIRECT_URL;
+  const directUrl = parsed.DIRECT_URL ?? parsed.DATABASE_URL;
+
+  if (isProductionRuntime()) {
+    if (!databaseUrl) {
+      throw new ConfigurationError(
+        "Database is not configured. Set DATABASE_URL (Supabase pooler URL recommended) on your deployment.",
+      );
+    }
+  }
+
+  return {
+    ...parsed,
+    DATABASE_URL: databaseUrl ?? localDatabaseUrl,
+    DIRECT_URL: directUrl ?? localDatabaseUrl,
+  };
 }
