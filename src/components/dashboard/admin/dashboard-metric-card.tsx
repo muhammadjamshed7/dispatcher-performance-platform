@@ -12,6 +12,7 @@ type DashboardMetricCardProps = {
   iconBackground: string;
   icon: LucideIcon;
   sparklineData?: number[];
+  sparklineFormatter?: (value: number) => string;
   className?: string;
 };
 
@@ -24,6 +25,7 @@ export function DashboardMetricCard({
   iconBackground,
   icon: Icon,
   sparklineData = [],
+  sparklineFormatter,
   className,
 }: DashboardMetricCardProps) {
   const showSparkline = sparklineData.length > 0;
@@ -35,33 +37,40 @@ export function DashboardMetricCard({
         className,
       )}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-3">
-          <div
-            className="flex size-11 shrink-0 items-center justify-center rounded-xl"
-            style={{ backgroundColor: iconBackground, color: accent }}
-          >
-            <Icon className="size-5" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-[#64748B]">{label}</p>
-            <p className="mt-1 text-2xl font-semibold tracking-tight text-[#0F172A]">
-              {value}
-            </p>
-            <p className="mt-1 text-xs text-[#64748B]">{helper}</p>
-            {growth ? (
-              <p className="mt-2 text-xs font-medium text-[#22C55E]">{growth}</p>
-            ) : null}
-          </div>
+      <div className="flex items-start gap-3">
+        <div
+          className="flex size-11 shrink-0 items-center justify-center rounded-xl"
+          style={{ backgroundColor: iconBackground, color: accent }}
+        >
+          <Icon className="size-5" />
         </div>
-        {showSparkline ? (
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-[#64748B]">{label}</p>
+          <p className="mt-1 text-2xl font-semibold tracking-tight text-[#0F172A]">
+            {value}
+          </p>
+          <p className="mt-1 text-xs text-[#64748B]">{helper}</p>
+          {growth ? (
+            <p className="mt-2 text-xs font-medium text-[#22C55E]">{growth}</p>
+          ) : null}
+        </div>
+      </div>
+
+      {showSparkline ? (
+        <div className="mt-4 border-t border-[#F1F5F9] pt-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-[#94A3B8]">
+              Last 7 days
+            </p>
+          </div>
           <Sparkline
             data={sparklineData}
             color={accent}
-            className="h-9 w-[88px] shrink-0"
+            valueFormatter={sparklineFormatter}
+            className="h-14 w-full"
           />
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }

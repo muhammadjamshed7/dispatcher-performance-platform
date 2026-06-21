@@ -36,6 +36,38 @@ export function formatActivityDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+/** Last N days ending at dateTo, clamped to dateFrom (for dashboard trend charts). */
+export function buildTrendDateKeys(
+  dateFrom: string,
+  dateTo: string,
+  dayCount = 7,
+): string[] {
+  const start = parseActivityDate(dateFrom);
+  const end = parseActivityDate(dateTo);
+  const dayMs = 24 * 60 * 60 * 1000;
+  const windowStart = new Date(
+    Math.max(start.getTime(), end.getTime() - (dayCount - 1) * dayMs),
+  );
+  const keys: string[] = [];
+
+  for (
+    let cursor = windowStart.getTime();
+    cursor <= end.getTime();
+    cursor += dayMs
+  ) {
+    keys.push(formatActivityDate(new Date(cursor)));
+  }
+
+  return keys;
+}
+
+export function formatTrendDateLabel(dateKey: string): string {
+  return parseActivityDate(dateKey).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
 export async function assertFilterAccess(
   scope: AccessScope,
   filters: ActivityFilters,

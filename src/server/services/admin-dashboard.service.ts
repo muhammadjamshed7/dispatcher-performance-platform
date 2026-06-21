@@ -1,7 +1,12 @@
 import "server-only";
 
 import type { LoadActivityStatus } from "@/generated/prisma/client";
-import { DELIVERED } from "@/lib/constants/statuses";
+import {
+  CANCELLED,
+  DELIVERED,
+  NOT_BOOKED,
+  NOT_WORKING,
+} from "@/lib/constants/statuses";
 import { STATUSES } from "@/lib/constants/statuses";
 import { TRUCK_TYPES } from "@/lib/constants/truck-types";
 import { db } from "@/lib/db/prisma";
@@ -10,7 +15,9 @@ import type { AccessScope } from "@/server/auth/types";
 import {
   assertFilterAccess,
   buildActivityWhere,
+  buildTrendDateKeys,
   formatActivityDate,
+  formatTrendDateLabel,
   parseActivityDate,
   previousPeriodRange,
   resolveDashboardDateRange,
@@ -82,19 +89,136 @@ function computeGrowthPercent(current: number, previous: number): number | null 
   return Math.round(((current - previous) / previous) * 1000) / 10;
 }
 
-function buildSparkline(valuesByDate: Map<string, number>): number[] {
-  const values = [...valuesByDate.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([, value]) => value);
-
-  if (values.length === 0) {
-    return [];
-  }
-
-  return values.slice(-7);
+function buildSparkline(
+  valuesByDate: Map<string, number>,
+  dateKeys: string[],
+): number[] {
+  return dateKeys.map((key) => valuesByDate.get(key) ?? 0);
 }
 
-function summarizeActivities(activities: ActivityRecord[]) {
+function buildStatusTrend(activities: ActivityRecord[], dateKeys: string[]) {
+  const countsByDate = new Map<
+    string,
+    {
+      delivered: number;
+      cancelled: number;
+      booked: number;
+      notBooked: number;
+      bookedButCancelled: number;
+    }
+  >();
+
+  for (const dateKey of dateKeys) {
+    countsByDate.set(dateKey, {
+      delivered: 0,
+      cancelled: 0,
+      booked: 0,
+      notBooked: 0,
+      bookedButCancelled: 0,
+    });
+  }
+
+  for (const row of activities) {
+    const dateKey = formatActivityDate(row.activityDate);
+    const bucket = countsByDate.get(dateKey);
+    if (!bucket) continue;
+
+    switch (row.status) {
+      case DELIVERED:
+        bucket.delivered += 1;
+        break;
+      case CANCELLED:
+        bucket.cancelled += 1;
+        break;
+      case NOT_WORKING:
+        bucket.booked += 1;
+        break;
+      case NOT_BOOKED:
+        bucket.notBooked += 1;
+        break;
+      default:
+        break;
+    }
+  }
+
+  return dateKeys.map((dateKey) => {
+    const bucket = countsByDate.get(dateKey)!;
+
+    return {
+      date: formatTrendDateLabel(dateKey),
+      ...bucket,
+    };
+  });
+}
+
+const MONTH_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
+
+function buildMonthlyGrowthTrend(activities: ActivityRecord[]) {
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const currentMonth = now.getUTCMonth();
+  const revenueByMonth = new Map<number, number>();
+
+  for (let month = -1; month <= currentMonth; month += 1) {
+    revenueByMonth.set(month, 0);
+  }
+
+  for (const row of activities) {
+    if (row.status !== DELIVERED) {
+      continue;
+    }
+
+    const activityYear = row.activityDate.getUTCFullYear();
+    const activityMonth = row.activityDate.getUTCMonth();
+    const amount = decimalToNumber(row.loadAmount);
+
+    if (activityYear === year && activityMonth <= currentMonth) {
+      revenueByMonth.set(
+        activityMonth,
+        (revenueByMonth.get(activityMonth) ?? 0) + amount,
+      );
+      continue;
+    }
+
+    if (activityYear === year - 1 && activityMonth === 11) {
+      revenueByMonth.set(-1, (revenueByMonth.get(-1) ?? 0) + amount);
+    }
+  }
+
+  return Array.from({ length: currentMonth + 1 }, (_, month) => {
+    const revenue = revenueByMonth.get(month) ?? 0;
+    const previousRevenue =
+      month === 0 ? (revenueByMonth.get(-1) ?? 0) : (revenueByMonth.get(month - 1) ?? 0);
+    const growth =
+      revenue === 0 && previousRevenue === 0
+        ? 0
+        : (computeGrowthPercent(revenue, previousRevenue) ?? 0);
+
+    return {
+      month: MONTH_LABELS[month]!,
+      growth,
+      revenue: Math.round(revenue * 100) / 100,
+    };
+  });
+}
+
+function summarizeActivities(
+  activities: ActivityRecord[],
+  trendDateKeys: string[],
+) {
   const delivered = activities.filter((row) => row.status === DELIVERED);
   const totalRevenue = delivered.reduce(
     (sum, row) => sum + decimalToNumber(row.loadAmount),
@@ -208,10 +332,11 @@ function summarizeActivities(activities: ActivityRecord[]) {
       amount: decimalToNumber(row.loadAmount),
     })),
     sparklines: {
-      revenue: buildSparkline(revenueByDate),
-      loads: buildSparkline(loadsByDate),
-      delivered: buildSparkline(deliveredByDate),
+      revenue: buildSparkline(revenueByDate, trendDateKeys),
+      loads: buildSparkline(loadsByDate, trendDateKeys),
+      delivered: buildSparkline(deliveredByDate, trendDateKeys),
     },
+    statusTrend: buildStatusTrend(activities, trendDateKeys),
   };
 }
 
@@ -238,13 +363,18 @@ async function fetchActivities(
   });
 }
 
-async function fetchActiveDispatchers(scope: AccessScope): Promise<number> {
+async function fetchActiveDispatchers(
+  scope: AccessScope,
+  filters: ActivityFilters,
+): Promise<number> {
   return db.dispatcher.count({
     where: {
       organizationId: scope.organizationId,
       status: "ACTIVE",
       deletedAt: null,
       ...dispatcherScopeFilter(scope),
+      ...(filters.teamId ? { teamId: filters.teamId } : {}),
+      ...(filters.dispatcherId ? { id: filters.dispatcherId } : {}),
     },
   });
 }
@@ -282,7 +412,7 @@ async function fetchFilterOptions(scope: AccessScope) {
         status: "ACTIVE",
         ...carrierScopeFilter(scope),
       },
-      select: { id: true, carrierName: true },
+      select: { id: true, carrierName: true, teamId: true, dispatcherId: true },
       orderBy: { carrierName: "asc" },
     }),
   ]);
@@ -297,6 +427,8 @@ async function fetchFilterOptions(scope: AccessScope) {
     carriers: carriers.map((carrier) => ({
       id: carrier.id,
       name: carrier.carrierName,
+      teamId: carrier.teamId,
+      dispatcherId: carrier.dispatcherId,
     })),
     truckTypes: TRUCK_TYPES.map((type) => ({
       value: type,
@@ -323,8 +455,15 @@ export async function getAdminDashboardBundle(
   };
 
   const previousRange = previousPeriodRange(range.dateFrom, range.dateTo);
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const yearTrendFrom = formatActivityDate(new Date(Date.UTC(year - 1, 11, 1)));
+  const yearTrendTo = formatActivityDate(now);
 
-  const [currentActivities, previousActivities, activeDispatchers, filterOptions] =
+  const trendDateKeys = buildTrendDateKeys(range.dateFrom, range.dateTo);
+  const trendDates = trendDateKeys.map(formatTrendDateLabel);
+
+  const [currentActivities, previousActivities, yearTrendActivities, activeDispatchers, filterOptions] =
     await Promise.all([
       fetchActivities(scope, filters),
       fetchActivities(scope, {
@@ -332,12 +471,17 @@ export async function getAdminDashboardBundle(
         dateFrom: previousRange.dateFrom,
         dateTo: previousRange.dateTo,
       }),
-      fetchActiveDispatchers(scope),
+      fetchActivities(scope, {
+        ...rawFilters,
+        dateFrom: yearTrendFrom,
+        dateTo: yearTrendTo,
+      }),
+      fetchActiveDispatchers(scope, rawFilters),
       fetchFilterOptions(scope),
     ]);
 
-  const current = summarizeActivities(currentActivities);
-  const previous = summarizeActivities(previousActivities);
+  const current = summarizeActivities(currentActivities, trendDateKeys);
+  const previous = summarizeActivities(previousActivities, trendDateKeys);
 
   const monthlyGrowth = computeGrowthPercent(
     current.totalRevenue,
@@ -373,6 +517,9 @@ export async function getAdminDashboardBundle(
         monthlyGrowth,
       },
       sparklines: current.sparklines,
+      statusTrend: current.statusTrend,
+      trendDates,
+      monthlyGrowthTrend: buildMonthlyGrowthTrend(yearTrendActivities),
     },
     revenueTrend: current.revenueTrend,
     loadsByTeam: current.loadsByTeam,

@@ -107,6 +107,21 @@ export type AdminDashboardGrowth = {
   monthlyGrowth: number | null;
 };
 
+export type AdminDashboardMonthlyGrowthPoint = {
+  month: string;
+  growth: number;
+  revenue: number;
+};
+
+export type AdminDashboardStatusTrendPoint = {
+  date: string;
+  delivered: number;
+  cancelled: number;
+  booked: number;
+  notBooked: number;
+  bookedButCancelled: number;
+};
+
 export type AdminDashboardMetrics = {
   totalRevenue: number;
   totalLoads: number;
@@ -120,6 +135,9 @@ export type AdminDashboardMetrics = {
     loads: number[];
     delivered: number[];
   };
+  statusTrend: AdminDashboardStatusTrendPoint[];
+  trendDates: string[];
+  monthlyGrowthTrend: AdminDashboardMonthlyGrowthPoint[];
 };
 
 export type AdminDashboardBundle = {
@@ -163,7 +181,7 @@ export type AdminDashboardBundle = {
   filterOptions: {
     teams: { id: string; name: string }[];
     dispatchers: { id: string; name: string; teamId: string }[];
-    carriers: { id: string; name: string }[];
+    carriers: { id: string; name: string; teamId: string; dispatcherId: string | null }[];
     truckTypes: { value: string; label: string }[];
     statuses: { value: string; label: string }[];
   };

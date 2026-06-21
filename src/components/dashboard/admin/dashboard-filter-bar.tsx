@@ -119,6 +119,21 @@ export function DashboardFilterBar({
           (dispatcher) => dispatcher.teamId === values.teamId,
         );
 
+  const filteredCarriers = filterOptions.carriers.filter((carrier) => {
+    if (values.teamId !== FILTER_ALL && carrier.teamId !== values.teamId) {
+      return false;
+    }
+
+    if (
+      values.dispatcherId !== FILTER_ALL &&
+      carrier.dispatcherId !== values.dispatcherId
+    ) {
+      return false;
+    }
+
+    return true;
+  });
+
   function patch(next: Partial<DashboardFilterValues>) {
     const merged = { ...values, ...next };
 
@@ -136,6 +151,28 @@ export function DashboardFilterBar({
       ) {
         merged.dispatcherId = FILTER_ALL;
       }
+    }
+
+    const visibleCarriers = filterOptions.carriers.filter((carrier) => {
+      if (merged.teamId !== FILTER_ALL && carrier.teamId !== merged.teamId) {
+        return false;
+      }
+
+      if (
+        merged.dispatcherId !== FILTER_ALL &&
+        carrier.dispatcherId !== merged.dispatcherId
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+
+    if (
+      merged.carrierId !== FILTER_ALL &&
+      !visibleCarriers.some((carrier) => carrier.id === merged.carrierId)
+    ) {
+      merged.carrierId = FILTER_ALL;
     }
 
     onChange(merged);
@@ -200,7 +237,7 @@ export function DashboardFilterBar({
           }}
         >
           <SelectItem value={FILTER_ALL}>All Carriers</SelectItem>
-          {filterOptions.carriers.map((carrier) => (
+          {filteredCarriers.map((carrier) => (
             <SelectItem key={carrier.id} value={carrier.id}>
               {carrier.name}
             </SelectItem>
