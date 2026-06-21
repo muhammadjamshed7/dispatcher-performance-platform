@@ -72,8 +72,28 @@ export function jsonError(error: unknown) {
     );
   }
 
+  if (error instanceof Error && error.message.includes("query_compiler")) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          "Prisma runtime files are missing on the server. Redeploy after updating next.config.ts outputFileTracingIncludes.",
+      },
+      { status: 503 },
+    );
+  }
+
   console.error(error);
-  return NextResponse.json({ ok: false, error: "Internal server error." }, { status: 500 });
+  return NextResponse.json(
+    {
+      ok: false,
+      error: "Internal server error.",
+      ...(error instanceof Error
+        ? { debug: { name: error.name, message: error.message } }
+        : {}),
+    },
+    { status: 500 },
+  );
 }
 
 export async function handleApi<T>(handler: () => Promise<T>) {

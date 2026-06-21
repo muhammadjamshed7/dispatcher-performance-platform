@@ -1,6 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Prisma client is generated into gitignored `src/generated/prisma` during build.
+  // Next.js file tracing skips gitignored files unless we include them explicitly.
+  outputFileTracingIncludes: {
+    "/*": ["./src/generated/prisma/**/*"],
+    "/api/**/*": ["./src/generated/prisma/**/*"],
+  },
   async redirects() {
     return [
       { source: "/dashboard/admin", destination: "/admin/dashboard", permanent: false },

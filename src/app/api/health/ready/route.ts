@@ -1,10 +1,28 @@
 import { NextResponse } from "next/server";
+import pg from "pg";
 
-import { jsonError } from "@/server/api/response";
+export const runtime = "nodejs";
 
 function envFlag(name: string): boolean {
   const value = process.env[name];
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function formatError(error: unknown) {
+  if (error instanceof AggregateError) {
+    return {
+      message: error.message,
+      details: error.errors.map((nested) =>
+        nested instanceof Error ? nested.message : String(nested),
+      ),
+    };
+  }
+
+  if (error instanceof Error) {
+    return { message: error.message, name: error.name };
+  }
+
+  return { message: String(error) };
 }
 
 export async function GET() {
@@ -35,18 +53,59 @@ export async function GET() {
     );
   }
 
+  const connectionString =
+    process.env.DATABASE_URL?.trim() || process.env.DIRECT_URL?.trim();
+
+  if (!connectionString) {
+    return NextResponse.json(
+      {
+        ok: false,
+        status: "not_ready",
+        error: "DATABASE_URL is empty.",
+        checks,
+      },
+      { status: 503 },
+    );
+  }
+
+  let pool: pg.Pool | undefined;
+
   try {
-    const { db } = await import("@/lib/db/prisma");
-    await db.$queryRaw`SELECT 1`;
+    const url = new URL(connectionString);
+    url.searchParams.delete("sslmode");
+
+    pool = new pg.Pool({
+      connectionString: url.toString(),
+      ssl: { rejectUnauthorized: false },
+      max: 1,
+      connectionTimeoutMillis: 10_000,
+    });
+
+    const result = await pool.query("SELECT 1 AS ok");
 
     return NextResponse.json({
       ok: true,
       status: "ready",
       checks,
       database: true,
-      supabase: true,
+      query: result.rows[0],
     });
   } catch (error) {
-    return jsonError(error);
+    const formatted = formatError(error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        status: "not_ready",
+        error: formatted.message,
+        details: formatted.details,
+        checks,
+        hint:
+          "Copy DATABASE_URL from your local .env into Vercel (no quotes). Use the Supabase pooler URL (port 6543) if direct connection fails.",
+      },
+      { status: 503 },
+    );
+  } finally {
+    await pool?.end().catch(() => undefined);
   }
 }
