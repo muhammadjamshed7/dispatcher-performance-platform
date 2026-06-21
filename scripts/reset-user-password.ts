@@ -17,7 +17,7 @@ async function main() {
 
   if (!email) {
     throw new Error(
-      "Usage: npm run reset-password -- <email> <new-password>\nExample: npm run reset-password -- jamshedmsd589@gmail.com 12345678",
+      "Usage: npm run reset-password -- <email> <new-password>\nExample: npm run reset-password -- user@example.com your-new-password",
     );
   }
 

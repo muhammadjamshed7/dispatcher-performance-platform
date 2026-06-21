@@ -1,3 +1,6 @@
 import "dotenv/config";
 
-console.log("create-admin-user: use INITIAL_ADMIN_EMAILS with scripts/bootstrap.ts");
+console.log(
+  "Create the user in Supabase Dashboard → Authentication, then run:\n" +
+    "  npm run sync-auth-user -- <email> ADMIN [fullName]",
+);

@@ -1,3 +1,3 @@
 import "dotenv/config";
 
-console.log("seed-demo-data: use ENABLE_DEMO_DATA=true with scripts/bootstrap.ts or extend this script.");
+console.log("seed-demo-data: extend scripts/seed-demo-data.ts when demo fixtures are needed.");

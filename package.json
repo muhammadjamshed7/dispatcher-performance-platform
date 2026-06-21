@@ -17,6 +17,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "bootstrap": "tsx scripts/bootstrap.ts",
+    "sync-auth-user": "tsx scripts/sync-auth-user.ts",
     "reset-password": "tsx scripts/reset-user-password.ts",
     "seed:demo": "tsx scripts/seed-demo-data.ts"
   },

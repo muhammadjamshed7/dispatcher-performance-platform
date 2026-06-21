@@ -1,17 +1,14 @@
--- Supabase SQL Editor: reset Auth password (cannot READ existing password — only set a new one)
--- Passwords are bcrypt hashes; plaintext is never stored.
---
--- Replace email/password below, then run in: Supabase Dashboard → SQL Editor
+-- Supabase SQL Editor: set a new Auth password (optional — prefer Supabase Dashboard → Authentication → Users)
+-- Replace YOUR_EMAIL and YOUR_NEW_PASSWORD below.
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 UPDATE auth.users
 SET
-  encrypted_password = crypt('12345678', gen_salt('bf')),
+  encrypted_password = crypt('YOUR_NEW_PASSWORD', gen_salt('bf')),
   updated_at = now()
-WHERE email = 'jamshedmsd589@gmail.com';
+WHERE email = 'YOUR_EMAIL';
 
--- Verify the user row exists (password column will show a hash, not plain text)
 SELECT id, email, updated_at, last_sign_in_at
 FROM auth.users
-WHERE email = 'jamshedmsd589@gmail.com';
+WHERE email = 'YOUR_EMAIL';
