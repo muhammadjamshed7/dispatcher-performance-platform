@@ -143,7 +143,7 @@ export function DashboardFilterBar({
 
   return (
     <div className="rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-7">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
         <DashboardFilterSelect
           label="Date Range"
           value={values.dateRange}
@@ -239,11 +239,11 @@ export function DashboardFilterBar({
           ))}
         </DashboardFilterSelect>
 
-        <div className="flex items-end">
+        <div className="flex items-end sm:col-span-2 lg:col-span-1">
           <Button
             type="button"
             variant="outline"
-            className="h-11 w-full rounded-[10px] border-[#E2E8F0] bg-white text-[#334155] hover:bg-[#F8FAFC]"
+            className="h-11 w-full max-w-none rounded-[10px] border-[#E2E8F0] bg-white text-[#334155] hover:bg-[#F8FAFC] sm:w-auto sm:min-w-[160px]"
             onClick={onReset}
           >
             <Filter className="size-4" />
