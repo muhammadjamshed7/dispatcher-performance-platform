@@ -92,6 +92,10 @@ export async function GET() {
     });
   } catch (error) {
     const formatted = formatError(error);
+    const isDirectSupabaseHost =
+      connectionString.includes("db.") &&
+      connectionString.includes(".supabase.co:5432");
+    const isEnoNotFound = formatted.message.toLowerCase().includes("enotfound");
 
     return NextResponse.json(
       {
@@ -101,7 +105,9 @@ export async function GET() {
         details: formatted.details,
         checks,
         hint:
-          "Copy DATABASE_URL from your local .env into Vercel (no quotes). Use the Supabase pooler URL (port 6543) if direct connection fails.",
+          isDirectSupabaseHost && isEnoNotFound
+            ? "Vercel cannot use the direct Supabase URL (IPv6 only). In Supabase Dashboard → Connect → copy the Transaction pooler URI (port 6543) into Vercel DATABASE_URL, then redeploy."
+            : "Copy DATABASE_URL from Supabase Dashboard → Connect → Transaction pooler (port 6543). Do not use the direct db.*.supabase.co URL on Vercel.",
       },
       { status: 503 },
     );
