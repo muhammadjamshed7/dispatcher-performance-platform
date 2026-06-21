@@ -7,6 +7,10 @@ import { ValidationError } from "@/lib/errors/validation-error";
 import { UnauthorizedError } from "@/server/auth/require-auth";
 
 function isDatabaseConnectionError(error: unknown): boolean {
+  if (error instanceof AggregateError) {
+    return error.errors.some((nested) => isDatabaseConnectionError(nested));
+  }
+
   if (!(error instanceof Error)) {
     return false;
   }
@@ -18,10 +22,13 @@ function isDatabaseConnectionError(error: unknown): boolean {
     code === "ECONNREFUSED" ||
     code === "ENOTFOUND" ||
     code === "ETIMEDOUT" ||
+    code === "ECONNRESET" ||
     message.includes("connect econnrefused") ||
     message.includes("connection terminated") ||
     message.includes("password authentication failed") ||
-    message.includes("getaddrinfo")
+    message.includes("getaddrinfo") ||
+    message.includes("self-signed certificate") ||
+    message.includes("timeout expired")
   );
 }
 

@@ -3,6 +3,7 @@ import "server-only";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
 import { PrismaClient } from "@/generated/prisma/client";
+import { ConfigurationError } from "@/lib/errors/configuration-error";
 import { getServerEnv } from "@/lib/env";
 
 const globalForPrisma = globalThis as unknown as {
@@ -11,11 +12,20 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 function createPgPool(connectionString: string): pg.Pool {
-  const url = new URL(connectionString);
-  url.searchParams.delete("sslmode");
+  let normalizedConnectionString: string;
+
+  try {
+    const url = new URL(connectionString);
+    url.searchParams.delete("sslmode");
+    normalizedConnectionString = url.toString();
+  } catch {
+    throw new ConfigurationError(
+      "DATABASE_URL is not a valid PostgreSQL connection string.",
+    );
+  }
 
   return new pg.Pool({
-    connectionString: url.toString(),
+    connectionString: normalizedConnectionString,
     ssl: { rejectUnauthorized: false },
     max: process.env.VERCEL ? 1 : 10,
     idleTimeoutMillis: 20_000,
@@ -32,7 +42,25 @@ function createPrismaClient(): PrismaClient {
   return new PrismaClient({ adapter });
 }
 
-export const db = globalForPrisma.prisma ?? createPrismaClient();
-globalForPrisma.prisma = db;
+function getPrismaClient(): PrismaClient {
+  if (!globalForPrisma.prisma) {
+    globalForPrisma.prisma = createPrismaClient();
+  }
+
+  return globalForPrisma.prisma;
+}
+
+export const db = new Proxy({} as PrismaClient, {
+  get(_target, property) {
+    const client = getPrismaClient();
+    const value = Reflect.get(client, property, client) as unknown;
+
+    if (typeof value === "function") {
+      return value.bind(client);
+    }
+
+    return value;
+  },
+}) as PrismaClient;
 
 export type DatabaseClient = typeof db;
