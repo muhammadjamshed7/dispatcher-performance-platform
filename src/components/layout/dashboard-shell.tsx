@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useState, type ReactNode } from "react";
 
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { MainContent } from "@/components/layout/main-content";
@@ -9,11 +11,16 @@ type DashboardShellProps = {
 };
 
 export function DashboardShell({ children }: DashboardShellProps) {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
   return (
-    <div className="flex min-h-screen bg-background">
-      <AppSidebar />
+    <div className="flex min-h-screen bg-[#F8FAFC]">
+      <AppSidebar
+        mobileOpen={mobileNavOpen}
+        onMobileClose={() => setMobileNavOpen(false)}
+      />
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopNav />
+        <TopNav onMenuClick={() => setMobileNavOpen(true)} />
         <MainContent>{children}</MainContent>
       </div>
     </div>

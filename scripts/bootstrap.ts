@@ -3,7 +3,6 @@ import "dotenv/config";
 import {
   PrismaClient,
   type TruckType,
-  type UserRole,
 } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";

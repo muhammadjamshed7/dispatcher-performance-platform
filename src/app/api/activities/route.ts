@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { STATUSES } from "@/lib/constants/statuses";
+import { TRUCK_TYPES } from "@/lib/constants/truck-types";
 import { parseJsonBody, parseSearchParams } from "@/server/api/request";
 import { handleApi } from "@/server/api/response";
 import { requireAccessScope } from "@/server/auth/require-auth";
@@ -16,6 +17,7 @@ const activityFiltersSchema = z.object({
   teamId: z.string().optional(),
   dispatcherId: z.string().optional(),
   carrierId: z.string().optional(),
+  truckType: z.enum(TRUCK_TYPES).optional(),
 });
 
 const createActivityBodySchema = z.object({

@@ -1,6 +1,7 @@
 import { apiFetch } from "@/lib/api/client";
 import type { SessionUser } from "@/lib/auth/session-types";
 import type {
+  AdminDashboardBundle,
   AppSettings,
   Carrier,
   DailyActivity,
@@ -142,8 +143,9 @@ export function updateActivityRequest(id: string, input: Record<string, unknown>
   });
 }
 
-export function fetchAdminDashboard() {
-  return apiFetch<DashboardMetric>("/api/dashboard/admin");
+export function fetchAdminDashboard(params?: Record<string, string>) {
+  const query = params ? `?${new URLSearchParams(params).toString()}` : "";
+  return apiFetch<AdminDashboardBundle>(`/api/dashboard/admin${query}`);
 }
 
 export function fetchTeamLeadDashboard() {

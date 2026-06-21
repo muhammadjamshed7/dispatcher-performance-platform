@@ -98,6 +98,77 @@ export type DashboardMetric = {
   activeDispatchers: number;
 };
 
+export type AdminDashboardGrowth = {
+  revenue: number | null;
+  loads: number | null;
+  delivered: number | null;
+  dispatchers: number | null;
+  onTimeRate: number | null;
+  monthlyGrowth: number | null;
+};
+
+export type AdminDashboardMetrics = {
+  totalRevenue: number;
+  totalLoads: number;
+  deliveredLoads: number;
+  activeDispatchers: number;
+  onTimeRate: number;
+  monthlyGrowth: number;
+  growth: AdminDashboardGrowth;
+  sparklines: {
+    revenue: number[];
+    loads: number[];
+    delivered: number[];
+  };
+};
+
+export type AdminDashboardBundle = {
+  filters: {
+    dateFrom: string;
+    dateTo: string;
+    teamId: string | null;
+    dispatcherId: string | null;
+    carrierId: string | null;
+    truckType: string | null;
+    status: string | null;
+  };
+  metrics: AdminDashboardMetrics;
+  revenueTrend: { date: string; revenue: number }[];
+  loadsByTeam: { team: string; loads: number }[];
+  statusBreakdown: {
+    name: string;
+    value: number;
+    percent: string;
+    color: string;
+  }[];
+  topPerformers: {
+    rank: number;
+    name: string;
+    initials: string;
+    team: string;
+    revenue: number;
+  }[];
+  recentActivities: {
+    id: string;
+    dateTime: string;
+    dispatcher: string;
+    initials: string;
+    carrier: string;
+    loadId: string;
+    route: string;
+    truckType: string;
+    status: string;
+    amount: number;
+  }[];
+  filterOptions: {
+    teams: { id: string; name: string }[];
+    dispatchers: { id: string; name: string; teamId: string }[];
+    carriers: { id: string; name: string }[];
+    truckTypes: { value: string; label: string }[];
+    statuses: { value: string; label: string }[];
+  };
+};
+
 export type DispatcherRanking = {
   rank: number;
   name: string;

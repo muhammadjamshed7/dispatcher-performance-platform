@@ -1,7 +1,7 @@
 import "server-only";
 
 import { z } from "zod";
-import type { LoadActivityStatus, Prisma } from "@/generated/prisma/client";
+import type { LoadActivityStatus } from "@/generated/prisma/client";
 import { ForbiddenError } from "@/lib/errors/forbidden-error";
 import { NotFoundError } from "@/lib/errors/not-found-error";
 import { ValidationError } from "@/lib/errors/validation-error";
@@ -20,16 +20,14 @@ import { calculateRatePerMile } from "@/lib/utils/calculate-rate-per-mile";
 import type { AccessScope, AuthContextUser } from "@/server/auth/types";
 import { mapDailyActivity } from "@/server/mappers";
 import { writeAuditLog } from "@/server/services/audit.service";
+import {
+  activityFiltersSchema,
+  assertFilterAccess,
+  buildActivityWhere,
+  parseActivityDate,
+  type ActivityFilters,
+} from "@/server/utils/activity-filters";
 import { activityScopeFilter } from "@/server/utils/scope-filters";
-
-const activityFiltersSchema = z.object({
-  dateFrom: z.string().optional(),
-  dateTo: z.string().optional(),
-  status: z.enum(STATUSES).optional(),
-  teamId: z.string().optional(),
-  dispatcherId: z.string().optional(),
-  carrierId: z.string().optional(),
-});
 
 const activityPayloadSchema = z.object({
   status: z.enum(STATUSES, { message: "Status is required" }),
@@ -113,73 +111,8 @@ const updateActivityInputSchema = activityPayloadSchema
 const validatedActivityPayloadSchema =
   activityPayloadSchema.superRefine(refineActivityPayload);
 
-type ActivityFilters = z.infer<typeof activityFiltersSchema>;
 type CreateActivityInput = z.infer<typeof createActivityInputSchema>;
 type UpdateActivityInput = z.infer<typeof updateActivityInputSchema>;
-
-function parseActivityDate(dateStr: string): Date {
-  const [year, month, day] = dateStr.split("-").map(Number);
-
-  if (!year || !month || !day) {
-    throw new ValidationError("Invalid activity date.");
-  }
-
-  return new Date(Date.UTC(year, month - 1, day));
-}
-
-function assertFilterAccess(scope: AccessScope, filters: ActivityFilters): void {
-  if (filters.teamId && !scope.isCompanyWide && scope.teamId !== filters.teamId) {
-    throw new ForbiddenError("You cannot filter by another team.");
-  }
-
-  if (
-    filters.dispatcherId &&
-    scope.role === "DISPATCHER" &&
-    scope.dispatcherId !== filters.dispatcherId
-  ) {
-    throw new ForbiddenError("You cannot filter by another dispatcher.");
-  }
-}
-
-function buildActivityWhere(
-  scope: AccessScope,
-  filters: ActivityFilters,
-): Prisma.DailyActivityWhereInput {
-  const where: Prisma.DailyActivityWhereInput = {
-    organizationId: scope.organizationId,
-    ...activityScopeFilter(scope),
-  };
-
-  if (filters.dateFrom || filters.dateTo) {
-    where.activityDate = {};
-
-    if (filters.dateFrom) {
-      where.activityDate.gte = parseActivityDate(filters.dateFrom);
-    }
-
-    if (filters.dateTo) {
-      where.activityDate.lte = parseActivityDate(filters.dateTo);
-    }
-  }
-
-  if (filters.status) {
-    where.status = filters.status;
-  }
-
-  if (filters.teamId) {
-    where.teamId = filters.teamId;
-  }
-
-  if (filters.dispatcherId) {
-    where.dispatcherId = filters.dispatcherId;
-  }
-
-  if (filters.carrierId) {
-    where.carrierId = filters.carrierId;
-  }
-
-  return where;
-}
 
 async function assertCarrierAccess(
   scope: AccessScope,
