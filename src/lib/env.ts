@@ -67,7 +67,7 @@ const serverEnvSchema = z.object({
   ),
   AUTH_REDIRECT_URL: z.preprocess(
     emptyToUndefined,
-    z.url().default("http://localhost:3000/dashboard"),
+    z.url().default("http://localhost:3000/"),
   ),
   APP_ENCRYPTION_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
   CSRF_SECRET: z.preprocess(emptyToUndefined, z.string().optional()),
@@ -137,6 +137,12 @@ export function getServerEnv(): ServerEnv {
     if (!databaseUrl) {
       throw new ConfigurationError(
         "Database is not configured. Set DATABASE_URL (Supabase pooler URL recommended) on your deployment.",
+      );
+    }
+
+    if (!parsed.SUPABASE_SERVICE_ROLE_KEY) {
+      throw new ConfigurationError(
+        "Supabase service role key is not configured. Set SUPABASE_SERVICE_ROLE_KEY on your deployment.",
       );
     }
   }

@@ -2,7 +2,6 @@ import "server-only";
 
 import { z } from "zod";
 import type { DailyActivity, LoadActivityStatus, Prisma } from "@/generated/prisma/client";
-import { ForbiddenError } from "@/lib/errors/forbidden-error";
 import { ValidationError } from "@/lib/errors/validation-error";
 import {
   CANCELLED,
@@ -11,6 +10,7 @@ import {
   NOT_WORKING,
   STATUSES,
 } from "@/lib/constants/statuses";
+import { TRUCK_TYPES } from "@/lib/constants/truck-types";
 import {
   CUSTOM,
   DAILY,
@@ -31,6 +31,7 @@ import type {
 import type { AccessScope, AuthContextUser } from "@/server/auth/types";
 import { mapDailyActivity } from "@/server/mappers";
 import { writeAuditLog } from "@/server/services/audit.service";
+import { assertFilterAccess } from "@/server/utils/activity-filters";
 import { activityScopeFilter } from "@/server/utils/scope-filters";
 
 const reportFiltersSchema = z.object({
@@ -40,6 +41,7 @@ const reportFiltersSchema = z.object({
   teamId: z.string().optional(),
   dispatcherId: z.string().optional(),
   carrierId: z.string().optional(),
+  truckType: z.enum(TRUCK_TYPES).optional(),
 });
 
 type ReportFilters = z.infer<typeof reportFiltersSchema>;
@@ -70,6 +72,13 @@ function resolveDateRange(
   period: ReportPeriod,
   filters: ReportFilters,
 ): { start: Date; end: Date } {
+  if (filters.dateFrom && filters.dateTo) {
+    return {
+      start: parseDate(filters.dateFrom),
+      end: parseDate(filters.dateTo),
+    };
+  }
+
   const today = startOfDay(new Date());
 
   switch (period) {
@@ -105,19 +114,6 @@ function resolveDateRange(
   }
 }
 
-function assertFilterAccess(scope: AccessScope, filters: ReportFilters): void {
-  if (filters.teamId && !scope.isCompanyWide && scope.teamId !== filters.teamId) {
-    throw new ForbiddenError("You cannot filter by another team.");
-  }
-
-  if (
-    filters.dispatcherId &&
-    scope.role === "DISPATCHER" &&
-    scope.dispatcherId !== filters.dispatcherId
-  ) {
-    throw new ForbiddenError("You cannot filter by another dispatcher.");
-  }
-}
 
 function buildActivityWhere(
   scope: AccessScope,
@@ -147,6 +143,10 @@ function buildActivityWhere(
 
   if (filters.carrierId) {
     where.carrierId = filters.carrierId;
+  }
+
+  if (filters.truckType) {
+    where.truckTypeSnapshot = filters.truckType;
   }
 
   return where;
@@ -369,7 +369,7 @@ async function loadReportActivities(
 ): Promise<DailyActivity[]> {
   const parsedPeriod = z.enum(REPORT_PERIODS).parse(period);
   const parsedFilters = reportFiltersSchema.parse(filters);
-  assertFilterAccess(scope, parsedFilters);
+  await assertFilterAccess(scope, parsedFilters);
 
   const range = resolveDateRange(parsedPeriod, parsedFilters);
 
@@ -390,7 +390,7 @@ export async function getReportBundle(
   const teamIds = [...new Set(activities.map((activity) => activity.teamId))];
   const teams = teamIds.length
     ? await db.team.findMany({
-        where: { id: { in: teamIds } },
+        where: { id: { in: teamIds }, organizationId: scope.organizationId },
         include: { teamLead: { select: { fullName: true } } },
       })
     : [];
@@ -400,7 +400,7 @@ export async function getReportBundle(
   );
 
   const mcNumbers = await db.carrier.findMany({
-    where: { id: { in: [...carrierIds] } },
+    where: { id: { in: [...carrierIds] }, organizationId: scope.organizationId },
     select: { id: true, mcNumber: true },
   });
   const mcByCarrierId = new Map<string, string>(

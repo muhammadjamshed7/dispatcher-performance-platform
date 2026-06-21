@@ -3,6 +3,7 @@ import { z } from "zod";
 import { parseJsonBody } from "@/server/api/request";
 import { handleApi } from "@/server/api/response";
 import { submitRegistrationRequest } from "@/server/auth/auth.service";
+import { assertRateLimit } from "@/server/utils/rate-limit";
 
 const registerBodySchema = z.object({
   fullName: z.string().trim().min(1),
@@ -15,7 +16,8 @@ const registerBodySchema = z.object({
 
 export async function POST(request: Request) {
   return handleApi(async () => {
+    assertRateLimit(request, "auth:register");
     const body = await parseJsonBody(request, registerBodySchema);
     return submitRegistrationRequest(body);
-  });
+  }, request);
 }

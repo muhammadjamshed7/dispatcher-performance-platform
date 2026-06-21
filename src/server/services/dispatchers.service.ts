@@ -8,6 +8,7 @@ import { ValidationError } from "@/lib/errors/validation-error";
 import { DISPATCHER, TEAM_LEAD } from "@/lib/constants/roles";
 import { TEAM_STATUSES } from "@/lib/constants/team-statuses";
 import { db } from "@/lib/db/prisma";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Dispatcher as DispatcherDto } from "@/lib/types";
 import type { AccessScope, AuthContextUser } from "@/server/auth/types";
 import { mapDispatcher } from "@/server/mappers";
@@ -29,6 +30,16 @@ const updateDispatcherInputSchema = createDispatcherInputSchema.partial();
 
 type CreateDispatcherInput = z.infer<typeof createDispatcherInputSchema>;
 type UpdateDispatcherInput = z.infer<typeof updateDispatcherInputSchema>;
+
+function generateTemporaryPassword(): string {
+  return `${crypto.randomUUID().replaceAll("-", "").slice(0, 10)}Aa1!`;
+}
+
+function assertRoleAssignment(scope: AccessScope, role: typeof DISPATCHER | typeof TEAM_LEAD): void {
+  if (role === TEAM_LEAD && !scope.isCompanyWide) {
+    throw new ForbiddenError("Only administrators can assign the team lead role.");
+  }
+}
 
 function requireAdminOrTeamLead(scope: AccessScope): void {
   if (!scope.isCompanyWide && scope.role !== TEAM_LEAD) {
@@ -90,6 +101,7 @@ export async function createDispatcher(
   requireAdminOrTeamLead(scope);
   const parsed = createDispatcherInputSchema.parse(input);
 
+  assertRoleAssignment(scope, parsed.role);
   assertTeamAssignment(scope, parsed.teamId);
 
   const team = await db.team.findFirst({
@@ -117,10 +129,29 @@ export async function createDispatcher(
     throw new ValidationError("A user with this email already exists.");
   }
 
-  const dispatcher = await db.$transaction(async (tx) => {
+  const temporaryPassword = generateTemporaryPassword();
+  const supabase = createSupabaseAdminClient();
+  const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    email: parsed.email.toLowerCase(),
+    password: temporaryPassword,
+    email_confirm: true,
+    user_metadata: {
+      fullName: parsed.fullName,
+    },
+  });
+
+  if (authError || !authData.user) {
+    throw new ValidationError(authError?.message ?? "Failed to create auth user.");
+  }
+
+  let dispatcher;
+
+  try {
+    dispatcher = await db.$transaction(async (tx) => {
     const user = await tx.user.create({
       data: {
         organizationId: scope.organizationId,
+        supabaseUserId: authData.user.id,
         email: parsed.email.toLowerCase(),
         fullName: parsed.fullName,
         phoneNumber: parsed.phoneNumber ?? null,
@@ -139,7 +170,11 @@ export async function createDispatcher(
       },
       include: dispatcherInclude,
     });
-  });
+    });
+  } catch (error) {
+    await supabase.auth.admin.deleteUser(authData.user.id).catch(() => undefined);
+    throw error;
+  }
 
   await writeAuditLog({
     organizationId: scope.organizationId,
@@ -163,6 +198,10 @@ export async function updateDispatcher(
   const parsed = updateDispatcherInputSchema.parse(input);
 
   const existing = await getDispatcherRecord(scope, id);
+
+  if (parsed.role !== undefined) {
+    assertRoleAssignment(scope, parsed.role);
+  }
 
   if (parsed.teamId) {
     assertTeamAssignment(scope, parsed.teamId);
@@ -197,7 +236,7 @@ export async function updateDispatcher(
 
   const dispatcher = await db.$transaction(async (tx) => {
     await tx.user.update({
-      where: { id: existing.userId },
+      where: { id: existing.userId, organizationId: scope.organizationId },
       data: {
         ...(parsed.fullName !== undefined ? { fullName: parsed.fullName } : {}),
         ...(parsed.email !== undefined ? { email: parsed.email.toLowerCase() } : {}),
@@ -210,7 +249,7 @@ export async function updateDispatcher(
     });
 
     return tx.dispatcher.update({
-      where: { id },
+      where: { id, organizationId: scope.organizationId },
       data: {
         ...(parsed.teamId !== undefined ? { teamId: parsed.teamId } : {}),
         ...(parsed.status !== undefined ? { status: parsed.status as TeamStatus } : {}),
@@ -241,13 +280,13 @@ export async function activateDispatcher(
 
   const dispatcher = await db.$transaction(async (tx) => {
     const record = await tx.dispatcher.update({
-      where: { id },
+      where: { id, organizationId: scope.organizationId },
       data: { status: "ACTIVE", deletedAt: null },
       include: dispatcherInclude,
     });
 
     await tx.user.update({
-      where: { id: record.userId },
+      where: { id: record.userId, organizationId: scope.organizationId },
       data: { status: "ACTIVE", deletedAt: null },
     });
 
@@ -276,13 +315,13 @@ export async function deactivateDispatcher(
 
   const dispatcher = await db.$transaction(async (tx) => {
     const record = await tx.dispatcher.update({
-      where: { id },
+      where: { id, organizationId: scope.organizationId },
       data: { status: "INACTIVE", deletedAt: new Date() },
       include: dispatcherInclude,
     });
 
     await tx.user.update({
-      where: { id: record.userId },
+      where: { id: record.userId, organizationId: scope.organizationId },
       data: { status: "INACTIVE" },
     });
 

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const idSchema = z.string().min(1);
+export const idSchema = z.string().cuid();
 
 export const paginationSchema = z.object({
   page: z.number().int().positive().default(1),

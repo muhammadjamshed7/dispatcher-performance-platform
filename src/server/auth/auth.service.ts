@@ -8,11 +8,7 @@ import { ValidationError } from "@/lib/errors/validation-error";
 import { createServerClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db/prisma";
 import type { SessionUser } from "@/lib/api/resources";
-import {
-  getCurrentUser,
-  getCurrentUserByEmail,
-  touchLastLogin,
-} from "@/server/auth/session";
+import { getCurrentUser, touchLastLogin } from "@/server/auth/session";
 
 function toSessionUser(user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>): SessionUser {
   return {
@@ -50,24 +46,6 @@ export async function signInWithRole(input: {
   const parsed = loginSchema.parse(input);
   const supabase = await createServerClient();
 
-  const profile = await getCurrentUserByEmail(parsed.email);
-
-  if (!profile) {
-    throw new ValidationError("Invalid email or password for this portal.");
-  }
-
-  if (profile.role !== parsed.expectedRole) {
-    throw new ValidationError("Invalid email or password for this portal.");
-  }
-
-  if (profile.status !== ACTIVE) {
-    throw new ForbiddenError(
-      profile.status === "PENDING_APPROVAL"
-        ? "Your account is pending admin approval."
-        : "Your account is not active. Contact an administrator.",
-    );
-  }
-
   const { error } = await supabase.auth.signInWithPassword({
     email: parsed.email.toLowerCase(),
     password: parsed.password,
@@ -77,12 +55,29 @@ export async function signInWithRole(input: {
     throw new ValidationError("Invalid email or password for this portal.");
   }
 
-  await touchLastLogin(profile.id);
-
   const sessionUser = await getCurrentUser();
-  if (!sessionUser) {
-    throw new ValidationError("Unable to establish session.");
+
+  if (!sessionUser || sessionUser.email !== parsed.email.toLowerCase()) {
+    await supabase.auth.signOut();
+    throw new ValidationError("Invalid email or password for this portal.");
   }
+
+  if (sessionUser.role !== parsed.expectedRole) {
+    await supabase.auth.signOut();
+    throw new ValidationError("Invalid email or password for this portal.");
+  }
+
+  if (sessionUser.status !== ACTIVE) {
+    await supabase.auth.signOut();
+
+    if (sessionUser.status === "PENDING_APPROVAL") {
+      throw new ForbiddenError("Your account is pending admin approval.");
+    }
+
+    throw new ForbiddenError("Your account is not active. Contact an administrator.");
+  }
+
+  await touchLastLogin(sessionUser.id);
 
   return toSessionUser(sessionUser);
 }

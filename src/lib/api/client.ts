@@ -25,6 +25,14 @@ export async function apiFetch<T>(
     credentials: "include",
   });
 
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    throw new ApiClientError(
+      response.ok ? "Unexpected response from server." : "Request failed.",
+      response.status,
+    );
+  }
+
   const payload = (await response.json()) as ApiResponse<T>;
 
   if (!response.ok || !payload.ok) {

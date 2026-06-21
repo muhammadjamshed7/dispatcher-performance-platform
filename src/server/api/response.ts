@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@/generated/prisma/client";
+
 import { AppError } from "@/lib/errors/app-error";
 import { ConfigurationError } from "@/lib/errors/configuration-error";
 import { ForbiddenError } from "@/lib/errors/forbidden-error";
 import { NotFoundError } from "@/lib/errors/not-found-error";
 import { ValidationError } from "@/lib/errors/validation-error";
 import { UnauthorizedError } from "@/server/auth/require-auth";
+import { assertSameOrigin } from "@/server/utils/request-security";
 
 function isDatabaseConnectionError(error: unknown): boolean {
   if (error instanceof AggregateError) {
@@ -32,11 +35,42 @@ function isDatabaseConnectionError(error: unknown): boolean {
   );
 }
 
+function mapUniqueConstraintError(error: Prisma.PrismaClientKnownRequestError): ValidationError {
+  const target = Array.isArray(error.meta?.target)
+    ? error.meta.target.join("_")
+    : String(error.meta?.target ?? "");
+
+  const messages: Record<string, string> = {
+    carrierId_activityDate: "An activity already exists for this carrier on that date.",
+    organizationId_mcNumber: "A carrier with this MC number already exists.",
+    organizationId_email: "A user with this email already exists.",
+    organizationId_name: "A team with this name already exists.",
+  };
+
+  return new ValidationError(
+    messages[target] ?? "A record with these values already exists.",
+  );
+}
+
+function normalizeError(error: unknown): unknown {
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002"
+  ) {
+    return mapUniqueConstraintError(error);
+  }
+
+  return error;
+}
+
 export function jsonOk<T>(data: T, init?: ResponseInit) {
   return NextResponse.json({ ok: true, data }, init);
 }
 
 export function jsonError(error: unknown) {
+  const normalized = normalizeError(error);
+  error = normalized;
+
   if (error instanceof ValidationError) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
   }
@@ -84,20 +118,28 @@ export function jsonError(error: unknown) {
   }
 
   console.error(error);
-  return NextResponse.json(
-    {
-      ok: false,
-      error: "Internal server error.",
-      ...(error instanceof Error
-        ? { debug: { name: error.name, message: error.message } }
-        : {}),
-    },
-    { status: 500 },
-  );
+
+  const payload: { ok: false; error: string; debug?: { name: string; message: string } } = {
+    ok: false,
+    error: "Internal server error.",
+  };
+
+  if (
+    process.env.NODE_ENV !== "production" &&
+    error instanceof Error
+  ) {
+    payload.debug = { name: error.name, message: error.message };
+  }
+
+  return NextResponse.json(payload, { status: 500 });
 }
 
-export async function handleApi<T>(handler: () => Promise<T>) {
+export async function handleApi<T>(handler: () => Promise<T>, request?: Request) {
   try {
+    if (request) {
+      assertSameOrigin(request);
+    }
+
     const data = await handler();
     return jsonOk(data);
   } catch (error) {

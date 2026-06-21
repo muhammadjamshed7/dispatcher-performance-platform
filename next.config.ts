@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
+      { source: "/dashboard", destination: "/", permanent: false },
       { source: "/dashboard/admin", destination: "/admin/dashboard", permanent: false },
       {
         source: "/dashboard/team-lead",
@@ -20,6 +21,8 @@ const nextConfig: NextConfig = {
         destination: "/dispatcher/dashboard",
         permanent: false,
       },
+      { source: "/auth/login", destination: "/", permanent: false },
+      { source: "/auth/reset-password", destination: "/", permanent: false },
       { source: "/teams", destination: "/admin/teams", permanent: false },
       { source: "/dispatchers", destination: "/admin/dispatchers", permanent: false },
       { source: "/carriers", destination: "/admin/carriers", permanent: false },

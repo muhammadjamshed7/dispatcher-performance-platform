@@ -20,5 +20,5 @@ export async function POST(
     const { user, scope } = await requireAccessScope("ADMIN");
     const body = await parseJsonBody(request, rejectRegistrationBodySchema);
     return rejectRegistrationRequest(scope, user, requestId, body);
-  });
+  }, request);
 }

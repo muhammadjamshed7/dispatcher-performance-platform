@@ -22,5 +22,5 @@ export async function POST(
     const { user, scope } = await requireAccessScope();
     const body = await parseJsonBody(request, reassignCarrierBodySchema);
     return reassignCarrier(scope, user, carrierId, body);
-  });
+  }, request);
 }

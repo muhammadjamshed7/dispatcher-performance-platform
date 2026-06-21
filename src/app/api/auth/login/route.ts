@@ -4,6 +4,7 @@ import { ADMIN, DISPATCHER, TEAM_LEAD } from "@/lib/constants/roles";
 import { parseJsonBody } from "@/server/api/request";
 import { handleApi } from "@/server/api/response";
 import { signInWithRole } from "@/server/auth/auth.service";
+import { assertRateLimit } from "@/server/utils/rate-limit";
 
 const loginBodySchema = z.object({
   email: z.email(),
@@ -13,7 +14,8 @@ const loginBodySchema = z.object({
 
 export async function POST(request: Request) {
   return handleApi(async () => {
+    assertRateLimit(request, "auth:login");
     const body = await parseJsonBody(request, loginBodySchema);
     return signInWithRole(body);
-  });
+  }, request);
 }

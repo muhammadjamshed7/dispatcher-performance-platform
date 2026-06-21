@@ -46,5 +46,5 @@ export async function POST(request: Request) {
     const { user, scope } = await requireAccessScope();
     const body = await parseJsonBody(request, createActivityBodySchema);
     return createActivity(scope, user, body);
-  });
+  }, request);
 }

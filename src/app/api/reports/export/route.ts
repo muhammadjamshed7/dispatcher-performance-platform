@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { STATUSES } from "@/lib/constants/statuses";
+import { TRUCK_TYPES } from "@/lib/constants/truck-types";
 import { REPORT_PERIODS } from "@/lib/constants/report-periods";
 import { parseJsonBody } from "@/server/api/request";
 import { handleApi } from "@/server/api/response";
@@ -15,6 +16,7 @@ const exportReportBodySchema = z.object({
   dateFrom: z.string().optional(),
   dateTo: z.string().optional(),
   status: z.enum(STATUSES).optional(),
+  truckType: z.enum(TRUCK_TYPES).optional(),
 });
 
 export async function POST(request: Request) {
@@ -23,5 +25,5 @@ export async function POST(request: Request) {
     const body = await parseJsonBody(request, exportReportBodySchema);
     const { period, ...filters } = body;
     return exportReportCsv(scope, user, period, filters);
-  });
+  }, request);
 }

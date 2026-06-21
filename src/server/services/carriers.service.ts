@@ -8,10 +8,14 @@ import { ValidationError } from "@/lib/errors/validation-error";
 import { TEAM_LEAD } from "@/lib/constants/roles";
 import { TEAM_STATUSES } from "@/lib/constants/team-statuses";
 import { db } from "@/lib/db/prisma";
+import { normalizeMcNumber } from "@/lib/utils/normalize-mc-number";
 import type { Carrier as CarrierDto } from "@/lib/types";
 import type { AccessScope, AuthContextUser } from "@/server/auth/types";
 import { mapCarrier } from "@/server/mappers";
 import { writeAuditLog } from "@/server/services/audit.service";
+import {
+  assertAllowedTruckType,
+} from "@/server/services/settings.service";
 import { carrierScopeFilter } from "@/server/utils/scope-filters";
 
 const PRISMA_TRUCK_TYPES = [
@@ -145,13 +149,15 @@ export async function createCarrier(
 ): Promise<CarrierDto> {
   requireAdminOrTeamLead(scope);
   const parsed = createCarrierInputSchema.parse(input);
+  const mcNumber = normalizeMcNumber(parsed.mcNumber);
 
   assertTeamAssignment(scope, parsed.teamId);
+  await assertAllowedTruckType(scope.organizationId, parsed.truckType);
 
   const duplicate = await db.carrier.findFirst({
     where: {
       organizationId: scope.organizationId,
-      mcNumber: parsed.mcNumber,
+      mcNumber,
       deletedAt: null,
     },
   });
@@ -172,7 +178,7 @@ export async function createCarrier(
         organizationId: scope.organizationId,
         carrierName: parsed.carrierName,
         driverName: parsed.driverName,
-        mcNumber: parsed.mcNumber,
+        mcNumber,
         truckType: parsed.truckType,
         teamId: parsed.teamId,
         dispatcherId: parsed.dispatcherId,
@@ -204,7 +210,7 @@ export async function createCarrier(
     action: "CARRIER_CREATED",
     entityType: "Carrier",
     entityId: carrier.id,
-    metadata: { mcNumber: parsed.mcNumber },
+    metadata: { mcNumber },
   });
 
   return mapCarrier(await getCarrierRecord(scope, carrier.id));
@@ -222,11 +228,18 @@ export async function updateCarrier(
   const existing = await getCarrierRecord(scope, id);
   assertTeamAssignment(scope, existing.teamId);
 
-  if (parsed.mcNumber && parsed.mcNumber !== existing.mcNumber) {
+  const mcNumber =
+    parsed.mcNumber !== undefined ? normalizeMcNumber(parsed.mcNumber) : undefined;
+
+  if (parsed.truckType !== undefined) {
+    await assertAllowedTruckType(scope.organizationId, parsed.truckType);
+  }
+
+  if (mcNumber && mcNumber !== existing.mcNumber) {
     const duplicate = await db.carrier.findFirst({
       where: {
         organizationId: scope.organizationId,
-        mcNumber: parsed.mcNumber,
+        mcNumber,
         deletedAt: null,
         NOT: { id },
       },
@@ -238,11 +251,11 @@ export async function updateCarrier(
   }
 
   const carrier = await db.carrier.update({
-    where: { id },
+    where: { id, organizationId: scope.organizationId },
     data: {
       ...(parsed.carrierName !== undefined ? { carrierName: parsed.carrierName } : {}),
       ...(parsed.driverName !== undefined ? { driverName: parsed.driverName } : {}),
-      ...(parsed.mcNumber !== undefined ? { mcNumber: parsed.mcNumber } : {}),
+      ...(mcNumber !== undefined ? { mcNumber } : {}),
       ...(parsed.truckType !== undefined ? { truckType: parsed.truckType } : {}),
       ...(parsed.dispatchFeePercentage !== undefined
         ? { dispatchFeePercentage: parsed.dispatchFeePercentage }
@@ -275,7 +288,7 @@ export async function activateCarrier(
   await getCarrierRecord(scope, id);
 
   const carrier = await db.carrier.update({
-    where: { id },
+    where: { id, organizationId: scope.organizationId },
     data: { status: "ACTIVE", deletedAt: null },
     include: carrierInclude,
   });
@@ -301,7 +314,7 @@ export async function deactivateCarrier(
   await getCarrierRecord(scope, id);
 
   const carrier = await db.carrier.update({
-    where: { id },
+    where: { id, organizationId: scope.organizationId },
     data: { status: "INACTIVE", deletedAt: new Date() },
     include: carrierInclude,
   });
@@ -358,7 +371,7 @@ export async function reassignCarrier(
     });
 
     return tx.carrier.update({
-      where: { id },
+      where: { id, organizationId: scope.organizationId },
       data: {
         teamId: parsed.teamId,
         dispatcherId: parsed.dispatcherId,

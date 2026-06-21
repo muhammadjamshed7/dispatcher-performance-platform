@@ -19,6 +19,11 @@ import { useApiData } from "@/hooks/use-api-data";
 import { ApiClientError } from "@/lib/api/client";
 import { exportReportRequest, fetchReports } from "@/lib/api/resources";
 import type { ReportPeriod } from "@/lib/constants/report-periods";
+import {
+  DEFAULT_REPORT_FILTERS,
+  reportFiltersToParams,
+  type ReportFilterValues,
+} from "@/lib/dashboard/report-filter-params";
 import { cn } from "@/lib/utils";
 import { formatCurrencyCompact } from "@/lib/utils/format-currency";
 
@@ -51,19 +56,21 @@ function isReportEmpty(report: {
 
 export function ReportsPageContent() {
   const [activeTab, setActiveTab] = useState<ReportTab>("daily");
+  const [filters, setFilters] = useState<ReportFilterValues>(DEFAULT_REPORT_FILTERS);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const activeConfig =
     REPORT_TABS.find((tab) => tab.id === activeTab) ?? REPORT_TABS[0];
 
   const loadReport = useCallback(
-    () => fetchReports({ period: activeConfig.period }),
-    [activeConfig.period],
+    () =>
+      fetchReports(reportFiltersToParams(activeConfig.period, filters)),
+    [activeConfig.period, filters],
   );
 
   const { data: activeReport, error, isLoading, reload } = useApiData(
     loadReport,
-    [activeTab],
+    [activeTab, filters],
   );
 
   const isEmpty =
@@ -83,7 +90,9 @@ export function ReportsPageContent() {
 
   async function handleExport() {
     try {
-      const result = await exportReportRequest({ period: activeConfig.period });
+      const result = await exportReportRequest(
+        reportFiltersToParams(activeConfig.period, filters),
+      );
       const blob = new Blob([result.csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -176,7 +185,11 @@ export function ReportsPageContent() {
               />
             </div>
 
-            <ReportFilterBar onApply={() => void reload()} />
+            <ReportFilterBar
+              values={filters}
+              onChange={setFilters}
+              onApply={() => void reload()}
+            />
 
             <DailyReportTable
               rows={report.daily}

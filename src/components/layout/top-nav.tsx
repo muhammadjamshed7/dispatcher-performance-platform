@@ -6,6 +6,7 @@ import { Bell, ChevronDown, Menu, Search } from "lucide-react";
 
 import { LogoutButton } from "@/components/auth/logout-button";
 import { useSession } from "@/components/auth/session-provider";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   getAccountPathForRole,
@@ -64,6 +65,12 @@ export function TopNav({ onMenuClick }: TopNavProps) {
             <Bell className="size-5" />
             <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-[#2563EB]" />
           </button>
+
+          {session ? (
+            <Badge className="hidden rounded-full bg-[#DBEAFE] px-3 py-1 text-xs font-medium text-[#1D4ED8] hover:bg-[#DBEAFE] md:inline-flex">
+              {roleLabel(session.role)}
+            </Badge>
+          ) : null}
 
           {session && accountPath ? (
             <Link

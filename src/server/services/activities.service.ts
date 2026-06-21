@@ -20,6 +20,7 @@ import { calculateRatePerMile } from "@/lib/utils/calculate-rate-per-mile";
 import type { AccessScope, AuthContextUser } from "@/server/auth/types";
 import { mapDailyActivity } from "@/server/mappers";
 import { writeAuditLog } from "@/server/services/audit.service";
+import { assertAllowedStatusReason } from "@/server/services/settings.service";
 import {
   activityFiltersSchema,
   assertFilterAccess,
@@ -199,7 +200,7 @@ export async function listActivities(
   filters: ActivityFilters = {},
 ): Promise<DailyActivityDto[]> {
   const parsedFilters = activityFiltersSchema.parse(filters);
-  assertFilterAccess(scope, parsedFilters);
+  await assertFilterAccess(scope, parsedFilters);
 
   const activities = await db.dailyActivity.findMany({
     where: buildActivityWhere(scope, parsedFilters),
@@ -236,6 +237,10 @@ export async function createActivity(
   }
 
   await assertCarrierAccess(scope, carrier);
+
+  if (parsed.reason?.trim()) {
+    await assertAllowedStatusReason(scope.organizationId, parsed.reason);
+  }
 
   const duplicate = await db.dailyActivity.findUnique({
     where: {
@@ -341,6 +346,10 @@ export async function updateActivity(
   };
 
   validatedActivityPayloadSchema.parse(merged);
+
+  if (merged.reason?.trim()) {
+    await assertAllowedStatusReason(scope.organizationId, merged.reason);
+  }
 
   const activityDate = parsed.activityDate
     ? parseActivityDate(parsed.activityDate)

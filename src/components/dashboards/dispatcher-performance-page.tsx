@@ -47,7 +47,7 @@ export function DispatcherPerformancePage() {
   const loadActivities = useCallback(() => fetchActivities(), []);
 
   const {
-    data: metrics,
+    data: dashboard,
     error: metricsError,
     isLoading: metricsLoading,
     reload: reloadMetrics,
@@ -176,7 +176,9 @@ export function DispatcherPerformancePage() {
             />
             <MetricCard
               label="Revenue Generated"
-              value={formatCurrency(metrics?.totalRevenue ?? null, { nullLabel: "—" })}
+              value={formatCurrency(dashboard?.metrics.personalRevenue ?? null, {
+                nullLabel: "—",
+              })}
               hint="Month-to-date total"
             />
             <MetricCard
@@ -186,7 +188,7 @@ export function DispatcherPerformancePage() {
             />
             <MetricCard
               label="Avg Rate / Mile"
-              value={formatRatePerMile(metrics?.avgRatePerMile ?? null, "—")}
+              value={formatRatePerMile(dashboard?.metrics.avgRatePerMile ?? null, "—")}
               hint="Personal average"
             />
           </div>

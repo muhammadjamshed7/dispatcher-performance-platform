@@ -33,6 +33,7 @@ import {
   TEAM_STATUS_ACTIVE,
   TEAM_STATUS_INACTIVE,
 } from "@/lib/constants/team-statuses";
+import { DISPATCHER } from "@/lib/constants/roles";
 import type { Carrier } from "@/lib/types";
 import type {
   CarrierFormValues,
@@ -44,7 +45,8 @@ function getErrorMessage(error: unknown, fallback: string) {
 }
 
 export function CarriersPageContent() {
-  const { filterCarriers } = useRoleScope();
+  const { filterCarriers, role } = useRoleScope();
+  const canManageCarriers = role !== DISPATCHER;
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<CarrierModalMode>("create");
   const [selectedCarrier, setSelectedCarrier] = useState<Carrier | null>(null);
@@ -117,7 +119,7 @@ export function CarriersPageContent() {
     const { teamId, dispatcherId } = resolveTeamAndDispatcher(values);
     if (!teamId || !dispatcherId) {
       showToast("Selected team or dispatcher not found.");
-      return;
+      throw new Error("Selected team or dispatcher not found.");
     }
 
     try {
@@ -136,6 +138,7 @@ export function CarriersPageContent() {
       await reload();
     } catch (err) {
       showToast(getErrorMessage(err, "Failed to create carrier."));
+      throw err;
     }
   }
 
@@ -158,6 +161,7 @@ export function CarriersPageContent() {
       await reload();
     } catch (err) {
       showToast(getErrorMessage(err, "Failed to update carrier."));
+      throw err;
     }
   }
 
@@ -210,11 +214,13 @@ export function CarriersPageContent() {
       >
         <RoleScopeBanner />
 
-        <div className="flex justify-end">
-          <Button type="button" onClick={() => openModal("create")}>
-            Create Carrier
-          </Button>
-        </div>
+        {canManageCarriers ? (
+          <div className="flex justify-end">
+            <Button type="button" onClick={() => openModal("create")}>
+              Create Carrier
+            </Button>
+          </div>
+        ) : null}
 
         <EntityFilterBar />
 
@@ -224,14 +230,18 @@ export function CarriersPageContent() {
           loadingTitle="Loading carriers"
           emptyTitle="No carriers found"
           emptyDescription="Create a carrier profile to manage assignments and dispatch fees."
-          emptyActionLabel="Create Carrier"
-          onEmptyAction={() => openModal("create")}
+          emptyActionLabel={canManageCarriers ? "Create Carrier" : undefined}
+          onEmptyAction={canManageCarriers ? () => openModal("create") : undefined}
           errorTitle="Unable to load carriers"
           errorDescription={
             error ?? "Carrier records could not be loaded. Try again in a moment."
           }
         >
-          <CarriersTable carriers={visibleCarriers} onAction={handleRowAction} />
+          <CarriersTable
+            carriers={visibleCarriers}
+            readOnly={!canManageCarriers}
+            onAction={handleRowAction}
+          />
         </PageContentGate>
       </PageShell>
 

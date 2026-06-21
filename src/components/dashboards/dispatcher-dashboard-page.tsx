@@ -1,71 +1,45 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { DollarSign, PackageCheck, Route, Truck } from "lucide-react";
 
+import { DashboardMetricCard } from "@/components/dashboard/admin/dashboard-metric-card";
+import { AssignedCarrierPerformanceTable } from "@/components/dashboard/dispatcher/assigned-carrier-performance-table";
+import { DispatcherDashboardHeader } from "@/components/dashboard/dispatcher/dispatcher-dashboard-header";
+import {
+  DEFAULT_DISPATCHER_FILTERS,
+  DispatcherFilterBar,
+} from "@/components/dashboard/dispatcher/dispatcher-filter-bar";
+import { DispatcherLoadStatusChart } from "@/components/dashboard/dispatcher/dispatcher-load-status-chart";
+import { DispatcherRecentActivitiesTable } from "@/components/dashboard/dispatcher/dispatcher-recent-activities-table";
+import { PendingCarrierEntriesCard } from "@/components/dashboard/dispatcher/pending-carrier-entries-card";
+import { PersonalRevenueTrendChart } from "@/components/dashboard/dispatcher/personal-revenue-trend-chart";
+import { TodayEntryCompletionCard } from "@/components/dashboard/dispatcher/today-entry-completion-card";
 import { PageContentGate } from "@/components/feedback/page-content-gate";
 import type { PageContentState } from "@/components/feedback/page-content-gate";
-import { DataTablePlaceholder } from "@/components/data-table-placeholder";
-import { RoleScopeBanner } from "@/components/layout/role-scope-banner";
-import { PageShell } from "@/components/layout/page-shell";
-import { MetricCard } from "@/components/metric-card";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useApiData } from "@/hooks/use-api-data";
-import { useRoleScope } from "@/hooks/use-role-scope";
-import {
-  fetchActivities,
-  fetchCarriers,
-  fetchDispatcherDashboard,
-} from "@/lib/api/resources";
-import { formatCurrency } from "@/lib/utils/format-currency";
+import { fetchDispatcherDashboard } from "@/lib/api/resources";
+import { dispatcherDashboardFiltersToParams } from "@/lib/dashboard/dispatcher-filter-params";
+import type { DispatcherDashboardFilterValues } from "@/lib/dashboard/dispatcher-filter-params";
+import { formatCurrencyCompact } from "@/lib/utils/format-currency";
 import { formatRatePerMile } from "@/lib/utils/format-rate-per-mile";
 
 export function DispatcherDashboardPage() {
-  const { filterActivities, filterCarriers, dispatcherName } = useRoleScope();
-  const today = new Date().toISOString().slice(0, 10);
+  const [filters, setFilters] = useState<DispatcherDashboardFilterValues>(
+    DEFAULT_DISPATCHER_FILTERS,
+  );
 
-  const loadMetrics = useCallback(() => fetchDispatcherDashboard(), []);
-  const loadCarriers = useCallback(() => fetchCarriers(), []);
-  const loadActivities = useCallback(() => fetchActivities(), []);
+  const loadDashboard = useCallback(
+    () => fetchDispatcherDashboard(dispatcherDashboardFiltersToParams(filters)),
+    [filters],
+  );
 
   const {
-    data: metrics,
-    error: metricsError,
-    isLoading: metricsLoading,
-    reload: reloadMetrics,
-  } = useApiData(loadMetrics, []);
-  const {
-    data: carriers = [],
-    error: carriersError,
-    isLoading: carriersLoading,
-    reload: reloadCarriers,
-  } = useApiData(loadCarriers, []);
-  const {
-    data: activities = [],
-    error: activitiesError,
-    isLoading: activitiesLoading,
-    reload: reloadActivities,
-  } = useApiData(loadActivities, []);
-
-  const isLoading = metricsLoading || carriersLoading || activitiesLoading;
-  const error = metricsError ?? carriersError ?? activitiesError;
-
-  const assignedCarriers = useMemo(
-    () => filterCarriers(carriers),
-    [carriers, filterCarriers],
-  );
-  const personalActivities = useMemo(
-    () => filterActivities(activities),
-    [activities, filterActivities],
-  );
-  const todaysActivities = personalActivities.filter(
-    (activity) => activity.date === today,
-  );
-  const loggedCarrierNames = new Set(
-    todaysActivities.map((activity) => activity.carrierName),
-  );
-  const pendingEntries = assignedCarriers.filter(
-    (carrier) => !loggedCarrierNames.has(carrier.carrierName),
-  );
+    data: dashboard,
+    error,
+    isLoading,
+    reload,
+  } = useApiData(loadDashboard, [filters]);
 
   const pageState: PageContentState = isLoading
     ? "loading"
@@ -73,23 +47,69 @@ export function DispatcherDashboardPage() {
       ? "error"
       : "ready";
 
-  const reload = useCallback(() => {
-    void reloadMetrics();
-    void reloadCarriers();
-    void reloadActivities();
-  }, [reloadMetrics, reloadCarriers, reloadActivities]);
+  const metrics = dashboard?.metrics;
+  const filterOptions = dashboard?.filterOptions ?? {
+    carriers: [],
+    truckTypes: [],
+    statuses: [],
+  };
+
+  const totalFilteredLoads = useMemo(() => {
+    return dashboard?.statusBreakdown.reduce((sum, item) => sum + item.value, 0) ?? 0;
+  }, [dashboard?.statusBreakdown]);
+
+  const metricCards = useMemo(
+    () => [
+      {
+        label: "Personal Revenue",
+        value: formatCurrencyCompact(metrics?.personalRevenue ?? 0, "$0"),
+        helper: "Month-to-date delivered revenue",
+        growth: null,
+        accent: "#2563EB",
+        iconBackground: "#DBEAFE",
+        icon: DollarSign,
+        sparklineData: [],
+      },
+      {
+        label: "Delivered Loads",
+        value: (metrics?.deliveredLoads ?? 0).toLocaleString(),
+        helper: "Completed deliveries this month",
+        growth: null,
+        accent: "#22C55E",
+        iconBackground: "#DCFCE7",
+        icon: PackageCheck,
+        sparklineData: [],
+      },
+      {
+        label: "Avg Rate / Mile",
+        value: formatRatePerMile(metrics?.avgRatePerMile ?? 0, "$0.00/mi"),
+        helper: "Average across delivered loads",
+        growth: null,
+        accent: "#8B5CF6",
+        iconBackground: "#F3E8FF",
+        icon: Route,
+        sparklineData: [],
+      },
+      {
+        label: "Assigned Carriers",
+        value: (metrics?.assignedCarriers ?? 0).toLocaleString(),
+        helper: "Active carriers under your dispatch",
+        growth: null,
+        accent: "#F97316",
+        iconBackground: "#FFEDD5",
+        icon: Truck,
+        sparklineData: [],
+      },
+    ],
+    [metrics],
+  );
 
   return (
-    <PageShell
-      title="Dispatcher Dashboard"
-      description="Your personal performance metrics and assigned carriers."
-    >
-      <RoleScopeBanner
-        message={
-          dispatcherName
-            ? `Personal view for ${dispatcherName}`
-            : "Dispatcher personal view"
-        }
+    <div className="space-y-6">
+      <DispatcherDashboardHeader
+        dispatcherName={dashboard?.dispatcherName ?? "Dispatcher"}
+        onRefresh={reload}
+        isRefreshing={isLoading}
       />
 
       <PageContentGate
@@ -104,62 +124,42 @@ export function DispatcherDashboardPage() {
         }
       >
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <MetricCard
-              label="Personal Revenue"
-              value={formatCurrency(metrics?.totalRevenue ?? null, { nullLabel: "—" })}
-              hint="Month-to-date total"
-            />
-            <MetricCard
-              label="Delivered Loads"
-              value={metrics?.deliveredLoads.toString() ?? "—"}
-              hint="Completed deliveries"
-            />
-            <MetricCard
-              label="Avg Rate / Mile"
-              value={formatRatePerMile(metrics?.avgRatePerMile ?? null, "—")}
-              hint="Personal average"
-            />
-            <MetricCard
-              label="Assigned Carriers"
-              value={assignedCarriers.length.toString()}
-              hint="Under your dispatch"
+          {dashboard?.todayCompletion ? (
+            <TodayEntryCompletionCard completion={dashboard.todayCompletion} />
+          ) : null}
+
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            {metricCards.map((card) => (
+              <DashboardMetricCard key={card.label} {...card} />
+            ))}
+          </div>
+
+          <PendingCarrierEntriesCard carriers={dashboard?.pendingCarriers ?? []} />
+
+          <DispatcherFilterBar
+            values={filters}
+            filterOptions={filterOptions}
+            onChange={setFilters}
+            onReset={() => setFilters(DEFAULT_DISPATCHER_FILTERS)}
+          />
+
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <PersonalRevenueTrendChart data={dashboard?.revenueTrend ?? []} />
+            <DispatcherLoadStatusChart
+              data={dashboard?.statusBreakdown ?? []}
+              totalLoads={totalFilteredLoads}
             />
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Daily Entry Completion</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <p>
-                <span className="text-muted-foreground">Logged today:</span>{" "}
-                {loggedCarrierNames.size} of {assignedCarriers.length} assigned carriers
-              </p>
-              {pendingEntries.length > 0 ? (
-                <p className="text-muted-foreground">
-                  Pending entries:{" "}
-                  {pendingEntries.map((carrier) => carrier.carrierName).join(", ")}
-                </p>
-              ) : (
-                <p className="text-muted-foreground">
-                  All assigned carriers have activity logged for today.
-                </p>
-              )}
-            </CardContent>
-          </Card>
+          <AssignedCarrierPerformanceTable
+            rows={dashboard?.assignedCarrierPerformance ?? []}
+          />
 
-          <DataTablePlaceholder
-            title="Assigned Carrier Performance Preview"
-            columns={["Carrier", "Recent Status", "Load Amount"]}
-            rows={personalActivities.slice(0, 5).map((activity) => [
-              activity.carrierName,
-              activity.status.replaceAll("_", " "),
-              formatCurrency(activity.loadAmount, { nullLabel: "—" }),
-            ])}
+          <DispatcherRecentActivitiesTable
+            rows={dashboard?.recentActivities ?? []}
           />
         </>
       </PageContentGate>
-    </PageShell>
+    </div>
   );
 }

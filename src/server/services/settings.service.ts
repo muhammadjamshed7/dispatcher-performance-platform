@@ -112,6 +112,31 @@ export async function getSettings(scope: AccessScope): Promise<AppSettings> {
   return mapSettings(settings, statusReasons);
 }
 
+export async function assertAllowedTruckType(
+  organizationId: string,
+  truckType: TruckType,
+): Promise<void> {
+  const settings = await getOrCreateSettings(organizationId);
+
+  if (!settings.allowedTruckTypes.includes(truckType)) {
+    throw new ValidationError("This truck type is not allowed by organization settings.");
+  }
+}
+
+export async function assertAllowedStatusReason(
+  organizationId: string,
+  reason: string,
+): Promise<void> {
+  const statusReasons = await loadStatusReasons(organizationId);
+  const allowed = statusReasons
+    .filter((entry) => entry.isActive)
+    .map((entry) => entry.label.toLowerCase());
+
+  if (!allowed.includes(reason.trim().toLowerCase())) {
+    throw new ValidationError("This status reason is not allowed by organization settings.");
+  }
+}
+
 export async function updateSettings(
   scope: AccessScope,
   actor: AuthContextUser,

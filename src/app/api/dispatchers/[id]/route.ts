@@ -33,7 +33,7 @@ export async function PATCH(
     const { user, scope } = await requireAccessScope();
     const body = await parseJsonBody(request, updateDispatcherBodySchema);
     return updateDispatcher(scope, user, dispatcherId, body);
-  });
+  }, request);
 }
 
 export async function POST(
@@ -54,5 +54,5 @@ export async function POST(
     }
 
     return deactivateDispatcher(scope, user, dispatcherId);
-  });
+  }, request);
 }

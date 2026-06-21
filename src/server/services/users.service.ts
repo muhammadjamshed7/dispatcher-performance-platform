@@ -121,7 +121,10 @@ export async function approveRegistrationRequest(
     throw new ValidationError(authError?.message ?? "Failed to create auth user.");
   }
 
-  const user = await db.$transaction(async (tx) => {
+  let user;
+
+  try {
+    user = await db.$transaction(async (tx) => {
     const createdUser = await tx.user.create({
       data: {
         organizationId: scope.organizationId,
@@ -159,7 +162,11 @@ export async function approveRegistrationRequest(
     });
 
     return createdUser;
-  });
+    });
+  } catch (error) {
+    await supabase.auth.admin.deleteUser(authData.user.id).catch(() => undefined);
+    throw error;
+  }
 
   await writeAuditLog({
     organizationId: scope.organizationId,
@@ -252,7 +259,7 @@ export async function assignRoleAndTeam(
 
   const user = await db.$transaction(async (tx) => {
     const updatedUser = await tx.user.update({
-      where: { id: userId },
+      where: { id: userId, organizationId: scope.organizationId },
       data: {
         role: parsed.role,
         teamId: parsed.role === "ADMIN" ? null : parsed.teamId,

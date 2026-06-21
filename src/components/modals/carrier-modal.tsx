@@ -1,5 +1,10 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Truck } from "lucide-react";
+import { useForm } from "react-hook-form";
+
 import { CarrierDetailView } from "@/components/details/carrier-detail-view";
 import { CarrierForm } from "@/components/forms/carrier-form";
 import { CarrierReassignForm } from "@/components/forms/carrier-reassign-form";
@@ -21,6 +26,7 @@ import type {
   CarrierFormValues,
   CarrierReassignValues,
 } from "@/lib/validation/carrier-form";
+import { cn } from "@/lib/utils";
 
 export type CarrierModalMode =
   | "create"
@@ -35,14 +41,20 @@ type CarrierModalProps = {
   mode: CarrierModalMode;
   carrier?: Carrier | null;
   onOpenChange: (open: boolean) => void;
-  onCreate?: (values: CarrierFormValues) => void;
-  onEdit?: (values: CarrierFormValues) => void;
-  onReassign?: (values: CarrierReassignValues) => void;
-  onToggleStatus?: (carrier : Carrier) => void;
+  onCreate?: (values: CarrierFormValues) => void | Promise<void>;
+  onEdit?: (values: CarrierFormValues) => void | Promise<void>;
+  onReassign?: (values: CarrierReassignValues) => void | Promise<void>;
+  onToggleStatus?: (carrier: Carrier) => void;
 };
 
 const FORM_ID = "carrier-form";
 const REASSIGN_FORM_ID = "carrier-reassign-form";
+
+const PREMIUM_DIALOG_CLASS =
+  "flex max-h-[calc(100vh-32px)] w-full max-w-[min(820px,calc(100vw-32px))] flex-col gap-0 overflow-hidden rounded-[24px] border border-[#E5E7EB] bg-white p-0 text-[#0F172A] shadow-[0_24px_80px_rgba(15,23,42,0.18)] ring-0 sm:max-w-[min(820px,calc(100vw-32px))]";
+
+const PREMIUM_OVERLAY_CLASS =
+  "bg-[#0F172A]/40 backdrop-blur-[2px] supports-backdrop-filter:backdrop-blur-sm";
 
 function getDefaultValues(
   carrier?: Carrier | null,
@@ -87,6 +99,8 @@ export function CarrierModal({
   onReassign,
   onToggleStatus,
 }: CarrierModalProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const titles: Record<CarrierModalMode, string> = {
     create: "Create Carrier",
     edit: "Edit Carrier",
@@ -105,22 +119,46 @@ export function CarrierModal({
     deactivate: "Mark this carrier as inactive.",
   };
 
-  function handleSubmit(values: CarrierFormValues) {
+  useEffect(() => {
+    if (!open) {
+      setIsSubmitting(false);
+    }
+  }, [open]);
+
+  async function handleSubmit(values: CarrierFormValues) {
     if (mode === "create") {
-      onCreate?.(values);
-      onOpenChange(false);
+      setIsSubmitting(true);
+      try {
+        await onCreate?.(values);
+        onOpenChange(false);
+      } catch {
+        // Parent surfaces errors via toast.
+      } finally {
+        setIsSubmitting(false);
+      }
       return;
     }
 
     if (mode === "edit") {
-      onEdit?.(values);
-      onOpenChange(false);
+      setIsSubmitting(true);
+      try {
+        await onEdit?.(values);
+        onOpenChange(false);
+      } catch {
+        // Parent surfaces errors via toast.
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   }
 
-  function handleReassign(values: CarrierReassignValues) {
-    onReassign?.(values);
-    onOpenChange(false);
+  async function handleReassign(values: CarrierReassignValues) {
+    try {
+      await onReassign?.(values);
+      onOpenChange(false);
+    } catch {
+      // Parent surfaces errors via toast.
+    }
   }
 
   function handleToggleStatus() {
@@ -131,6 +169,87 @@ export function CarrierModal({
   }
 
   const isStatusModal = mode === "activate" || mode === "deactivate";
+  const isPremiumCreate = mode === "create";
+
+  const formDefaults = useMemo(
+    () => getDefaultValues(mode === "create" ? null : carrier),
+    [carrier, mode],
+  );
+
+  if (isPremiumCreate) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent
+          showCloseButton={false}
+          overlayClassName={PREMIUM_OVERLAY_CLASS}
+          className={PREMIUM_DIALOG_CLASS}
+        >
+          <header className="shrink-0 px-6 pt-8 pb-5 sm:px-10">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex min-w-0 items-start gap-4">
+                <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-[#DBEAFE] text-[#2563EB]">
+                  <Truck className="size-6" />
+                </div>
+                <div className="min-w-0 pt-0.5">
+                  <h2 className="text-xl font-semibold tracking-tight text-[#0F172A]">
+                    Create Carrier
+                  </h2>
+                  <p className="mt-1 text-sm leading-relaxed text-[#64748B]">
+                    Add a new carrier and assign it to a team and dispatcher.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="rounded-lg p-2 text-[#64748B] transition-colors hover:bg-[#F8FAFC] hover:text-[#0F172A]"
+                onClick={() => onOpenChange(false)}
+                disabled={isSubmitting}
+                aria-label="Close"
+              >
+                <span className="text-2xl leading-none">&times;</span>
+              </button>
+            </div>
+          </header>
+
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 sm:px-10">
+            <CarrierForm
+              formId={FORM_ID}
+              defaultValues={formDefaults}
+              readOnly={false}
+              variant="premium"
+              onSubmit={handleSubmit}
+            />
+          </div>
+
+          <footer className="shrink-0 border-t border-[#E5E7EB] px-6 py-6 sm:px-10">
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                className={cn(
+                  "inline-flex h-11 items-center justify-center rounded-xl border border-[#E5E7EB] bg-white px-6 text-sm font-medium text-[#334155] transition-colors hover:bg-[#F8FAFC]",
+                  isSubmitting && "cursor-not-allowed opacity-60",
+                )}
+                onClick={() => onOpenChange(false)}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form={FORM_ID}
+                disabled={isSubmitting}
+                className={cn(
+                  "inline-flex h-11 min-w-[168px] items-center justify-center rounded-xl bg-[#2563EB] px-7 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(37,99,235,0.25)] transition-colors hover:bg-[#1D4ED8] disabled:cursor-not-allowed disabled:opacity-70",
+                )}
+              >
+                {isSubmitting ? "Creating..." : "Create Carrier"}
+              </button>
+            </div>
+          </footer>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -161,10 +280,10 @@ export function CarrierModal({
           />
         ) : null}
 
-        {mode === "create" || mode === "edit" ? (
+        {mode === "edit" ? (
           <CarrierForm
             formId={FORM_ID}
-            defaultValues={getDefaultValues(mode === "create" ? null : carrier)}
+            defaultValues={formDefaults}
             readOnly={false}
             onSubmit={handleSubmit}
           />
@@ -175,15 +294,9 @@ export function CarrierModal({
             Cancel
           </Button>
 
-          {mode === "create" ? (
-            <Button type="submit" form={FORM_ID}>
-              Create Carrier
-            </Button>
-          ) : null}
-
           {mode === "edit" ? (
-            <Button type="submit" form={FORM_ID}>
-              Save Changes
+            <Button type="submit" form={FORM_ID} disabled={isSubmitting}>
+              {isSubmitting ? "Saving..." : "Save Changes"}
             </Button>
           ) : null}
 

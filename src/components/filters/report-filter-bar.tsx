@@ -10,22 +10,67 @@ import { TeamFilter } from "@/components/filters/team-filter";
 import { TruckTypeFilter } from "@/components/filters/truck-type-filter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import type { ReportFilterValues } from "@/lib/dashboard/report-filter-params";
 
 type ReportFilterBarProps = {
+  values: ReportFilterValues;
+  onChange: (values: ReportFilterValues) => void;
   onApply?: () => void;
 };
 
-export function ReportFilterBar({ onApply }: ReportFilterBarProps) {
+export function ReportFilterBar({ values, onChange, onApply }: ReportFilterBarProps) {
   return (
     <Card>
       <CardContent className="flex flex-wrap items-center gap-3 py-4">
         <Filter className="size-4 shrink-0 text-muted-foreground" />
-        <DateRangeFilter />
-        <TeamFilter />
-        <DispatcherFilter />
-        <CarrierFilter />
-        <TruckTypeFilter />
-        <StatusFilter />
+        <DateRangeFilter
+          value={values.dateRange}
+          onValueChange={(dateRange) => {
+            if (dateRange) {
+              onChange({ ...values, dateRange });
+            }
+          }}
+        />
+        <TeamFilter
+          value={values.teamId}
+          onValueChange={(teamId) => {
+            if (teamId) {
+              onChange({ ...values, teamId });
+            }
+          }}
+        />
+        <DispatcherFilter
+          value={values.dispatcherId}
+          onValueChange={(dispatcherId) => {
+            if (dispatcherId) {
+              onChange({ ...values, dispatcherId });
+            }
+          }}
+        />
+        <CarrierFilter
+          value={values.carrierId}
+          onValueChange={(carrierId) => {
+            if (carrierId) {
+              onChange({ ...values, carrierId });
+            }
+          }}
+        />
+        <TruckTypeFilter
+          value={values.truckType}
+          onValueChange={(truckType) => {
+            if (truckType) {
+              onChange({ ...values, truckType });
+            }
+          }}
+        />
+        <StatusFilter
+          value={values.status}
+          onValueChange={(status) => {
+            if (status) {
+              onChange({ ...values, status });
+            }
+          }}
+        />
         <Button
           type="button"
           variant="outline"

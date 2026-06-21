@@ -25,5 +25,5 @@ export async function PATCH(
     const { user, scope } = await requireAccessScope("ADMIN");
     const body = await parseJsonBody(request, updateTeamBodySchema);
     return updateTeam(scope, user, teamId, body);
-  });
+  }, request);
 }

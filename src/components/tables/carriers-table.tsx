@@ -27,10 +27,15 @@ export type CarrierRowAction = "view" | "edit" | "reassign" | "toggle-status";
 
 type CarriersTableProps = {
   carriers: Carrier[];
-  onAction: (carrier : Carrier, action: CarrierRowAction) => void;
+  readOnly?: boolean;
+  onAction: (carrier: Carrier, action: CarrierRowAction) => void;
 };
 
-export function CarriersTable({ carriers, onAction }: CarriersTableProps) {
+export function CarriersTable({
+  carriers,
+  readOnly = false,
+  onAction,
+}: CarriersTableProps) {
   return (
     <Card>
       <CardHeader>
@@ -104,26 +109,30 @@ export function CarriersTable({ carriers, onAction }: CarriersTableProps) {
                         <DropdownMenuItem onClick={() => onAction(carrier, "view")}>
                           View
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onAction(carrier, "edit")}>
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => onAction(carrier, "reassign")}
-                        >
-                          Reassign
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => onAction(carrier, "toggle-status")}
-                          variant={
-                            carrier.status === TEAM_STATUS_ACTIVE
-                              ? "destructive"
-                              : "default"
-                          }
-                        >
-                          {carrier.status === TEAM_STATUS_ACTIVE
-                            ? "Deactivate"
-                            : "Activate"}
-                        </DropdownMenuItem>
+                        {!readOnly ? (
+                          <>
+                            <DropdownMenuItem onClick={() => onAction(carrier, "edit")}>
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => onAction(carrier, "reassign")}
+                            >
+                              Reassign
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => onAction(carrier, "toggle-status")}
+                              variant={
+                                carrier.status === TEAM_STATUS_ACTIVE
+                                  ? "destructive"
+                                  : "default"
+                              }
+                            >
+                              {carrier.status === TEAM_STATUS_ACTIVE
+                                ? "Deactivate"
+                                : "Activate"}
+                            </DropdownMenuItem>
+                          </>
+                        ) : null}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

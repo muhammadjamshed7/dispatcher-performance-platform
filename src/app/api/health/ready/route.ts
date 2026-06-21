@@ -3,52 +3,33 @@ import pg from "pg";
 
 export const runtime = "nodejs";
 
+function isProductionRuntime() {
+  return process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
+}
+
 function envFlag(name: string): boolean {
   const value = process.env[name];
   return typeof value === "string" && value.trim().length > 0;
 }
 
-function formatError(error: unknown) {
-  if (error instanceof AggregateError) {
-    return {
-      message: error.message,
-      details: error.errors.map((nested) =>
-        nested instanceof Error ? nested.message : String(nested),
-      ),
-    };
-  }
-
-  if (error instanceof Error) {
-    return { message: error.message, name: error.name };
-  }
-
-  return { message: String(error) };
-}
-
 export async function GET() {
-  const checks = {
-    databaseUrl: envFlag("DATABASE_URL") || envFlag("DIRECT_URL"),
-    supabaseUrl: envFlag("NEXT_PUBLIC_SUPABASE_URL"),
-    supabaseAnonKey:
-      envFlag("NEXT_PUBLIC_SUPABASE_ANON_KEY") ||
-      envFlag("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"),
-    serviceRoleKey: envFlag("SUPABASE_SERVICE_ROLE_KEY"),
-  };
+  const isProduction = isProductionRuntime();
+  const configured =
+    (envFlag("DATABASE_URL") || envFlag("DIRECT_URL")) &&
+    envFlag("NEXT_PUBLIC_SUPABASE_URL") &&
+    (envFlag("NEXT_PUBLIC_SUPABASE_ANON_KEY") ||
+      envFlag("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY")) &&
+    envFlag("SUPABASE_SERVICE_ROLE_KEY");
 
-  const missing = Object.entries(checks)
-    .filter(([, configured]) => !configured)
-    .map(([name]) => name);
-
-  if (missing.length > 0) {
+  if (!configured) {
     return NextResponse.json(
-      {
-        ok: false,
-        status: "not_ready",
-        error:
-          "Missing deployment environment variables. Add them in Vercel → Settings → Environment Variables, then redeploy.",
-        missing,
-        checks,
-      },
+      isProduction
+        ? { ok: false, status: "not_ready" }
+        : {
+            ok: false,
+            status: "not_ready",
+            error: "Missing required deployment environment variables.",
+          },
       { status: 503 },
     );
   }
@@ -58,12 +39,9 @@ export async function GET() {
 
   if (!connectionString) {
     return NextResponse.json(
-      {
-        ok: false,
-        status: "not_ready",
-        error: "DATABASE_URL is empty.",
-        checks,
-      },
+      isProduction
+        ? { ok: false, status: "not_ready" }
+        : { ok: false, status: "not_ready", error: "DATABASE_URL is empty." },
       { status: 503 },
     );
   }
@@ -81,34 +59,21 @@ export async function GET() {
       connectionTimeoutMillis: 10_000,
     });
 
-    const result = await pool.query("SELECT 1 AS ok");
+    await pool.query("SELECT 1 AS ok");
 
     return NextResponse.json({
       ok: true,
       status: "ready",
-      checks,
-      database: true,
-      query: result.rows[0],
     });
-  } catch (error) {
-    const formatted = formatError(error);
-    const isDirectSupabaseHost =
-      connectionString.includes("db.") &&
-      connectionString.includes(".supabase.co:5432");
-    const isEnoNotFound = formatted.message.toLowerCase().includes("enotfound");
-
+  } catch {
     return NextResponse.json(
-      {
-        ok: false,
-        status: "not_ready",
-        error: formatted.message,
-        details: formatted.details,
-        checks,
-        hint:
-          isDirectSupabaseHost && isEnoNotFound
-            ? "Vercel cannot use the direct Supabase URL (IPv6 only). In Supabase Dashboard → Connect → copy the Transaction pooler URI (port 6543) into Vercel DATABASE_URL, then redeploy."
-            : "Copy DATABASE_URL from Supabase Dashboard → Connect → Transaction pooler (port 6543). Do not use the direct db.*.supabase.co URL on Vercel.",
-      },
+      isProduction
+        ? { ok: false, status: "not_ready" }
+        : {
+            ok: false,
+            status: "not_ready",
+            error: "Database connection failed.",
+          },
       { status: 503 },
     );
   } finally {

@@ -2,10 +2,12 @@ import { apiFetch } from "@/lib/api/client";
 import type { SessionUser } from "@/lib/auth/session-types";
 import type {
   AdminDashboardBundle,
+  AdminDailyReportBundle,
   AppSettings,
   Carrier,
   DailyActivity,
   DashboardMetric,
+  DispatcherDashboardBundle,
   Dispatcher,
   PendingUserRequest,
   RankingRow,
@@ -148,12 +150,18 @@ export function fetchAdminDashboard(params?: Record<string, string>) {
   return apiFetch<AdminDashboardBundle>(`/api/dashboard/admin${query}`);
 }
 
+export function fetchAdminDailyReport(params?: Record<string, string>) {
+  const query = params ? `?${new URLSearchParams(params).toString()}` : "";
+  return apiFetch<AdminDailyReportBundle>(`/api/admin/daily-report${query}`);
+}
+
 export function fetchTeamLeadDashboard() {
   return apiFetch<DashboardMetric>("/api/dashboard/team-lead");
 }
 
-export function fetchDispatcherDashboard() {
-  return apiFetch<DashboardMetric>("/api/dashboard/dispatcher");
+export function fetchDispatcherDashboard(params?: Record<string, string>) {
+  const query = params ? `?${new URLSearchParams(params).toString()}` : "";
+  return apiFetch<DispatcherDashboardBundle>(`/api/dashboard/dispatcher${query}`);
 }
 
 export function fetchRankings(type: "dispatcher" | "carrier" | "team") {

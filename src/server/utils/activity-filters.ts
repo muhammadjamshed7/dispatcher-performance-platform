@@ -1,13 +1,14 @@
 import "server-only";
 
 import { z } from "zod";
-import type { LoadActivityStatus, Prisma } from "@/generated/prisma/client";
+import type { Prisma } from "@/generated/prisma/client";
 import { STATUSES } from "@/lib/constants/statuses";
 import { TRUCK_TYPES } from "@/lib/constants/truck-types";
 import type { AccessScope } from "@/server/auth/types";
 import { activityScopeFilter } from "@/server/utils/scope-filters";
 import { ForbiddenError } from "@/lib/errors/forbidden-error";
 import { ValidationError } from "@/lib/errors/validation-error";
+import { db } from "@/lib/db/prisma";
 
 export const activityFiltersSchema = z.object({
   dateFrom: z.string().optional(),
@@ -35,10 +36,10 @@ export function formatActivityDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-export function assertFilterAccess(
+export async function assertFilterAccess(
   scope: AccessScope,
   filters: ActivityFilters,
-): void {
+): Promise<void> {
   if (filters.teamId && !scope.isCompanyWide && scope.teamId !== filters.teamId) {
     throw new ForbiddenError("You cannot filter by another team.");
   }
@@ -49,6 +50,40 @@ export function assertFilterAccess(
     scope.dispatcherId !== filters.dispatcherId
   ) {
     throw new ForbiddenError("You cannot filter by another dispatcher.");
+  }
+
+  if (scope.role === "TEAM_LEAD" && scope.teamId) {
+    if (filters.dispatcherId) {
+      const dispatcher = await db.dispatcher.findFirst({
+        where: {
+          id: filters.dispatcherId,
+          organizationId: scope.organizationId,
+          teamId: scope.teamId,
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+
+      if (!dispatcher) {
+        throw new ForbiddenError("You cannot filter by that dispatcher.");
+      }
+    }
+
+    if (filters.carrierId) {
+      const carrier = await db.carrier.findFirst({
+        where: {
+          id: filters.carrierId,
+          organizationId: scope.organizationId,
+          teamId: scope.teamId,
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+
+      if (!carrier) {
+        throw new ForbiddenError("You cannot filter by that carrier.");
+      }
+    }
   }
 }
 

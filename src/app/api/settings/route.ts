@@ -24,7 +24,7 @@ const updateSettingsBodySchema = z
 
 export async function GET() {
   return handleApi(async () => {
-    const { scope } = await requireAccessScope();
+    const { scope } = await requireAccessScope("ADMIN");
     return getSettings(scope);
   });
 }
@@ -34,5 +34,5 @@ export async function PATCH(request: Request) {
     const { user, scope } = await requireAccessScope("ADMIN");
     const body = await parseJsonBody(request, updateSettingsBodySchema);
     return updateSettings(scope, user, body);
-  });
+  }, request);
 }

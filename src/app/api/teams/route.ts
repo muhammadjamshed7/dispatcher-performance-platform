@@ -24,5 +24,5 @@ export async function POST(request: Request) {
     const { user, scope } = await requireAccessScope("ADMIN");
     const body = await parseJsonBody(request, createTeamBodySchema);
     return createTeam(scope, user, body);
-  });
+  }, request);
 }

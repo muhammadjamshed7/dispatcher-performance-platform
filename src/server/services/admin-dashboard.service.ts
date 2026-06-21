@@ -313,7 +313,7 @@ export async function getAdminDashboardBundle(
   scope: AccessScope,
   rawFilters: ActivityFilters = {},
 ): Promise<AdminDashboardBundle> {
-  assertFilterAccess(scope, rawFilters);
+  await assertFilterAccess(scope, rawFilters);
 
   const range = resolveDashboardDateRange(rawFilters);
   const filters: ActivityFilters = {
@@ -384,13 +384,6 @@ export async function getAdminDashboardBundle(
 }
 
 export async function getTeamLeadDashboardBundle(
-  scope: AccessScope,
-  rawFilters: ActivityFilters = {},
-): Promise<AdminDashboardBundle> {
-  return getAdminDashboardBundle(scope, rawFilters);
-}
-
-export async function getDispatcherDashboardBundle(
   scope: AccessScope,
   rawFilters: ActivityFilters = {},
 ): Promise<AdminDashboardBundle> {

@@ -49,6 +49,7 @@ export const ADMIN_NAV_ITEMS: RoleNavItem[] = [
   { label: "Activities", href: "/admin/activities", iconKey: "activities" },
   { label: "Rankings", href: "/admin/rankings", iconKey: "rankings" },
   { label: "Reports", href: "/admin/reports", iconKey: "reports" },
+  { label: "Daily Report", href: "/admin/daily-report", iconKey: "dailyReport" },
   { label: "Settings", href: "/admin/settings", iconKey: "settings" },
   { label: "User Requests", href: "/admin/users/requests", iconKey: "users" },
   { label: "Account", href: "/admin/account", iconKey: "account" },
@@ -128,6 +129,7 @@ export function isPublicAuthPath(pathname: string): boolean {
   return (
     pathname.endsWith("/login") ||
     pathname.endsWith("/register") ||
-    pathname === "/auth/login"
+    pathname === "/auth/login" ||
+    pathname === "/auth/reset-password"
   );
 }

@@ -30,5 +30,5 @@ export async function PATCH(
     const { user, scope } = await requireAccessScope();
     const body = await parseJsonBody(request, updateActivityBodySchema);
     return updateActivity(scope, user, activityId, body);
-  });
+  }, request);
 }

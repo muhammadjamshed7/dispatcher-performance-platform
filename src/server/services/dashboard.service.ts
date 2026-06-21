@@ -65,14 +65,6 @@ async function buildMetrics(
   };
 }
 
-export async function getAdminMetrics(scope: AccessScope): Promise<DashboardMetric> {
-  return buildMetrics(scope, activityScopeFilter(scope));
-}
-
 export async function getTeamLeadMetrics(scope: AccessScope): Promise<DashboardMetric> {
-  return buildMetrics(scope, activityScopeFilter(scope));
-}
-
-export async function getDispatcherMetrics(scope: AccessScope): Promise<DashboardMetric> {
   return buildMetrics(scope, activityScopeFilter(scope));
 }

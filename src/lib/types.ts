@@ -169,6 +169,130 @@ export type AdminDashboardBundle = {
   };
 };
 
+export type AdminDailyReportSummary = {
+  totalActivities: number;
+  deliveredLoads: number;
+  cancelledLoads: number;
+  notBooked: number;
+  notWorking: number;
+  totalRevenue: number;
+  dispatchFees: number;
+  activeDispatchers: number;
+  activeCarriers: number;
+};
+
+export type AdminDailyReportBundle = {
+  filters: {
+    date: string;
+    teamId: string | null;
+    dispatcherId: string | null;
+    status: string | null;
+  };
+  summary: AdminDailyReportSummary;
+  teamComparison: { team: string; deliveredLoads: number }[];
+  revenueByTeam: { team: string; revenue: number }[];
+  statusBreakdown: {
+    name: string;
+    value: number;
+    percent: string;
+    color: string;
+  }[];
+  liveActivities: {
+    id: string;
+    time: string;
+    dispatcher: string;
+    team: string;
+    carrier: string;
+    status: string;
+    loadAmount: number | null;
+    origin: string | null;
+    destination: string | null;
+  }[];
+  filterOptions: {
+    teams: { id: string; name: string }[];
+    dispatchers: { id: string; name: string; teamId: string }[];
+    statuses: { value: string; label: string }[];
+  };
+};
+
+export type DispatcherDashboardMetrics = {
+  personalRevenue: number;
+  deliveredLoads: number;
+  avgRatePerMile: number;
+  assignedCarriers: number;
+};
+
+export type DispatcherTodayCompletion = {
+  assignedActive: number;
+  loggedToday: number;
+  pendingCount: number;
+  completionPercent: number;
+  isComplete: boolean;
+  message: string;
+};
+
+export type DispatcherPendingCarrier = {
+  id: string;
+  carrierName: string;
+  driverName: string;
+  truckType: string;
+  lastActivityStatus: string | null;
+  lastActivityDate: string | null;
+};
+
+export type DispatcherCarrierPerformanceRow = {
+  carrierId: string;
+  carrierName: string;
+  driverName: string;
+  truckType: string;
+  recentStatus: string;
+  lastActivityDate: string | null;
+  loadsMtd: number;
+  revenueMtd: number;
+  carrierStatus: string;
+};
+
+export type DispatcherRecentActivityRow = {
+  id: string;
+  date: string;
+  carrierName: string;
+  status: string;
+  origin: string | null;
+  destination: string | null;
+  miles: number | null;
+  loadAmount: number | null;
+  ratePerMile: number | null;
+  reason: string | null;
+};
+
+export type DispatcherDashboardBundle = {
+  dispatcherName: string;
+  filters: {
+    dateFrom: string;
+    dateTo: string;
+    carrierId: string | null;
+    truckType: string | null;
+    status: string | null;
+  };
+  metrics: DispatcherDashboardMetrics;
+  todayCompletion: DispatcherTodayCompletion;
+  pendingCarriers: DispatcherPendingCarrier[];
+  revenueTrend: { date: string; revenue: number }[];
+  statusBreakdown: {
+    name: string;
+    value: number;
+    percent: string;
+    color: string;
+  }[];
+  assignedCarrierPerformance: DispatcherCarrierPerformanceRow[];
+  recentActivities: DispatcherRecentActivityRow[];
+  filterOptions: {
+    carriers: { id: string; name: string }[];
+    truckTypes: { value: string; label: string }[];
+    statuses: { value: string; label: string }[];
+  };
+};
+
 export type DispatcherRanking = {
   rank: number;
   name: string;

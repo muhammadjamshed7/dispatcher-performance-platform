@@ -31,5 +31,5 @@ export async function POST(request: Request) {
     const { user, scope } = await requireAccessScope();
     const body = await parseJsonBody(request, createDispatcherBodySchema);
     return createDispatcher(scope, user, body);
-  });
+  }, request);
 }

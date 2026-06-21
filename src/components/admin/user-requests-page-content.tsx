@@ -48,17 +48,17 @@ import {
   fetchUserRequests,
   rejectUserRequest,
 } from "@/lib/api/resources";
-import { DISPATCHER, TEAM_LEAD } from "@/lib/constants/roles";
+import { DISPATCHER } from "@/lib/constants/roles";
 import { formatDate } from "@/lib/utils/format-date";
 import type { PendingUserRequest } from "@/lib/types";
 
-type ModalAction =
-  | "view"
-  | "approve"
-  | "reject"
-  | "assign-role"
-  | "assign-team"
-  | null;
+type ModalAction = "view" | "approve" | "reject" | null;
+
+type ApprovedCredentials = {
+  fullName: string;
+  email: string;
+  temporaryPassword: string;
+};
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof ApiClientError ? error.message : fallback;
@@ -92,11 +92,12 @@ export function UserRequestsPageContent() {
     null,
   );
   const [modalAction, setModalAction] = useState<ModalAction>(null);
-  const [assignedRole, setAssignedRole] = useState<string>(DISPATCHER);
   const [assignedTeamId, setAssignedTeamId] = useState<string>("");
   const [modalError, setModalError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [approvedCredentials, setApprovedCredentials] =
+    useState<ApprovedCredentials | null>(null);
 
   const loadRequests = useCallback(() => fetchUserRequests(), []);
   const loadTeams = useCallback(() => fetchTeams(), []);
@@ -132,9 +133,9 @@ export function UserRequestsPageContent() {
   const openModal = (request: PendingUserRequest, action: ModalAction) => {
     setSelectedRequest(request);
     setModalAction(action);
-    setAssignedRole(request.requestedRole);
     setAssignedTeamId(resolveDefaultTeamId(request, teams));
     setModalError(null);
+    setApprovedCredentials(null);
   };
 
   const closeModal = () => {
@@ -143,15 +144,11 @@ export function UserRequestsPageContent() {
     setAssignedTeamId("");
     setModalError(null);
     setIsSubmitting(false);
+    setApprovedCredentials(null);
   };
 
   async function handleConfirmAction() {
-    if (!selectedRequest) {
-      return;
-    }
-
-    if (modalAction === "assign-role" || modalAction === "assign-team") {
-      showToast("Use Approve to assign role and team.");
+    if (!selectedRequest || approvedCredentials) {
       closeModal();
       return;
     }
@@ -178,10 +175,12 @@ export function UserRequestsPageContent() {
           temporaryPassword,
         });
 
-        closeModal();
-        showToast(
-          `Approved "${selectedRequest.fullName}". Temporary password: ${temporaryPassword} — share this with the dispatcher for /dispatcher/login.`,
-        );
+        setApprovedCredentials({
+          fullName: selectedRequest.fullName,
+          email: selectedRequest.email,
+          temporaryPassword,
+        });
+        showToast(`Approved "${selectedRequest.fullName}". Share the temporary password securely.`);
         await reload();
         return;
       }
@@ -203,6 +202,10 @@ export function UserRequestsPageContent() {
   }
 
   const modalDescription = (() => {
+    if (approvedCredentials) {
+      return "Copy the temporary password and share it with the dispatcher through a secure channel.";
+    }
+
     switch (modalAction) {
       case "approve":
         return "Assign a team and confirm to create the dispatcher account.";
@@ -216,6 +219,10 @@ export function UserRequestsPageContent() {
   })();
 
   const modalTitle = (() => {
+    if (approvedCredentials) {
+      return "Account Approved";
+    }
+
     switch (modalAction) {
       case "view":
         return "Registration Request Details";
@@ -223,10 +230,6 @@ export function UserRequestsPageContent() {
         return "Approve User Request";
       case "reject":
         return "Reject User Request";
-      case "assign-role":
-        return "Assign Role";
-      case "assign-team":
-        return "Assign Team";
       default:
         return "";
     }
@@ -304,12 +307,6 @@ export function UserRequestsPageContent() {
                             <DropdownMenuItem onClick={() => openModal(request, "reject")}>
                               Reject
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => openModal(request, "assign-role")}>
-                              Assign Role
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => openModal(request, "assign-team")}>
-                              Assign Team
-                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -337,7 +334,28 @@ export function UserRequestsPageContent() {
             </p>
           ) : null}
 
-          {selectedRequest ? (
+          {approvedCredentials ? (
+            <div className="space-y-3 rounded-md border bg-muted/40 p-4 text-sm">
+              <p>
+                <span className="font-medium">Name:</span> {approvedCredentials.fullName}
+              </p>
+              <p>
+                <span className="font-medium">Email:</span> {approvedCredentials.email}
+              </p>
+              <p>
+                <span className="font-medium">Temporary password:</span>{" "}
+                <code className="rounded bg-background px-2 py-1 font-mono text-xs">
+                  {approvedCredentials.temporaryPassword}
+                </code>
+              </p>
+              <p className="text-xs text-muted-foreground">
+                The dispatcher can sign in at /dispatcher/login. Ask them to change this
+                password after their first login.
+              </p>
+            </div>
+          ) : null}
+
+          {selectedRequest && !approvedCredentials ? (
             <div className="space-y-3 text-sm">
               <p>
                 <span className="font-medium">Name:</span> {selectedRequest.fullName}
@@ -365,25 +383,7 @@ export function UserRequestsPageContent() {
                 </p>
               ) : null}
 
-              {modalAction === "assign-role" ? (
-                <div className="space-y-2">
-                  <p className="font-medium">Select role</p>
-                  <Select
-                    value={assignedRole}
-                    onValueChange={(value) => setAssignedRole(value ?? DISPATCHER)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={TEAM_LEAD}>Team Lead</SelectItem>
-                      <SelectItem value={DISPATCHER}>Dispatcher</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : null}
-
-              {modalAction === "assign-team" || modalAction === "approve" ? (
+              {modalAction === "approve" ? (
                 <div className="space-y-2">
                   <p className="font-medium">Select team</p>
                   <Select
@@ -417,9 +417,9 @@ export function UserRequestsPageContent() {
 
           <DialogFooter>
             <Button variant="outline" type="button" onClick={closeModal}>
-              Cancel
+              {approvedCredentials ? "Close" : "Cancel"}
             </Button>
-            {modalAction !== "view" ? (
+            {!approvedCredentials && modalAction !== "view" ? (
               <Button
                 type="button"
                 onClick={handleConfirmAction}

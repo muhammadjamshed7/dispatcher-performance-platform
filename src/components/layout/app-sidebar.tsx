@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   Activity,
   BarChart3,
-  Crown,
+  CalendarDays,
   FileText,
   LayoutDashboard,
   Settings,
@@ -35,6 +35,7 @@ const NAV_ICONS: Record<string, typeof LayoutDashboard> = {
   activities: Activity,
   rankings: Trophy,
   reports: FileText,
+  dailyReport: CalendarDays,
   settings: Settings,
   users: UserPlus,
   performance: BarChart3,
@@ -124,20 +125,6 @@ export function AppSidebar({
 
       {session && accountPath && !isCollapsed ? (
         <div className="space-y-4 border-t border-[#E5E7EB] p-4">
-          <div className="rounded-2xl border border-[#E5E7EB] bg-[#F8FAFC] p-4">
-            <div className="flex items-center gap-2">
-              <Crown className="size-4 text-[#F97316]" />
-              <p className="text-sm font-semibold text-[#0F172A]">Premium Plan</p>
-            </div>
-            <p className="mt-1 text-xs text-[#64748B]">You&apos;re on a premium plan</p>
-            <button
-              type="button"
-              className="mt-2 text-xs font-medium text-[#2563EB] hover:text-[#1D4ED8]"
-            >
-              View Plan Details →
-            </button>
-          </div>
-
           <div className="flex flex-wrap items-center gap-1.5">
             <Badge
               variant="outline"

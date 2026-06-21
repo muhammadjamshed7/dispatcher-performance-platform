@@ -5,6 +5,7 @@ import type { TeamStatus } from "@/generated/prisma/client";
 import { ForbiddenError } from "@/lib/errors/forbidden-error";
 import { NotFoundError } from "@/lib/errors/not-found-error";
 import { ValidationError } from "@/lib/errors/validation-error";
+import { ADMIN, TEAM_LEAD } from "@/lib/constants/roles";
 import { TEAM_STATUSES } from "@/lib/constants/team-statuses";
 import { db } from "@/lib/db/prisma";
 import type { Team as TeamDto } from "@/lib/types";
@@ -82,8 +83,8 @@ async function validateTeamLead(
     },
   });
 
-  if (!lead) {
-    throw new ValidationError("Team lead user not found or inactive.");
+  if (!lead || (lead.role !== TEAM_LEAD && lead.role !== ADMIN)) {
+    throw new ValidationError("Team lead must be an active team lead or admin user.");
   }
 }
 

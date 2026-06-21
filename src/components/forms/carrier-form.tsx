@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 
@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useEntityOptions } from "@/hooks/use-entity-options";
 import { TRUCK_TYPES } from "@/lib/constants/truck-types";
 import { TEAM_STATUSES } from "@/lib/constants/team-statuses";
+import { cn } from "@/lib/utils";
 import {
   carrierFormSchema,
   defaultCarrierFormValues,
@@ -27,15 +28,63 @@ type CarrierFormProps = {
   formId: string;
   defaultValues?: CarrierFormValues;
   readOnly?: boolean;
+  variant?: "default" | "premium";
   onSubmit: (values: CarrierFormValues) => void;
 };
+
+const premiumLabelClass = "mb-2 block text-sm font-semibold text-[#0F172A]";
+const premiumErrorClass = "mt-1.5 text-xs text-[#DC2626]";
+const premiumInputClass =
+  "h-12 rounded-xl border-[#CBD5E1] bg-white px-4 text-[15px] text-[#0F172A] placeholder:text-[#94A3B8] shadow-none focus-visible:border-[#2563EB] focus-visible:ring-[3px] focus-visible:ring-[rgba(37,99,235,0.12)] aria-invalid:border-[#EF4444] aria-invalid:ring-[3px] aria-invalid:ring-[rgba(239,68,68,0.12)] disabled:cursor-not-allowed disabled:bg-[#F8FAFC] disabled:text-[#94A3B8]";
+const premiumSelectTriggerClass =
+  "h-12 w-full rounded-xl border-[#CBD5E1] bg-white px-4 text-[15px] text-[#0F172A] shadow-none focus-visible:border-[#2563EB] focus-visible:ring-[3px] focus-visible:ring-[rgba(37,99,235,0.12)] aria-invalid:border-[#EF4444] aria-invalid:ring-[3px] aria-invalid:ring-[rgba(239,68,68,0.12)] disabled:cursor-not-allowed disabled:bg-[#F8FAFC] disabled:text-[#94A3B8] data-placeholder:text-[#94A3B8]";
+const premiumTextareaClass =
+  "min-h-[120px] resize-y rounded-xl border-[#CBD5E1] bg-white px-4 py-3.5 text-[15px] text-[#0F172A] placeholder:text-[#94A3B8] shadow-none focus-visible:border-[#2563EB] focus-visible:ring-[3px] focus-visible:ring-[rgba(37,99,235,0.12)] disabled:cursor-not-allowed disabled:bg-[#F8FAFC] disabled:text-[#94A3B8]";
+const premiumNumberInputClass =
+  "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
+
+function FieldLabel({
+  htmlFor,
+  children,
+  premium,
+}: {
+  htmlFor: string;
+  children: ReactNode;
+  premium: boolean;
+}) {
+  return (
+    <Label htmlFor={htmlFor} className={premium ? premiumLabelClass : undefined}>
+      {children}
+    </Label>
+  );
+}
+
+function FieldError({
+  message,
+  premium,
+}: {
+  message?: string;
+  premium: boolean;
+}) {
+  if (!message) {
+    return null;
+  }
+
+  return (
+    <p className={premium ? premiumErrorClass : "text-sm text-destructive"}>
+      {message}
+    </p>
+  );
+}
 
 export function CarrierForm({
   formId,
   defaultValues = defaultCarrierFormValues,
   readOnly = false,
+  variant = "default",
   onSubmit,
 }: CarrierFormProps) {
+  const premium = variant === "premium";
   const { teams, dispatchers } = useEntityOptions();
   const {
     register,
@@ -81,13 +130,231 @@ export function CarrierForm({
   return (
     <form
       id={formId}
-      className="max-h-[60vh] space-y-4 overflow-y-auto pr-1"
+      className={cn(
+        premium
+          ? "grid grid-cols-1 gap-x-6 gap-y-[22px] md:grid-cols-2"
+          : "max-h-[60vh] space-y-4 overflow-y-auto pr-1",
+      )}
       onSubmit={handleSubmit(onSubmit)}
       noValidate
     >
+      {premium ? (
+        <>
+          <div className="space-y-0">
+            <FieldLabel htmlFor={`${formId}-carrier-name`} premium={premium}>
+              Carrier Name
+            </FieldLabel>
+            <Input
+              id={`${formId}-carrier-name`}
+              placeholder="Enter carrier name"
+              disabled={readOnly}
+              aria-invalid={Boolean(errors.carrierName)}
+              className={premiumInputClass}
+              {...register("carrierName")}
+            />
+            <FieldError message={errors.carrierName?.message} premium={premium} />
+          </div>
+
+          <div className="space-y-0">
+            <FieldLabel htmlFor={`${formId}-driver-name`} premium={premium}>
+              Driver Name
+            </FieldLabel>
+            <Input
+              id={`${formId}-driver-name`}
+              placeholder="Enter driver name"
+              disabled={readOnly}
+              aria-invalid={Boolean(errors.driverName)}
+              className={premiumInputClass}
+              {...register("driverName")}
+            />
+            <FieldError message={errors.driverName?.message} premium={premium} />
+          </div>
+
+          <div className="space-y-0">
+            <FieldLabel htmlFor={`${formId}-mc-number`} premium={premium}>
+              MC Number
+            </FieldLabel>
+            <Input
+              id={`${formId}-mc-number`}
+              placeholder="MC-000000"
+              disabled={readOnly}
+              aria-invalid={Boolean(errors.mcNumber)}
+              className={premiumInputClass}
+              {...register("mcNumber")}
+            />
+            <FieldError message={errors.mcNumber?.message} premium={premium} />
+          </div>
+
+          <div className="space-y-0">
+            <FieldLabel htmlFor={`${formId}-dispatch-fee`} premium={premium}>
+              Dispatch Fee Percentage
+            </FieldLabel>
+            <div className="relative">
+              <Input
+                id={`${formId}-dispatch-fee`}
+                type="number"
+                min={0}
+                max={100}
+                step="0.1"
+                disabled={readOnly}
+                aria-invalid={Boolean(errors.dispatchFeePercentage)}
+                className={cn(premiumInputClass, "pr-10", premiumNumberInputClass)}
+                {...register("dispatchFeePercentage", { valueAsNumber: true })}
+              />
+              <span className="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-sm font-medium text-[#64748B]">
+                %
+              </span>
+            </div>
+            <FieldError
+              message={errors.dispatchFeePercentage?.message}
+              premium={premium}
+            />
+          </div>
+
+          <div className="space-y-0 md:col-span-2">
+            <FieldLabel htmlFor={`${formId}-truck-type`} premium={premium}>
+              Truck Type
+            </FieldLabel>
+            <Select
+              value={truckType}
+              onValueChange={(value) => {
+                if (value) {
+                  setValue("truckType", value as CarrierFormValues["truckType"], {
+                    shouldValidate: true,
+                  });
+                }
+              }}
+              disabled={readOnly}
+            >
+              <SelectTrigger
+                id={`${formId}-truck-type`}
+                className={premiumSelectTriggerClass}
+              >
+                <SelectValue placeholder="Select truck type" />
+              </SelectTrigger>
+              <SelectContent>
+                {TRUCK_TYPES.map((item) => (
+                  <SelectItem key={item} value={item}>
+                    {item.replaceAll("_", " ")}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FieldError message={errors.truckType?.message} premium={premium} />
+          </div>
+
+          <div className="space-y-0">
+            <FieldLabel htmlFor={`${formId}-assigned-team`} premium={premium}>
+              Assigned Team
+            </FieldLabel>
+            <Select
+              value={assignedTeam}
+              onValueChange={(value) => {
+                if (value) {
+                  setValue("assignedTeam", value, { shouldValidate: true });
+                }
+              }}
+              disabled={readOnly}
+            >
+              <SelectTrigger
+                id={`${formId}-assigned-team`}
+                className={premiumSelectTriggerClass}
+              >
+                <SelectValue placeholder="Select team" />
+              </SelectTrigger>
+              <SelectContent>
+                {teams.map((team) => (
+                  <SelectItem key={team.id} value={team.name}>
+                    {team.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FieldError message={errors.assignedTeam?.message} premium={premium} />
+          </div>
+
+          <div className="space-y-0">
+            <FieldLabel htmlFor={`${formId}-assigned-dispatcher`} premium={premium}>
+              Assigned Dispatcher
+            </FieldLabel>
+            <Select
+              value={assignedDispatcher}
+              onValueChange={(value) => {
+                if (value) {
+                  setValue("assignedDispatcher", value, { shouldValidate: true });
+                }
+              }}
+              disabled={readOnly || !assignedTeam}
+            >
+              <SelectTrigger
+                id={`${formId}-assigned-dispatcher`}
+                className={premiumSelectTriggerClass}
+              >
+                <SelectValue placeholder="Select dispatcher" />
+              </SelectTrigger>
+              <SelectContent>
+                {teamDispatchers.map((dispatcher) => (
+                  <SelectItem key={dispatcher.id} value={dispatcher.fullName}>
+                    {dispatcher.fullName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FieldError
+              message={errors.assignedDispatcher?.message}
+              premium={premium}
+            />
+          </div>
+
+          <div className="space-y-0 md:col-span-2">
+            <FieldLabel htmlFor={`${formId}-status`} premium={premium}>
+              Status
+            </FieldLabel>
+            <Select
+              value={status}
+              onValueChange={(value) => {
+                if (value) {
+                  setValue("status", value as CarrierFormValues["status"], {
+                    shouldValidate: true,
+                  });
+                }
+              }}
+              disabled={readOnly}
+            >
+              <SelectTrigger id={`${formId}-status`} className={premiumSelectTriggerClass}>
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                {TEAM_STATUSES.map((item) => (
+                  <SelectItem key={item} value={item}>
+                    {item}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FieldError message={errors.status?.message} premium={premium} />
+          </div>
+
+          <div className="space-y-0 md:col-span-2">
+            <FieldLabel htmlFor={`${formId}-notes`} premium={premium}>
+              Notes
+            </FieldLabel>
+            <Textarea
+              id={`${formId}-notes`}
+              placeholder="Optional notes"
+              disabled={readOnly}
+              className={premiumTextareaClass}
+              {...register("notes")}
+            />
+          </div>
+        </>
+      ) : (
+        <>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor={`${formId}-carrier-name`}>Carrier Name</Label>
+          <FieldLabel htmlFor={`${formId}-carrier-name`} premium={premium}>
+            Carrier Name
+          </FieldLabel>
           <Input
             id={`${formId}-carrier-name`}
             placeholder="Enter carrier name"
@@ -95,13 +362,13 @@ export function CarrierForm({
             aria-invalid={Boolean(errors.carrierName)}
             {...register("carrierName")}
           />
-          {errors.carrierName ? (
-            <p className="text-sm text-destructive">{errors.carrierName.message}</p>
-          ) : null}
+          <FieldError message={errors.carrierName?.message} premium={premium} />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor={`${formId}-driver-name`}>Driver Name</Label>
+          <FieldLabel htmlFor={`${formId}-driver-name`} premium={premium}>
+            Driver Name
+          </FieldLabel>
           <Input
             id={`${formId}-driver-name`}
             placeholder="Enter driver name"
@@ -109,15 +376,15 @@ export function CarrierForm({
             aria-invalid={Boolean(errors.driverName)}
             {...register("driverName")}
           />
-          {errors.driverName ? (
-            <p className="text-sm text-destructive">{errors.driverName.message}</p>
-          ) : null}
+          <FieldError message={errors.driverName?.message} premium={premium} />
         </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor={`${formId}-mc-number`}>MC Number</Label>
+          <FieldLabel htmlFor={`${formId}-mc-number`} premium={premium}>
+            MC Number
+          </FieldLabel>
           <Input
             id={`${formId}-mc-number`}
             placeholder="MC-000000"
@@ -125,13 +392,13 @@ export function CarrierForm({
             aria-invalid={Boolean(errors.mcNumber)}
             {...register("mcNumber")}
           />
-          {errors.mcNumber ? (
-            <p className="text-sm text-destructive">{errors.mcNumber.message}</p>
-          ) : null}
+          <FieldError message={errors.mcNumber?.message} premium={premium} />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor={`${formId}-dispatch-fee`}>Dispatch Fee Percentage</Label>
+          <FieldLabel htmlFor={`${formId}-dispatch-fee`} premium={premium}>
+            Dispatch Fee Percentage
+          </FieldLabel>
           <Input
             id={`${formId}-dispatch-fee`}
             type="number"
@@ -142,16 +409,17 @@ export function CarrierForm({
             aria-invalid={Boolean(errors.dispatchFeePercentage)}
             {...register("dispatchFeePercentage", { valueAsNumber: true })}
           />
-          {errors.dispatchFeePercentage ? (
-            <p className="text-sm text-destructive">
-              {errors.dispatchFeePercentage.message}
-            </p>
-          ) : null}
+          <FieldError
+            message={errors.dispatchFeePercentage?.message}
+            premium={premium}
+          />
         </div>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor={`${formId}-truck-type`}>Truck Type</Label>
+        <FieldLabel htmlFor={`${formId}-truck-type`} premium={premium}>
+          Truck Type
+        </FieldLabel>
         <Select
           value={truckType}
           onValueChange={(value) => {
@@ -174,14 +442,14 @@ export function CarrierForm({
             ))}
           </SelectContent>
         </Select>
-        {errors.truckType ? (
-          <p className="text-sm text-destructive">{errors.truckType.message}</p>
-        ) : null}
+        <FieldError message={errors.truckType?.message} premium={premium} />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor={`${formId}-assigned-team`}>Assigned Team</Label>
+          <FieldLabel htmlFor={`${formId}-assigned-team`} premium={premium}>
+            Assigned Team
+          </FieldLabel>
           <Select
             value={assignedTeam}
             onValueChange={(value) => {
@@ -202,13 +470,13 @@ export function CarrierForm({
               ))}
             </SelectContent>
           </Select>
-          {errors.assignedTeam ? (
-            <p className="text-sm text-destructive">{errors.assignedTeam.message}</p>
-          ) : null}
+          <FieldError message={errors.assignedTeam?.message} premium={premium} />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor={`${formId}-assigned-dispatcher`}>Assigned Dispatcher</Label>
+          <FieldLabel htmlFor={`${formId}-assigned-dispatcher`} premium={premium}>
+            Assigned Dispatcher
+          </FieldLabel>
           <Select
             value={assignedDispatcher}
             onValueChange={(value) => {
@@ -229,16 +497,17 @@ export function CarrierForm({
               ))}
             </SelectContent>
           </Select>
-          {errors.assignedDispatcher ? (
-            <p className="text-sm text-destructive">
-              {errors.assignedDispatcher.message}
-            </p>
-          ) : null}
+          <FieldError
+            message={errors.assignedDispatcher?.message}
+            premium={premium}
+          />
         </div>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor={`${formId}-status`}>Status</Label>
+        <FieldLabel htmlFor={`${formId}-status`} premium={premium}>
+          Status
+        </FieldLabel>
         <Select
           value={status}
           onValueChange={(value) => {
@@ -261,13 +530,13 @@ export function CarrierForm({
             ))}
           </SelectContent>
         </Select>
-        {errors.status ? (
-          <p className="text-sm text-destructive">{errors.status.message}</p>
-        ) : null}
+        <FieldError message={errors.status?.message} premium={premium} />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor={`${formId}-notes`}>Notes</Label>
+        <FieldLabel htmlFor={`${formId}-notes`} premium={premium}>
+          Notes
+        </FieldLabel>
         <Textarea
           id={`${formId}-notes`}
           placeholder="Optional notes"
@@ -275,6 +544,8 @@ export function CarrierForm({
           {...register("notes")}
         />
       </div>
+        </>
+      )}
     </form>
   );
 }
