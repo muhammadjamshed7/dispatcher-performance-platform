@@ -144,11 +144,12 @@ export type AdminDashboardBundle = {
   filters: {
     dateFrom: string;
     dateTo: string;
-    teamId: string | null;
-    dispatcherId: string | null;
-    carrierId: string | null;
-    truckType: string | null;
-    status: string | null;
+    teamIds: string[];
+    dispatcherIds: string[];
+    carrierIds: string[];
+    truckTypes: string[];
+    statuses: string[];
+    statusKeys: string[];
   };
   metrics: AdminDashboardMetrics;
   revenueTrend: { date: string; revenue: number }[];

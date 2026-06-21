@@ -38,22 +38,22 @@ export function AdminKpiSection({
   const scopedDispatchers = useMemo(() => {
     let dispatchers = filterOptions.dispatchers;
 
-    if (appliedFilters.teamId) {
-      dispatchers = dispatchers.filter(
-        (dispatcher) => dispatcher.teamId === appliedFilters.teamId,
+    if (appliedFilters.teamIds.length > 0) {
+      dispatchers = dispatchers.filter((dispatcher) =>
+        appliedFilters.teamIds.includes(dispatcher.teamId),
       );
     }
 
-    if (appliedFilters.dispatcherId) {
-      dispatchers = dispatchers.filter(
-        (dispatcher) => dispatcher.id === appliedFilters.dispatcherId,
+    if (appliedFilters.dispatcherIds.length > 0) {
+      dispatchers = dispatchers.filter((dispatcher) =>
+        appliedFilters.dispatcherIds.includes(dispatcher.id),
       );
     }
 
     return dispatchers;
   }, [
-    appliedFilters.dispatcherId,
-    appliedFilters.teamId,
+    appliedFilters.dispatcherIds,
+    appliedFilters.teamIds,
     filterOptions.dispatchers,
   ]);
 
@@ -150,7 +150,7 @@ export function AdminKpiSection({
         label="Active Dispatchers"
         value={metrics.activeDispatchers.toLocaleString()}
         helper={
-          appliedFilters.teamId || appliedFilters.dispatcherId
+          appliedFilters.teamIds.length > 0 || appliedFilters.dispatcherIds.length > 0
             ? "Matching current filters"
             : "Across all teams"
         }

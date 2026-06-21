@@ -1,15 +1,13 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Truck } from "lucide-react";
 
+import { AdminDashboardFilterControls } from "@/components/dashboard/admin/filters/admin-dashboard-filter-controls";
+import { ActiveFilterChips } from "@/components/dashboard/admin/filters/active-filter-chips";
 import { AdminDashboardHeader } from "@/components/dashboard/admin/admin-dashboard-header";
 import { AdminKpiSection } from "@/components/dashboard/admin/admin-kpi-section";
-import {
-  DashboardFilterBar,
-  DEFAULT_DASHBOARD_FILTERS,
-  type DashboardFilterValues,
-} from "@/components/dashboard/admin/dashboard-filter-bar";
 import { DashboardSecondaryMetricCard } from "@/components/dashboard/admin/dashboard-secondary-metric-card";
 import { MonthlyGrowthMetricCard } from "@/components/dashboard/admin/monthly-growth-metric-card";
 import { LoadStatusDonutChart } from "@/components/dashboard/admin/load-status-donut-chart";
@@ -21,17 +19,29 @@ import { PageContentGate } from "@/components/feedback/page-content-gate";
 import type { PageContentState } from "@/components/feedback/page-content-gate";
 import { useApiData } from "@/hooks/use-api-data";
 import { fetchAdminDashboard } from "@/lib/api/resources";
-import { dashboardFiltersToParams } from "@/lib/dashboard/dashboard-filter-params";
+import {
+  adminDashboardFiltersToSearchParams,
+  dashboardFiltersToParams,
+  DEFAULT_ADMIN_DASHBOARD_FILTERS,
+  parseAdminDashboardFiltersFromSearchParams,
+  type AdminDashboardFilterState,
+} from "@/lib/dashboard/dashboard-filter-params";
 import { formatGrowthLabel } from "@/lib/utils/resolve-date-range-preset";
 
-export function AdminDashboardPage() {
-  const [filters, setFilters] = useState<DashboardFilterValues>(
-    DEFAULT_DASHBOARD_FILTERS,
+function AdminDashboardPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [appliedFilters, setAppliedFilters] = useState<AdminDashboardFilterState>(() =>
+    parseAdminDashboardFiltersFromSearchParams(searchParams),
   );
 
+  useEffect(() => {
+    setAppliedFilters(parseAdminDashboardFiltersFromSearchParams(searchParams));
+  }, [searchParams]);
+
   const loadDashboard = useCallback(
-    () => fetchAdminDashboard(dashboardFiltersToParams(filters)),
-    [filters],
+    () => fetchAdminDashboard(dashboardFiltersToParams(appliedFilters)),
+    [appliedFilters],
   );
 
   const {
@@ -39,7 +49,7 @@ export function AdminDashboardPage() {
     error,
     isLoading,
     reload,
-  } = useApiData(loadDashboard, [filters]);
+  } = useApiData(loadDashboard, [appliedFilters]);
 
   const pageState: PageContentState = isLoading
     ? "loading"
@@ -58,9 +68,36 @@ export function AdminDashboardPage() {
     statuses: [],
   };
 
+  function handleApplyFilters(nextFilters: AdminDashboardFilterState) {
+    setAppliedFilters(nextFilters);
+    const params = adminDashboardFiltersToSearchParams(nextFilters);
+    const query = params.toString();
+    router.replace(query ? `/admin/dashboard?${query}` : "/admin/dashboard", {
+      scroll: false,
+    });
+  }
+
   return (
     <div className="space-y-6">
-      <AdminDashboardHeader onRefresh={reload} isRefreshing={isLoading} />
+      <AdminDashboardHeader
+        onRefresh={reload}
+        isRefreshing={isLoading}
+        filterAction={
+          <AdminDashboardFilterControls
+            appliedFilters={appliedFilters}
+            filterOptions={filterOptions}
+            onApplyFilters={handleApplyFilters}
+            showChips={false}
+          />
+        }
+        filterChips={
+          <ActiveFilterChips
+            filters={appliedFilters}
+            filterOptions={filterOptions}
+            onChange={handleApplyFilters}
+          />
+        }
+      />
 
       <PageContentGate
         state={pageState}
@@ -74,13 +111,6 @@ export function AdminDashboardPage() {
         }
       >
         <>
-          <DashboardFilterBar
-            values={filters}
-            filterOptions={filterOptions}
-            onChange={setFilters}
-            onReset={() => setFilters(DEFAULT_DASHBOARD_FILTERS)}
-          />
-
           {metrics && dashboard ? (
             <AdminKpiSection
               metrics={metrics}
@@ -122,5 +152,13 @@ export function AdminDashboardPage() {
         </>
       </PageContentGate>
     </div>
+  );
+}
+
+export function AdminDashboardPage() {
+  return (
+    <Suspense fallback={<div className="py-10 text-sm text-[#64748B]">Loading dashboard...</div>}>
+      <AdminDashboardPageContent />
+    </Suspense>
   );
 }

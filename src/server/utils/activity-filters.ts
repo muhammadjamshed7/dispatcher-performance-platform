@@ -14,13 +14,60 @@ export const activityFiltersSchema = z.object({
   dateFrom: z.string().optional(),
   dateTo: z.string().optional(),
   status: z.enum(STATUSES).optional(),
+  statuses: z.string().optional(),
   teamId: z.string().optional(),
+  teamIds: z.string().optional(),
   dispatcherId: z.string().optional(),
+  dispatcherIds: z.string().optional(),
   carrierId: z.string().optional(),
+  carrierIds: z.string().optional(),
   truckType: z.enum(TRUCK_TYPES).optional(),
+  truckTypes: z.string().optional(),
+  statusKeys: z.string().optional(),
 });
 
 export type ActivityFilters = z.infer<typeof activityFiltersSchema>;
+
+function parseCsvParam(value?: string): string[] {
+  if (!value?.trim()) {
+    return [];
+  }
+
+  return [...new Set(value.split(",").map((part) => part.trim()).filter(Boolean))];
+}
+
+export function normalizeActivityFilters(filters: ActivityFilters) {
+  const teamIds = [
+    ...parseCsvParam(filters.teamIds),
+    ...(filters.teamId ? [filters.teamId] : []),
+  ];
+  const dispatcherIds = [
+    ...parseCsvParam(filters.dispatcherIds),
+    ...(filters.dispatcherId ? [filters.dispatcherId] : []),
+  ];
+  const carrierIds = [
+    ...parseCsvParam(filters.carrierIds),
+    ...(filters.carrierId ? [filters.carrierId] : []),
+  ];
+  const truckTypes = [
+    ...parseCsvParam(filters.truckTypes),
+    ...(filters.truckType ? [filters.truckType] : []),
+  ] as typeof TRUCK_TYPES[number][];
+  const statuses = [
+    ...parseCsvParam(filters.statuses),
+    ...(filters.status ? [filters.status] : []),
+  ] as typeof STATUSES[number][];
+
+  return {
+    ...filters,
+    teamIds: [...new Set(teamIds)],
+    dispatcherIds: [...new Set(dispatcherIds)],
+    carrierIds: [...new Set(carrierIds)],
+    truckTypes: [...new Set(truckTypes)],
+    statuses: [...new Set(statuses)],
+    statusKeys: parseCsvParam(filters.statusKeys),
+  };
+}
 
 export function parseActivityDate(dateStr: string): Date {
   const [year, month, day] = dateStr.split("-").map(Number);
@@ -123,6 +170,7 @@ export function buildActivityWhere(
   scope: AccessScope,
   filters: ActivityFilters,
 ): Prisma.DailyActivityWhereInput {
+  const normalized = normalizeActivityFilters(filters);
   const where: Prisma.DailyActivityWhereInput = {
     organizationId: scope.organizationId,
     ...activityScopeFilter(scope),
@@ -140,24 +188,36 @@ export function buildActivityWhere(
     }
   }
 
-  if (filters.status) {
-    where.status = filters.status;
+  if (normalized.statuses.length === 1) {
+    where.status = normalized.statuses[0];
+  } else if (normalized.statuses.length > 1) {
+    where.status = { in: normalized.statuses };
+  } else if (normalized.statusKeys.length > 0) {
+    where.status = { in: [] };
   }
 
-  if (filters.teamId) {
-    where.teamId = filters.teamId;
+  if (normalized.teamIds.length === 1) {
+    where.teamId = normalized.teamIds[0];
+  } else if (normalized.teamIds.length > 1) {
+    where.teamId = { in: normalized.teamIds };
   }
 
-  if (filters.dispatcherId) {
-    where.dispatcherId = filters.dispatcherId;
+  if (normalized.dispatcherIds.length === 1) {
+    where.dispatcherId = normalized.dispatcherIds[0];
+  } else if (normalized.dispatcherIds.length > 1) {
+    where.dispatcherId = { in: normalized.dispatcherIds };
   }
 
-  if (filters.carrierId) {
-    where.carrierId = filters.carrierId;
+  if (normalized.carrierIds.length === 1) {
+    where.carrierId = normalized.carrierIds[0];
+  } else if (normalized.carrierIds.length > 1) {
+    where.carrierId = { in: normalized.carrierIds };
   }
 
-  if (filters.truckType) {
-    where.truckTypeSnapshot = filters.truckType;
+  if (normalized.truckTypes.length === 1) {
+    where.truckTypeSnapshot = normalized.truckTypes[0];
+  } else if (normalized.truckTypes.length > 1) {
+    where.truckTypeSnapshot = { in: normalized.truckTypes };
   }
 
   return where;

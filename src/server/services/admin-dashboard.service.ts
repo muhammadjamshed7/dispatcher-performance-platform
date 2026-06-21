@@ -18,6 +18,7 @@ import {
   buildTrendDateKeys,
   formatActivityDate,
   formatTrendDateLabel,
+  normalizeActivityFilters,
   parseActivityDate,
   previousPeriodRange,
   resolveDashboardDateRange,
@@ -367,14 +368,24 @@ async function fetchActiveDispatchers(
   scope: AccessScope,
   filters: ActivityFilters,
 ): Promise<number> {
+  const normalized = normalizeActivityFilters(filters);
+
   return db.dispatcher.count({
     where: {
       organizationId: scope.organizationId,
       status: "ACTIVE",
       deletedAt: null,
       ...dispatcherScopeFilter(scope),
-      ...(filters.teamId ? { teamId: filters.teamId } : {}),
-      ...(filters.dispatcherId ? { id: filters.dispatcherId } : {}),
+      ...(normalized.teamIds.length === 1
+        ? { teamId: normalized.teamIds[0] }
+        : normalized.teamIds.length > 1
+          ? { teamId: { in: normalized.teamIds } }
+          : {}),
+      ...(normalized.dispatcherIds.length === 1
+        ? { id: normalized.dispatcherIds[0] }
+        : normalized.dispatcherIds.length > 1
+          ? { id: { in: normalized.dispatcherIds } }
+          : {}),
     },
   });
 }
@@ -488,15 +499,18 @@ export async function getAdminDashboardBundle(
     previous.totalRevenue,
   );
 
+  const normalizedFilters = normalizeActivityFilters(rawFilters);
+
   return {
     filters: {
       dateFrom: range.dateFrom,
       dateTo: range.dateTo,
-      teamId: filters.teamId ?? null,
-      dispatcherId: filters.dispatcherId ?? null,
-      carrierId: filters.carrierId ?? null,
-      truckType: filters.truckType ?? null,
-      status: filters.status ?? null,
+      teamIds: normalizedFilters.teamIds,
+      dispatcherIds: normalizedFilters.dispatcherIds,
+      carrierIds: normalizedFilters.carrierIds,
+      truckTypes: normalizedFilters.truckTypes,
+      statuses: normalizedFilters.statuses,
+      statusKeys: normalizedFilters.statusKeys,
     },
     metrics: {
       totalRevenue: current.totalRevenue,

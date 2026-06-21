@@ -10,11 +10,20 @@ import { getAdminDashboardBundle } from "@/server/services/admin-dashboard.servi
 const adminDashboardFiltersSchema = z.object({
   dateFrom: z.string().optional(),
   dateTo: z.string().optional(),
+  dateRange: z.string().optional(),
+  customDateFrom: z.string().optional(),
+  customDateTo: z.string().optional(),
   status: z.enum(STATUSES).optional(),
+  statuses: z.string().optional(),
+  statusKeys: z.string().optional(),
   teamId: z.string().optional(),
+  teamIds: z.string().optional(),
   dispatcherId: z.string().optional(),
+  dispatcherIds: z.string().optional(),
   carrierId: z.string().optional(),
+  carrierIds: z.string().optional(),
   truckType: z.enum(TRUCK_TYPES).optional(),
+  truckTypes: z.string().optional(),
 });
 
 export async function GET(request: Request) {
