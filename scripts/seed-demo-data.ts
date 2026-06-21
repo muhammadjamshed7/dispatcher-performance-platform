@@ -164,7 +164,7 @@ async function ensureSupabase() {
 }
 
 async function ensureAuthUser(
-  supabase: ReturnType<typeof createClient>,
+  supabase: Awaited<ReturnType<typeof ensureSupabase>>,
   email: string,
   fullName: string,
 ) {
