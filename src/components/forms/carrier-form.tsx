@@ -43,6 +43,12 @@ const premiumTextareaClass =
 const premiumNumberInputClass =
   "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
 
+const modalSelectContentProps = {
+  alignItemWithTrigger: false as const,
+  side: "bottom" as const,
+  className: "max-h-60",
+};
+
 function FieldLabel({
   htmlFor,
   children,
@@ -85,7 +91,7 @@ export function CarrierForm({
   onSubmit,
 }: CarrierFormProps) {
   const premium = variant === "premium";
-  const { teams, dispatchers } = useEntityOptions();
+  const { teams, dispatchers, isLoading } = useEntityOptions();
   const {
     register,
     handleSubmit,
@@ -110,6 +116,14 @@ export function CarrierForm({
       ),
     [assignedTeam, dispatchers],
   );
+
+  const dispatcherPlaceholder = isLoading
+    ? "Loading dispatchers..."
+    : !assignedTeam
+      ? "Select team first"
+      : teamDispatchers.length === 0
+        ? "No dispatchers in this team"
+        : "Select dispatcher";
 
   useEffect(() => {
     reset(defaultValues);
@@ -284,15 +298,15 @@ export function CarrierForm({
                   setValue("assignedDispatcher", value, { shouldValidate: true });
                 }
               }}
-              disabled={readOnly || !assignedTeam}
+              disabled={readOnly || !assignedTeam || isLoading}
             >
               <SelectTrigger
                 id={`${formId}-assigned-dispatcher`}
                 className={premiumSelectTriggerClass}
               >
-                <SelectValue placeholder="Select dispatcher" />
+                <SelectValue placeholder={dispatcherPlaceholder} />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent {...modalSelectContentProps}>
                 {teamDispatchers.map((dispatcher) => (
                   <SelectItem key={dispatcher.id} value={dispatcher.fullName}>
                     {dispatcher.fullName}
@@ -484,12 +498,12 @@ export function CarrierForm({
                 setValue("assignedDispatcher", value, { shouldValidate: true });
               }
             }}
-            disabled={readOnly || !assignedTeam}
+            disabled={readOnly || !assignedTeam || isLoading}
           >
             <SelectTrigger id={`${formId}-assigned-dispatcher`} className="w-full">
-              <SelectValue placeholder="Select dispatcher" />
+              <SelectValue placeholder={dispatcherPlaceholder} />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent {...modalSelectContentProps}>
               {teamDispatchers.map((dispatcher) => (
                 <SelectItem key={dispatcher.id} value={dispatcher.fullName}>
                   {dispatcher.fullName}

@@ -5,6 +5,7 @@ import { useCallback, useState, type ReactNode } from "react";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { MainContent } from "@/components/layout/main-content";
 import { TopNav } from "@/components/layout/top-nav";
+import { EntityOptionsProvider } from "@/components/providers/entity-options-provider";
 
 type DashboardShellProps = {
   children: ReactNode;
@@ -32,7 +33,9 @@ export function DashboardShell({ children }: DashboardShellProps) {
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopNav onMenuClick={handleMenuClick} />
-        <MainContent>{children}</MainContent>
+        <MainContent>
+          <EntityOptionsProvider>{children}</EntityOptionsProvider>
+        </MainContent>
       </div>
     </div>
   );

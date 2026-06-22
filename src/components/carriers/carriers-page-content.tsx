@@ -24,11 +24,10 @@ import { ApiClientError } from "@/lib/api/client";
 import {
   createCarrierRequest,
   fetchCarriers,
-  fetchDispatchers,
-  fetchTeams,
   reassignCarrierRequest,
   updateCarrierRequest,
 } from "@/lib/api/resources";
+import { useEntityOptions } from "@/hooks/use-entity-options";
 import {
   TEAM_STATUS_ACTIVE,
   TEAM_STATUS_INACTIVE,
@@ -53,8 +52,6 @@ export function CarriersPageContent() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const loadCarriers = useCallback(() => fetchCarriers(), []);
-  const loadTeams = useCallback(() => fetchTeams(), []);
-  const loadDispatchers = useCallback(() => fetchDispatchers(), []);
 
   const {
     data: carriers = [],
@@ -63,10 +60,13 @@ export function CarriersPageContent() {
     isEmpty,
     reload,
   } = useApiData(loadCarriers, []);
-  const { data: teams = [] } = useApiData(loadTeams, []);
-  const { data: dispatchers = [] } = useApiData(loadDispatchers, []);
+  const { teams, dispatchers, reload: reloadEntityOptions } = useEntityOptions();
 
-  useRealtimeRefresh(["Carrier"], reload);
+  const refreshCarriers = useCallback(async () => {
+    await Promise.all([reload(), reloadEntityOptions()]);
+  }, [reload, reloadEntityOptions]);
+
+  useRealtimeRefresh(["Carrier"], refreshCarriers);
 
   const visibleCarriers = useMemo(
     () => filterCarriers(carriers),

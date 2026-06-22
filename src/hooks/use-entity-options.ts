@@ -1,36 +1,18 @@
 "use client";
 
-import { useCallback } from "react";
-
-import { useApiData } from "@/hooks/use-api-data";
 import { useRoleScope } from "@/hooks/use-role-scope";
-import {
-  fetchCarriers,
-  fetchDispatchers,
-  fetchTeams,
-} from "@/lib/api/resources";
+import { useEntityOptionsContext } from "@/components/providers/entity-options-provider";
 
 export function useEntityOptions() {
   const { filterTeams, filterDispatchers, filterCarriers } = useRoleScope();
-
-  const loadTeams = useCallback(() => fetchTeams(), []);
-  const loadDispatchers = useCallback(() => fetchDispatchers(), []);
-  const loadCarriers = useCallback(() => fetchCarriers(), []);
-
-  const { data: teams = [], isLoading: teamsLoading } = useApiData(loadTeams, []);
-  const { data: dispatchers = [], isLoading: dispatchersLoading } = useApiData(
-    loadDispatchers,
-    [],
-  );
-  const { data: carriers = [], isLoading: carriersLoading } = useApiData(
-    loadCarriers,
-    [],
-  );
+  const { teams, dispatchers, carriers, isLoading, reload } =
+    useEntityOptionsContext();
 
   return {
     teams: filterTeams(teams),
     dispatchers: filterDispatchers(dispatchers),
     carriers: filterCarriers(carriers),
-    isLoading: teamsLoading || dispatchersLoading || carriersLoading,
+    isLoading,
+    reload,
   };
 }

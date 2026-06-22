@@ -29,7 +29,7 @@ export function CarrierReassignForm({
   defaultValues,
   onSubmit,
 }: CarrierReassignFormProps) {
-  const { teams, dispatchers } = useEntityOptions();
+  const { teams, dispatchers, isLoading } = useEntityOptions();
   const {
     handleSubmit,
     reset,
@@ -51,6 +51,14 @@ export function CarrierReassignForm({
       ),
     [assignedTeam, dispatchers],
   );
+
+  const dispatcherPlaceholder = isLoading
+    ? "Loading dispatchers..."
+    : !assignedTeam
+      ? "Select team first"
+      : teamDispatchers.length === 0
+        ? "No dispatchers in this team"
+        : "Select dispatcher";
 
   useEffect(() => {
     if (defaultValues) {
@@ -112,12 +120,12 @@ export function CarrierReassignForm({
               setValue("assignedDispatcher", value, { shouldValidate: true });
             }
           }}
-          disabled={!assignedTeam}
+          disabled={!assignedTeam || isLoading}
         >
           <SelectTrigger id={`${formId}-assigned-dispatcher`} className="w-full">
-            <SelectValue placeholder="Select dispatcher" />
+            <SelectValue placeholder={dispatcherPlaceholder} />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent alignItemWithTrigger={false} side="bottom" className="max-h-60">
             {teamDispatchers.map((dispatcher) => (
               <SelectItem key={dispatcher.id} value={dispatcher.fullName}>
                 {dispatcher.fullName}
