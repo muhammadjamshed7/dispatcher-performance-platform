@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Truck } from "lucide-react";
@@ -7,13 +8,8 @@ import { Truck } from "lucide-react";
 import { AdminDashboardFilterControls } from "@/components/dashboard/admin/filters/admin-dashboard-filter-controls";
 import { ActiveFilterChips } from "@/components/dashboard/admin/filters/active-filter-chips";
 import { AdminDashboardHeader } from "@/components/dashboard/admin/admin-dashboard-header";
-import { AdminKpiSection } from "@/components/dashboard/admin/admin-kpi-section";
 import { DashboardSecondaryMetricCard } from "@/components/dashboard/admin/dashboard-secondary-metric-card";
-import { MonthlyGrowthMetricCard } from "@/components/dashboard/admin/monthly-growth-metric-card";
-import { LoadStatusDonutChart } from "@/components/dashboard/admin/load-status-donut-chart";
-import { LoadsByTeamChart } from "@/components/dashboard/admin/loads-by-team-chart";
 import { RecentActivitiesTable } from "@/components/dashboard/admin/recent-activities-table";
-import { RevenueTrendChart } from "@/components/dashboard/admin/revenue-trend-chart";
 import { TopPerformersCard } from "@/components/dashboard/admin/top-performers-card";
 import { PageContentGate } from "@/components/feedback/page-content-gate";
 import type { PageContentState } from "@/components/feedback/page-content-gate";
@@ -22,11 +18,50 @@ import { fetchAdminDashboard } from "@/lib/api/resources";
 import {
   adminDashboardFiltersToSearchParams,
   dashboardFiltersToParams,
-  DEFAULT_ADMIN_DASHBOARD_FILTERS,
   parseAdminDashboardFiltersFromSearchParams,
   type AdminDashboardFilterState,
 } from "@/lib/dashboard/dashboard-filter-params";
 import { formatGrowthLabel } from "@/lib/utils/resolve-date-range-preset";
+
+const AdminKpiSection = dynamic(
+  () =>
+    import("@/components/dashboard/admin/admin-kpi-section").then(
+      (module) => module.AdminKpiSection,
+    ),
+  { ssr: false },
+);
+
+const MonthlyGrowthMetricCard = dynamic(
+  () =>
+    import("@/components/dashboard/admin/monthly-growth-metric-card").then(
+      (module) => module.MonthlyGrowthMetricCard,
+    ),
+  { ssr: false },
+);
+
+const RevenueTrendChart = dynamic(
+  () =>
+    import("@/components/dashboard/admin/revenue-trend-chart").then(
+      (module) => module.RevenueTrendChart,
+    ),
+  { ssr: false },
+);
+
+const LoadsByTeamChart = dynamic(
+  () =>
+    import("@/components/dashboard/admin/loads-by-team-chart").then(
+      (module) => module.LoadsByTeamChart,
+    ),
+  { ssr: false },
+);
+
+const LoadStatusDonutChart = dynamic(
+  () =>
+    import("@/components/dashboard/admin/load-status-donut-chart").then(
+      (module) => module.LoadStatusDonutChart,
+    ),
+  { ssr: false },
+);
 
 function AdminDashboardPageContent() {
   const router = useRouter();

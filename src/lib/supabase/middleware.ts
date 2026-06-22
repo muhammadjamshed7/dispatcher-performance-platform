@@ -1,7 +1,27 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { isPublicAuthPath } from "@/lib/auth/roles";
 import { getPublicEnv } from "@/lib/env";
+import { hasSupabaseAuthCookiesFromList } from "@/lib/supabase/auth-cookies";
+
+function shouldRefreshSession(request: NextRequest): boolean {
+  const { pathname } = request.nextUrl;
+
+  if (pathname.startsWith("/api/")) {
+    return false;
+  }
+
+  if (
+    isPublicAuthPath(pathname) ||
+    pathname === "/auth/callback" ||
+    pathname === "/session-expired"
+  ) {
+    return false;
+  }
+
+  return hasSupabaseAuthCookiesFromList(request.cookies.getAll());
+}
 
 export async function updateSession(request: NextRequest) {
   const { NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY } =
@@ -36,8 +56,9 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  // Placeholder for future session refresh logic.
-  await supabase.auth.getUser();
+  if (shouldRefreshSession(request)) {
+    await supabase.auth.getUser();
+  }
 
   return supabaseResponse;
 }

@@ -216,51 +216,56 @@ function buildMonthlyGrowthTrend(activities: ActivityRecord[]) {
   });
 }
 
+function filterActivitiesByDateRange(
+  activities: ActivityRecord[],
+  dateFrom: string,
+  dateTo: string,
+): ActivityRecord[] {
+  return activities.filter((row) => {
+    const dateKey = formatActivityDate(row.activityDate);
+    return dateKey >= dateFrom && dateKey <= dateTo;
+  });
+}
+
 function summarizeActivities(
   activities: ActivityRecord[],
   trendDateKeys: string[],
 ) {
-  const delivered = activities.filter((row) => row.status === DELIVERED);
-  const totalRevenue = delivered.reduce(
-    (sum, row) => sum + decimalToNumber(row.loadAmount),
-    0,
-  );
-
   const revenueByDate = new Map<string, number>();
   const loadsByDate = new Map<string, number>();
   const deliveredByDate = new Map<string, number>();
-
-  for (const row of activities) {
-    const dateKey = formatActivityDate(row.activityDate);
-    loadsByDate.set(dateKey, (loadsByDate.get(dateKey) ?? 0) + 1);
-
-    if (row.status === DELIVERED) {
-      deliveredByDate.set(dateKey, (deliveredByDate.get(dateKey) ?? 0) + 1);
-      const amount = decimalToNumber(row.loadAmount);
-      revenueByDate.set(dateKey, (revenueByDate.get(dateKey) ?? 0) + amount);
-    }
-  }
-
   const loadsByTeamMap = new Map<string, number>();
-  for (const row of activities) {
-    const team = row.teamNameSnapshot || "Unassigned";
-    loadsByTeamMap.set(team, (loadsByTeamMap.get(team) ?? 0) + 1);
-  }
-
   const statusCounts = new Map<LoadActivityStatus, number>();
-  for (const status of STATUSES) {
-    statusCounts.set(status, 0);
-  }
-  for (const row of activities) {
-    statusCounts.set(row.status, (statusCounts.get(row.status) ?? 0) + 1);
-  }
-
   const revenueByDispatcher = new Map<
     string,
     { name: string; team: string; revenue: number }
   >();
-  for (const row of delivered) {
+
+  for (const status of STATUSES) {
+    statusCounts.set(status, 0);
+  }
+
+  let deliveredCount = 0;
+  let totalRevenue = 0;
+
+  for (const row of activities) {
+    const team = row.teamNameSnapshot || "Unassigned";
+    loadsByTeamMap.set(team, (loadsByTeamMap.get(team) ?? 0) + 1);
+    statusCounts.set(row.status, (statusCounts.get(row.status) ?? 0) + 1);
+
+    if (row.status !== DELIVERED) {
+      continue;
+    }
+
+    deliveredCount += 1;
+    const dateKey = formatActivityDate(row.activityDate);
+    loadsByDate.set(dateKey, (loadsByDate.get(dateKey) ?? 0) + 1);
+    deliveredByDate.set(dateKey, (deliveredByDate.get(dateKey) ?? 0) + 1);
+
     const amount = decimalToNumber(row.loadAmount);
+    totalRevenue += amount;
+    revenueByDate.set(dateKey, (revenueByDate.get(dateKey) ?? 0) + amount);
+
     const existing = revenueByDispatcher.get(row.dispatcherNameSnapshot) ?? {
       name: row.dispatcherNameSnapshot,
       team: row.teamNameSnapshot,
@@ -271,12 +276,12 @@ function summarizeActivities(
   }
 
   return {
-    totalLoads: activities.length,
-    deliveredLoads: delivered.length,
+    totalLoads: deliveredCount,
+    deliveredLoads: deliveredCount,
     totalRevenue: Math.round(totalRevenue * 100) / 100,
     onTimeRate:
       activities.length > 0
-        ? Math.round((delivered.length / activities.length) * 1000) / 10
+        ? Math.round((deliveredCount / activities.length) * 1000) / 10
         : 0,
     revenueTrend: [...revenueByDate.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
@@ -459,11 +464,6 @@ export async function getAdminDashboardBundle(
   await assertFilterAccess(scope, rawFilters);
 
   const range = resolveDashboardDateRange(rawFilters);
-  const filters: ActivityFilters = {
-    ...rawFilters,
-    dateFrom: range.dateFrom,
-    dateTo: range.dateTo,
-  };
 
   const previousRange = previousPeriodRange(range.dateFrom, range.dateTo);
   const now = new Date();
@@ -474,22 +474,38 @@ export async function getAdminDashboardBundle(
   const trendDateKeys = buildTrendDateKeys(range.dateFrom, range.dateTo);
   const trendDates = trendDateKeys.map(formatTrendDateLabel);
 
-  const [currentActivities, previousActivities, yearTrendActivities, activeDispatchers, filterOptions] =
-    await Promise.all([
-      fetchActivities(scope, filters),
-      fetchActivities(scope, {
-        ...rawFilters,
-        dateFrom: previousRange.dateFrom,
-        dateTo: previousRange.dateTo,
-      }),
-      fetchActivities(scope, {
-        ...rawFilters,
-        dateFrom: yearTrendFrom,
-        dateTo: yearTrendTo,
-      }),
-      fetchActiveDispatchers(scope, rawFilters),
-      fetchFilterOptions(scope),
-    ]);
+  const combinedDateFrom = [range.dateFrom, previousRange.dateFrom, yearTrendFrom].reduce(
+    (min, value) => (value < min ? value : min),
+  );
+  const combinedDateTo = [range.dateTo, previousRange.dateTo, yearTrendTo].reduce(
+    (max, value) => (value > max ? value : max),
+  );
+
+  const [allActivities, activeDispatchers, filterOptions] = await Promise.all([
+    fetchActivities(scope, {
+      ...rawFilters,
+      dateFrom: combinedDateFrom,
+      dateTo: combinedDateTo,
+    }),
+    fetchActiveDispatchers(scope, rawFilters),
+    fetchFilterOptions(scope),
+  ]);
+
+  const currentActivities = filterActivitiesByDateRange(
+    allActivities,
+    range.dateFrom,
+    range.dateTo,
+  );
+  const previousActivities = filterActivitiesByDateRange(
+    allActivities,
+    previousRange.dateFrom,
+    previousRange.dateTo,
+  );
+  const yearTrendActivities = filterActivitiesByDateRange(
+    allActivities,
+    yearTrendFrom,
+    yearTrendTo,
+  );
 
   const current = summarizeActivities(currentActivities, trendDateKeys);
   const previous = summarizeActivities(previousActivities, trendDateKeys);

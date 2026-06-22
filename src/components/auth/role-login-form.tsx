@@ -33,7 +33,7 @@ type RoleLoginFormProps = {
 function RoleLoginFormContent({ role, title, description }: RoleLoginFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { refreshSession, setSession } = useSession();
+  const { setSession } = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +50,6 @@ function RoleLoginFormContent({ role, title, description }: RoleLoginFormProps) 
     try {
       const session = await loginRequest({ email, password, expectedRole: role });
       setSession(session);
-      await refreshSession();
       router.replace(getDashboardPathForRole(role));
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : "Unable to sign in.");

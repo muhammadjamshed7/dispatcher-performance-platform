@@ -8,7 +8,7 @@ import { ValidationError } from "@/lib/errors/validation-error";
 import { createServerClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db/prisma";
 import type { SessionUser } from "@/lib/api/resources";
-import { getCurrentUser, touchLastLogin } from "@/server/auth/session";
+import { getCurrentUser, getCurrentUserBySupabaseId, touchLastLogin } from "@/server/auth/session";
 
 function toSessionUser(user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>): SessionUser {
   return {
@@ -46,16 +46,16 @@ export async function signInWithRole(input: {
   const parsed = loginSchema.parse(input);
   const supabase = await createServerClient();
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email: parsed.email.toLowerCase(),
     password: parsed.password,
   });
 
-  if (error) {
+  if (error || !data.user) {
     throw new ValidationError("Invalid email or password for this portal.");
   }
 
-  const sessionUser = await getCurrentUser();
+  const sessionUser = await getCurrentUserBySupabaseId(data.user.id);
 
   if (!sessionUser || sessionUser.email !== parsed.email.toLowerCase()) {
     await supabase.auth.signOut();
@@ -77,7 +77,7 @@ export async function signInWithRole(input: {
     throw new ForbiddenError("Your account is not active. Contact an administrator.");
   }
 
-  await touchLastLogin(sessionUser.id);
+  void touchLastLogin(sessionUser.id);
 
   return toSessionUser(sessionUser);
 }

@@ -60,6 +60,27 @@ export async function getCurrentUserByEmail(email: string): Promise<AuthContextU
   return mapUser(dbUser);
 }
 
+export async function getCurrentUserBySupabaseId(
+  supabaseUserId: string,
+): Promise<AuthContextUser | null> {
+  const dbUser = await db.user.findFirst({
+    where: {
+      supabaseUserId,
+      deletedAt: null,
+    },
+    include: {
+      team: { select: { name: true } },
+      dispatcher: { select: { id: true } },
+    },
+  });
+
+  if (!dbUser) {
+    return null;
+  }
+
+  return mapUser(dbUser);
+}
+
 export async function touchLastLogin(userId: string): Promise<void> {
   await db.user.update({
     where: { id: userId },

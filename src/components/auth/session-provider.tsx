@@ -9,12 +9,15 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { usePathname } from "next/navigation";
 
 import {
   fetchSession,
   logoutRequest,
   type SessionUser,
 } from "@/lib/api/resources";
+import { isPublicAuthPath } from "@/lib/auth/roles";
+import { hasSupabaseAuthCookiesInDocument } from "@/lib/supabase/auth-cookies";
 
 type SessionContextValue = {
   session: SessionUser | null;
@@ -27,6 +30,7 @@ type SessionContextValue = {
 const SessionContext = createContext<SessionContextValue | null>(null);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   const [session, setSessionState] = useState<SessionUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -37,6 +41,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
+
+    const shouldSkipSessionFetch =
+      isPublicAuthPath(pathname) && !hasSupabaseAuthCookiesInDocument();
+
+    if (shouldSkipSessionFetch) {
+      queueMicrotask(() => {
+        if (active) {
+          setIsLoading(false);
+        }
+      });
+      return () => {
+        active = false;
+      };
+    }
 
     queueMicrotask(() => {
       refreshSession()
@@ -51,7 +69,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, [refreshSession]);
+  }, [pathname, refreshSession]);
 
   const signOut = useCallback(async () => {
     await logoutRequest();
