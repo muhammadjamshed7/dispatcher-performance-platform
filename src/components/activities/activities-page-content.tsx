@@ -1,13 +1,19 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { Suspense, useCallback, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { PageContentGate } from "@/components/feedback/page-content-gate";
 import type { PageContentState } from "@/components/feedback/page-content-gate";
 import { AppToast } from "@/components/feedback/app-toast";
+import { ActivitiesExcelFilterControls } from "@/components/activities/activities-excel-filter-controls";
+import { ActivitiesPdfExportButton } from "@/components/activities/activities-pdf-export-button";
 import { EntityFilterBar } from "@/components/filters/entity-filter-bar";
 import { RoleScopeBanner } from "@/components/layout/role-scope-banner";
-import { ActivityModal, type ActivityModalMode } from "@/components/modals/activity-modal";
+import {
+  ActivityModal,
+  type ActivityModalMode,
+} from "@/components/modals/activity-modal";
 import {
   ActivitiesTable,
   type ActivityRowAction,
@@ -16,14 +22,25 @@ import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
 import { useApiData } from "@/hooks/use-api-data";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
-import { useRoleScope } from "@/hooks/use-role-scope";
 import { ApiClientError } from "@/lib/api/client";
+import { useEntityOptions } from "@/hooks/use-entity-options";
+import {
+  activityExcelFiltersToParams,
+  parseActivityExcelFiltersFromSearchParams,
+  type ActivityExcelFilterState,
+} from "@/lib/filters/activity-excel-filter-params";
+import {
+  entityFiltersToActivityParams,
+  parseEntityFiltersFromSearchParams,
+  type EntityFilterValues,
+} from "@/lib/filters/entity-filter-params";
 import {
   createActivityRequest,
   fetchActivities,
-  fetchCarriers,
+  fetchAllowedStatusReasons,
   updateActivityRequest,
 } from "@/lib/api/resources";
+import { getCarrierDisplayName } from "@/lib/utils/carrier-display";
 import { DELIVERED } from "@/lib/constants/statuses";
 import type { DailyActivity } from "@/lib/types";
 import type { DailyActivityFormValues } from "@/lib/validation/daily-activity-form";
@@ -32,13 +49,10 @@ function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof ApiClientError ? error.message : fallback;
 }
 
-function toCreateActivityPayload(
-  values: DailyActivityFormValues,
-  carrierId: string,
-) {
+function toCreateActivityPayload(values: DailyActivityFormValues) {
   const base = {
     activityDate: values.date,
-    carrierId,
+    carrierId: values.carrierId,
     status: values.status,
     notes: values.notes?.trim() ? values.notes : undefined,
   };
@@ -82,17 +96,70 @@ function toUpdateActivityPayload(values: DailyActivityFormValues) {
   };
 }
 
-export function ActivitiesPageContent() {
-  const { filterActivities } = useRoleScope();
+type ActivitiesPageContentProps = {
+  compact?: boolean;
+};
+
+function ActivitiesPageContentInner({
+  compact = false,
+}: ActivitiesPageContentProps) {
+  const searchParams = useSearchParams();
+  const searchParamKey = searchParams.toString();
+  const urlEntityFilters = useMemo(
+    () =>
+      parseEntityFiltersFromSearchParams(new URLSearchParams(searchParamKey)),
+    [searchParamKey],
+  );
+  const urlExcelFilters = useMemo(
+    () =>
+      parseActivityExcelFiltersFromSearchParams(
+        new URLSearchParams(searchParamKey),
+      ),
+    [searchParamKey],
+  );
+
+  return (
+    <ActivitiesPageState
+      key={searchParamKey}
+      initialEntityFilters={urlEntityFilters}
+      initialExcelFilters={urlExcelFilters}
+      compact={compact}
+    />
+  );
+}
+
+function ActivitiesPageState({
+  initialEntityFilters,
+  initialExcelFilters,
+  compact,
+}: {
+  initialEntityFilters: EntityFilterValues;
+  initialExcelFilters: ActivityExcelFilterState;
+  compact: boolean;
+}) {
+  const [draftFilters, setDraftFilters] = useState<EntityFilterValues>(
+    initialEntityFilters,
+  );
+  const [appliedFilters, setAppliedFilters] = useState<EntityFilterValues>(
+    initialEntityFilters,
+  );
+  const [excelAppliedFilters, setExcelAppliedFilters] =
+    useState<ActivityExcelFilterState>(initialExcelFilters);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<ActivityModalMode>("create");
-  const [selectedActivity, setSelectedActivity] = useState<DailyActivity | null>(
-    null,
-  );
+  const [selectedActivity, setSelectedActivity] =
+    useState<DailyActivity | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const loadActivities = useCallback(() => fetchActivities(), []);
-  const loadCarriers = useCallback(() => fetchCarriers(), []);
+  const loadActivities = useCallback(() => {
+    const params = compact
+      ? activityExcelFiltersToParams(excelAppliedFilters)
+      : entityFiltersToActivityParams(appliedFilters);
+
+    return fetchActivities(params);
+  }, [appliedFilters, compact, excelAppliedFilters]);
+  const loadAllowedReasons = useCallback(() => fetchAllowedStatusReasons(), []);
+  const { carriers, teams, dispatchers } = useEntityOptions();
 
   const {
     data: activities = [],
@@ -100,15 +167,29 @@ export function ActivitiesPageContent() {
     isLoading,
     isEmpty,
     reload,
-  } = useApiData(loadActivities, []);
-  const { data: carriers = [] } = useApiData(loadCarriers, []);
+  } = useApiData(loadActivities, [
+    compact ? excelAppliedFilters : appliedFilters,
+    compact,
+  ]);
+  const { data: allowedStatusReasons = [] } = useApiData(
+    loadAllowedReasons,
+    [],
+  );
 
   useRealtimeRefresh(["DailyActivity"], reload);
 
-  const visibleActivities = useMemo(
-    () => filterActivities(activities),
-    [activities, filterActivities],
+  const carrierNameById = useMemo(
+    () =>
+      new Map(
+        carriers.map((carrier) => [
+          carrier.id,
+          getCarrierDisplayName(carrier),
+        ]),
+      ),
+    [carriers],
   );
+
+  const visibleActivities = activities;
 
   const pageState: PageContentState = isLoading
     ? "loading"
@@ -136,21 +217,15 @@ export function ActivitiesPageContent() {
   }
 
   async function handleCreate(values: DailyActivityFormValues) {
-    const carrierId = carriers.find(
-      (carrier) => carrier.carrierName === values.carrier,
-    )?.id;
-
-    if (!carrierId) {
-      showToast("Selected carrier not found.");
-      return;
-    }
+    const carrierName = carrierNameById.get(values.carrierId) ?? "carrier";
 
     try {
-      await createActivityRequest(toCreateActivityPayload(values, carrierId));
-      showToast(`Activity for "${values.carrier}" added successfully.`);
+      await createActivityRequest(toCreateActivityPayload(values));
+      showToast(`Activity for "${carrierName}" added successfully.`);
       await reload();
     } catch (err) {
       showToast(getErrorMessage(err, "Failed to create activity."));
+      throw err;
     }
   }
 
@@ -159,15 +234,19 @@ export function ActivitiesPageContent() {
       return;
     }
 
+    const carrierName =
+      carrierNameById.get(values.carrierId) ?? selectedActivity.carrierName;
+
     try {
       await updateActivityRequest(
         selectedActivity.id,
         toUpdateActivityPayload(values),
       );
-      showToast(`Activity for "${values.carrier}" updated successfully.`);
+      showToast(`Activity for "${carrierName}" updated successfully.`);
       await reload();
     } catch (err) {
       showToast(getErrorMessage(err, "Failed to update activity."));
+      throw err;
     }
   }
 
@@ -175,17 +254,47 @@ export function ActivitiesPageContent() {
     <>
       <PageShell
         title="Daily Activity"
-        description="Log and review daily carrier activity by status."
+        description={
+          compact ? undefined : "Log and review daily carrier activity by status."
+        }
+        actions={
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {compact ? (
+              <ActivitiesExcelFilterControls
+                appliedFilters={excelAppliedFilters}
+                onApplyFilters={setExcelAppliedFilters}
+              />
+            ) : null}
+            <ActivitiesPdfExportButton
+              activities={visibleActivities}
+              compact={compact}
+              entityFilters={appliedFilters}
+              excelFilters={excelAppliedFilters}
+              teams={teams}
+              dispatchers={dispatchers}
+              carriers={carriers}
+              disabled={isLoading || Boolean(error)}
+              onSuccess={() =>
+                showToast("Daily activities PDF exported successfully.")
+              }
+              onError={(message) => showToast(message)}
+            />
+            <Button type="button" onClick={() => openModal("create")}>
+              Add Activity
+            </Button>
+          </div>
+        }
       >
-        <RoleScopeBanner />
+        {!compact ? <RoleScopeBanner /> : null}
 
-        <div className="flex justify-end">
-          <Button type="button" onClick={() => openModal("create")}>
-            Add Activity
-          </Button>
-        </div>
-
-        <EntityFilterBar />
+        {!compact ? (
+          <EntityFilterBar
+            values={draftFilters}
+            onChange={setDraftFilters}
+            onApply={() => setAppliedFilters(draftFilters)}
+            showDateRange
+          />
+        ) : null}
 
         <PageContentGate
           state={pageState}
@@ -197,10 +306,14 @@ export function ActivitiesPageContent() {
           onEmptyAction={() => openModal("create")}
           errorTitle="Unable to load activities"
           errorDescription={
-            error ?? "Daily activities could not be loaded. Try again in a moment."
+            error ??
+            "Daily activities could not be loaded. Try again in a moment."
           }
         >
-          <ActivitiesTable activities={visibleActivities} onAction={handleRowAction} />
+          <ActivitiesTable
+            activities={visibleActivities}
+            onAction={handleRowAction}
+          />
         </PageContentGate>
       </PageShell>
 
@@ -208,12 +321,30 @@ export function ActivitiesPageContent() {
         open={modalOpen}
         mode={modalMode}
         activity={selectedActivity}
+        allowedStatusReasons={allowedStatusReasons}
         onOpenChange={setModalOpen}
         onCreate={handleCreate}
         onEdit={handleEdit}
       />
 
-      <AppToast message={toastMessage} onDismiss={() => setToastMessage(null)} />
+      <AppToast
+        message={toastMessage}
+        onDismiss={() => setToastMessage(null)}
+      />
     </>
+  );
+}
+
+export function ActivitiesPageContent({
+  compact = false,
+}: ActivitiesPageContentProps = {}) {
+  return (
+    <Suspense
+      fallback={
+        <div className="py-10 text-sm text-[#64748B]">Loading activities...</div>
+      }
+    >
+      <ActivitiesPageContentInner compact={compact} />
+    </Suspense>
   );
 }

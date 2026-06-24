@@ -31,7 +31,9 @@ export function useApiData<T>(
       const next = await loader();
       setData(next);
     } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : "Failed to load data.");
+      setError(
+        err instanceof ApiClientError ? err.message : "Failed to load data.",
+      );
     } finally {
       setIsLoading(false);
     }

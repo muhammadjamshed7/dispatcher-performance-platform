@@ -10,7 +10,11 @@ export const DISPATCHER_ROLES = [DISPATCHER, TEAM_LEAD] as const;
 
 export const dispatcherFormSchema = z.object({
   fullName: z.string().trim().min(1, "Full name is required"),
-  email: z.string().trim().min(1, "Email is required").email("Enter a valid email"),
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email is required")
+    .email("Enter a valid email"),
   phoneNumber: z.string().trim().optional(),
   team: z.string().trim().min(1, "Team is required"),
   role: z.enum(DISPATCHER_ROLES, { message: "Role is required" }),

@@ -16,7 +16,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useApiData } from "@/hooks/use-api-data";
 import { ApiClientError } from "@/lib/api/client";
-import { fetchPublicTeams, registerDispatcherRequest } from "@/lib/api/resources";
+import {
+  fetchPublicTeams,
+  registerDispatcherRequest,
+} from "@/lib/api/resources";
 import {
   Select,
   SelectContent,
@@ -60,21 +63,26 @@ export function DispatcherRegisterForm() {
       });
       setSubmittedMessage(result.message);
     } catch (err) {
-      setErrorMessage(getErrorMessage(err, "Unable to submit registration request."));
+      setErrorMessage(
+        getErrorMessage(err, "Unable to submit registration request."),
+      );
       setIsSubmitting(false);
     }
   };
 
   if (submittedMessage) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-muted/30 p-6">
+      <main className="bg-muted/30 flex min-h-screen items-center justify-center p-6">
         <Card className="w-full max-w-md text-center shadow-sm">
           <CardHeader>
             <CardTitle>Request Submitted</CardTitle>
             <CardDescription>{submittedMessage}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
-            <Link href="/dispatcher/login" className={buttonVariants({ variant: "default" })}>
+            <Link
+              href="/dispatcher/login"
+              className={buttonVariants({ variant: "default" })}
+            >
               Back to dispatcher sign in
             </Link>
             <Link href="/" className={buttonVariants({ variant: "outline" })}>
@@ -87,19 +95,19 @@ export function DispatcherRegisterForm() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-muted/30 p-6">
+    <main className="bg-muted/30 flex min-h-screen items-center justify-center p-6">
       <Card className="w-full max-w-lg shadow-sm">
         <CardHeader className="space-y-2">
           <CardTitle>Dispatcher Registration</CardTitle>
           <CardDescription>
-            Submit a registration request. An administrator must approve your account
-            before you can sign in.
+            Submit a registration request. An administrator must approve your
+            account before you can sign in.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={handleSubmit}>
             {errorMessage ? (
-              <p className="text-sm text-destructive">{errorMessage}</p>
+              <p className="text-destructive text-sm">{errorMessage}</p>
             ) : null}
             <div className="space-y-2">
               <Label htmlFor="fullName">Full Name</Label>
@@ -161,11 +169,11 @@ export function DispatcherRegisterForm() {
               {isSubmitting ? "Submitting…" : "Submit registration request"}
             </Button>
           </form>
-          <p className="mt-4 text-center text-sm text-muted-foreground">
+          <p className="text-muted-foreground mt-4 text-center text-sm">
             Already approved?{" "}
             <Link
               href="/dispatcher/login"
-              className="font-medium text-primary underline-offset-4 hover:underline"
+              className="text-primary font-medium underline-offset-4 hover:underline"
             >
               Sign in
             </Link>

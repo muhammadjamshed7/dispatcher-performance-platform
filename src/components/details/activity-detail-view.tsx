@@ -28,14 +28,16 @@ export function ActivityDetailView({ activity }: ActivityDetailViewProps) {
             <StatusBadge status={activity.status} />
           </p>
           <p>
-            <span className="text-muted-foreground">Carrier:</span> {activity.carrierName}
+            <span className="text-muted-foreground">Carrier:</span>{" "}
+            {activity.carrierName}
           </p>
           <p>
             <span className="text-muted-foreground">Dispatcher:</span>{" "}
             {activity.dispatcherName}
           </p>
           <p>
-            <span className="text-muted-foreground">Team:</span> {activity.teamName}
+            <span className="text-muted-foreground">Team:</span>{" "}
+            {activity.teamName}
           </p>
           <p>
             <span className="text-muted-foreground">Truck Type:</span>{" "}
@@ -71,7 +73,9 @@ export function ActivityDetailView({ activity }: ActivityDetailViewProps) {
               {formatRatePerMile(activity.ratePerMile, "—")}
             </p>
             <p>
-              <span className="text-muted-foreground">Dispatch Fee Earned:</span>{" "}
+              <span className="text-muted-foreground">
+                Dispatch Fee Earned:
+              </span>{" "}
               {formatCurrency(activity.dispatchFee, { nullLabel: "—" })}
             </p>
           </CardContent>

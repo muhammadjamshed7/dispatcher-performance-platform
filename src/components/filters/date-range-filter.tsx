@@ -23,11 +23,7 @@ export function DateRangeFilter({
 }: DateRangeFilterProps) {
   return (
     <FilterField label="Date Range">
-      <Select
-        value={value}
-        onValueChange={onValueChange}
-        disabled={disabled}
-      >
+      <Select value={value} onValueChange={onValueChange} disabled={disabled}>
         <SelectTrigger className="w-full" size="sm">
           <SelectValue placeholder="Date range" />
         </SelectTrigger>

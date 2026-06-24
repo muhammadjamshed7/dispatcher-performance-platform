@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import { ActivityDetailView } from "@/components/details/activity-detail-view";
 import { DailyActivityForm } from "@/components/forms/daily-activity-form";
 import { Button } from "@/components/ui/button";
@@ -20,9 +22,10 @@ type ActivityModalProps = {
   open: boolean;
   mode: ActivityModalMode;
   activity?: DailyActivity | null;
+  allowedStatusReasons?: string[];
   onOpenChange: (open: boolean) => void;
-  onCreate?: (values: DailyActivityFormValues) => void;
-  onEdit?: (values: DailyActivityFormValues) => void;
+  onCreate?: (values: DailyActivityFormValues) => void | Promise<void>;
+  onEdit?: (values: DailyActivityFormValues) => void | Promise<void>;
 };
 
 const FORM_ID = "daily-activity-form";
@@ -36,7 +39,7 @@ function getDefaultValues(
 
   return {
     date: activity.date,
-    carrier: activity.carrierName,
+    carrierId: activity.carrierId,
     status: activity.status,
     notes: activity.notes ?? "",
     origin: activity.origin ?? "",
@@ -51,10 +54,20 @@ export function ActivityModal({
   open,
   mode,
   activity,
+  allowedStatusReasons = [],
   onOpenChange,
   onCreate,
   onEdit,
 }: ActivityModalProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createFormKey, setCreateFormKey] = useState(0);
+
+  useEffect(() => {
+    if (open && mode === "create") {
+      setCreateFormKey((current) => current + 1);
+    }
+  }, [mode, open]);
+
   const titles: Record<ActivityModalMode, string> = {
     create: "Add Activity",
     edit: "Edit Activity",
@@ -67,18 +80,27 @@ export function ActivityModal({
     view: "Activity details and financial summary.",
   };
 
-  function handleSubmit(values: DailyActivityFormValues) {
-    if (mode === "create") {
-      onCreate?.(values);
-      onOpenChange(false);
-      return;
-    }
+  async function handleSubmit(values: DailyActivityFormValues) {
+    setIsSubmitting(true);
 
-    if (mode === "edit") {
-      onEdit?.(values);
-      onOpenChange(false);
+    try {
+      if (mode === "create") {
+        await onCreate?.(values);
+        onOpenChange(false);
+        return;
+      }
+
+      if (mode === "edit") {
+        await onEdit?.(values);
+        onOpenChange(false);
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   }
+
+  const formKey =
+    mode === "create" ? `create-${createFormKey}` : `edit-${activity?.id ?? "new"}`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -92,26 +114,36 @@ export function ActivityModal({
           <ActivityDetailView activity={activity} />
         ) : (
           <DailyActivityForm
+            key={formKey}
             formId={FORM_ID}
-            defaultValues={getDefaultValues(mode === "create" ? null : activity)}
+            defaultValues={getDefaultValues(
+              mode === "create" ? null : activity,
+            )}
+            carrierLabelFallback={activity?.carrierName}
+            allowedStatusReasons={allowedStatusReasons}
             onSubmit={handleSubmit}
           />
         )}
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isSubmitting}
+          >
             Cancel
           </Button>
 
           {mode === "create" ? (
-            <Button type="submit" form={FORM_ID}>
-              Add Activity
+            <Button type="submit" form={FORM_ID} disabled={isSubmitting}>
+              {isSubmitting ? "Adding..." : "Add Activity"}
             </Button>
           ) : null}
 
           {mode === "edit" ? (
-            <Button type="submit" form={FORM_ID}>
-              Save Changes
+            <Button type="submit" form={FORM_ID} disabled={isSubmitting}>
+              {isSubmitting ? "Saving..." : "Save Changes"}
             </Button>
           ) : null}
         </DialogFooter>

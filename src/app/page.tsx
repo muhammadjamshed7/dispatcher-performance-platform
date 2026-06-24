@@ -12,29 +12,32 @@ import {
 const PORTALS = [
   {
     title: "Admin Portal",
-    description: "Company-wide management, teams, settings, and user approvals.",
+    description:
+      "Company-wide management, teams, settings, and user approvals.",
     href: "/admin/login",
   },
   {
     title: "Team Lead Portal",
-    description: "Team dispatchers, carriers, activities, rankings, and reports.",
+    description:
+      "Team dispatchers, carriers, activities, rankings, and reports.",
     href: "/team-lead/login",
   },
   {
     title: "Dispatcher Portal",
-    description: "Personal dashboard, assigned carriers, daily activity, and performance.",
+    description:
+      "Personal dashboard, assigned carriers, daily activity, and performance.",
     href: "/dispatcher/login",
   },
 ] as const;
 
 export default function HomePage() {
   return (
-    <main className="relative flex min-h-screen flex-col items-center justify-center bg-muted/30 p-6">
+    <main className="bg-muted/30 relative flex min-h-screen flex-col items-center justify-center p-6">
       <div className="mb-8 text-center">
         <h1 className="text-2xl font-semibold tracking-tight">
           Dispatcher Performance Platform
         </h1>
-        <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+        <p className="text-muted-foreground mt-2 max-w-xl text-sm">
           Choose your portal to sign in.
         </p>
       </div>

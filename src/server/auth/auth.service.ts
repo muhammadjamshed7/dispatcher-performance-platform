@@ -1,16 +1,24 @@
 import "server-only";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import type { Role } from "@/lib/constants/roles";
 import { ACTIVE } from "@/lib/auth/user-statuses";
 import { ForbiddenError } from "@/lib/errors/forbidden-error";
 import { ValidationError } from "@/lib/errors/validation-error";
 import { createServerClient } from "@/lib/supabase/server";
-import { db } from "@/lib/db/prisma";
+import { T, db } from "@/lib/db/client";
+import { assertDbVoid, createId, nowIso } from "@/lib/db/utils";
 import type { SessionUser } from "@/lib/api/resources";
-import { getCurrentUser, getCurrentUserBySupabaseId, touchLastLogin } from "@/server/auth/session";
+import {
+  getCurrentUser,
+  getCurrentUserByEmail,
+  touchLastLogin,
+} from "@/server/auth/session";
 
-function toSessionUser(user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>): SessionUser {
+function toSessionUser(
+  user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>,
+): SessionUser {
   return {
     userId: user.id,
     fullName: user.fullName,
@@ -20,6 +28,9 @@ function toSessionUser(user: NonNullable<Awaited<ReturnType<typeof getCurrentUse
     teamId: user.teamId,
     dispatcherId: user.dispatcherId,
     teamName: user.teamName,
+    lastLoginAt: user.lastLoginAt ?? null,
+    timezone: user.timezone,
+    currency: user.currency,
   };
 }
 
@@ -38,13 +49,16 @@ const registerSchema = z.object({
   notes: z.string().optional(),
 });
 
-export async function signInWithRole(input: {
-  email: string;
-  password: string;
-  expectedRole: Role;
-}): Promise<SessionUser> {
+export async function signInWithRole(
+  input: {
+    email: string;
+    password: string;
+    expectedRole: Role;
+  },
+  supabaseClient?: SupabaseClient,
+): Promise<SessionUser> {
   const parsed = loginSchema.parse(input);
-  const supabase = await createServerClient();
+  const supabase = supabaseClient ?? (await createServerClient());
 
   const { data, error } = await supabase.auth.signInWithPassword({
     email: parsed.email.toLowerCase(),
@@ -55,9 +69,13 @@ export async function signInWithRole(input: {
     throw new ValidationError("Invalid email or password for this portal.");
   }
 
-  const sessionUser = await getCurrentUserBySupabaseId(data.user.id);
+  const sessionUser = await getCurrentUserByEmail(parsed.email.toLowerCase());
 
-  if (!sessionUser || sessionUser.email !== parsed.email.toLowerCase()) {
+  if (
+    !sessionUser ||
+    sessionUser.supabaseUserId !== data.user.id ||
+    sessionUser.email !== parsed.email.toLowerCase()
+  ) {
     await supabase.auth.signOut();
     throw new ValidationError("Invalid email or password for this portal.");
   }
@@ -74,7 +92,9 @@ export async function signInWithRole(input: {
       throw new ForbiddenError("Your account is pending admin approval.");
     }
 
-    throw new ForbiddenError("Your account is not active. Contact an administrator.");
+    throw new ForbiddenError(
+      "Your account is not active. Contact an administrator.",
+    );
   }
 
   void touchLastLogin(sessionUser.id);
@@ -92,57 +112,121 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   return user ? toSessionUser(user) : null;
 }
 
-export async function submitRegistrationRequest(input: z.infer<typeof registerSchema>) {
+export async function submitRegistrationRequest(
+  input: z.infer<typeof registerSchema>,
+) {
   const parsed = registerSchema.parse(input);
-  const organization = await db.organization.findFirst({
-    where: { deletedAt: null },
-    orderBy: { createdAt: "asc" },
-  });
 
-  if (!organization) {
+  const organizationResult = await db()
+    .from(T.Organization)
+    .select("id")
+    .is("deletedAt", null)
+    .order("createdAt", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (organizationResult.error) {
+    throw organizationResult.error;
+  }
+
+  if (!organizationResult.data) {
     throw new ValidationError("Organization is not configured yet.");
   }
 
-  const existingUser = await db.user.findFirst({
-    where: {
-      organizationId: organization.id,
-      email: parsed.email.toLowerCase(),
-      deletedAt: null,
-    },
-  });
+  const organization = organizationResult.data;
 
-  if (existingUser) {
+  const existingUser = await db()
+    .from(T.User)
+    .select("id")
+    .eq("organizationId", organization.id)
+    .eq("email", parsed.email.toLowerCase())
+    .is("deletedAt", null)
+    .maybeSingle();
+
+  if (existingUser.error) {
+    throw existingUser.error;
+  }
+
+  if (existingUser.data) {
     throw new ValidationError("An account with this email already exists.");
   }
 
-  const existingPending = await db.registrationRequest.findFirst({
-    where: {
-      organizationId: organization.id,
-      email: parsed.email.toLowerCase(),
-      status: "PENDING",
-    },
-  });
+  const existingPending = await db()
+    .from(T.RegistrationRequest)
+    .select("id")
+    .eq("organizationId", organization.id)
+    .eq("email", parsed.email.toLowerCase())
+    .eq("status", "PENDING")
+    .maybeSingle();
 
-  if (existingPending) {
-    throw new ValidationError("A pending registration request already exists for this email.");
+  if (existingPending.error) {
+    throw existingPending.error;
   }
 
-  const request = await db.registrationRequest.create({
-    data: {
-      organizationId: organization.id,
-      fullName: parsed.fullName,
-      email: parsed.email.toLowerCase(),
-      phoneNumber: parsed.phoneNumber,
-      requestedRole: "DISPATCHER",
-      preferredTeamId: parsed.preferredTeamId,
-      preferredTeamName: parsed.preferredTeamName,
-      notes: parsed.notes,
-    },
-  });
+  if (existingPending.data) {
+    throw new ValidationError(
+      "A pending registration request already exists for this email.",
+    );
+  }
+
+  const requestId = createId();
+
+  assertDbVoid(
+    await db()
+      .from(T.RegistrationRequest)
+      .insert({
+        id: requestId,
+        organizationId: organization.id,
+        fullName: parsed.fullName,
+        email: parsed.email.toLowerCase(),
+        phoneNumber: parsed.phoneNumber,
+        requestedRole: "DISPATCHER",
+        preferredTeamId: parsed.preferredTeamId ?? null,
+        preferredTeamName: parsed.preferredTeamName ?? null,
+        notes: parsed.notes ?? null,
+        status: "PENDING",
+        submittedAt: nowIso(),
+      }),
+  );
 
   return {
-    id: request.id,
+    id: requestId,
     message:
       "Registration request submitted. Admin approval is required before login.",
   };
+}
+
+export async function requestPasswordReset(
+  email: string,
+): Promise<{ message: string }> {
+  const parsed = z.email().parse(email.toLowerCase());
+  const supabase = await createServerClient();
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+
+  const { error } = await supabase.auth.resetPasswordForEmail(parsed, {
+    redirectTo: `${appUrl}/auth/callback?next=/auth/update-password`,
+  });
+
+  if (error) {
+    throw new ValidationError("Unable to send password reset email.");
+  }
+
+  return {
+    message:
+      "If an account exists for that email, a password reset link has been sent.",
+  };
+}
+
+export async function updatePassword(
+  password: string,
+): Promise<{ message: string }> {
+  const parsed = z.string().min(8).parse(password);
+  const supabase = await createServerClient();
+  const { error } = await supabase.auth.updateUser({ password: parsed });
+
+  if (error) {
+    throw new ValidationError(error.message);
+  }
+
+  return { message: "Password updated successfully." };
 }

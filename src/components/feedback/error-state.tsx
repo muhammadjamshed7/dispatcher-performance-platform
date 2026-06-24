@@ -19,10 +19,12 @@ export function ErrorState({
   return (
     <Card>
       <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center">
-        <AlertCircle className="size-10 text-destructive" />
+        <AlertCircle className="text-destructive size-10" />
         <div className="space-y-1">
           <h3 className="text-base font-medium">{title}</h3>
-          <p className="max-w-md text-sm text-muted-foreground">{description}</p>
+          <p className="text-muted-foreground max-w-md text-sm">
+            {description}
+          </p>
         </div>
         <Button type="button" variant="outline" onClick={onRetry}>
           {retryLabel}

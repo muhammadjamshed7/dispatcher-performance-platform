@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { Suspense, useCallback, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { PageContentGate } from "@/components/feedback/page-content-gate";
 import type { PageContentState } from "@/components/feedback/page-content-gate";
 import { AppToast } from "@/components/feedback/app-toast";
 import { EntityFilterBar } from "@/components/filters/entity-filter-bar";
+import { CarriersExcelFilterControls } from "@/components/carriers/carriers-excel-filter-controls";
 import { RoleScopeBanner } from "@/components/layout/role-scope-banner";
 import {
   CarrierModal,
@@ -21,6 +23,16 @@ import { useApiData } from "@/hooks/use-api-data";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { useRoleScope } from "@/hooks/use-role-scope";
 import { ApiClientError } from "@/lib/api/client";
+import {
+  carrierExcelFiltersToParams,
+  parseCarrierExcelFiltersFromSearchParams,
+  type CarrierExcelFilterState,
+} from "@/lib/filters/carrier-excel-filter-params";
+import {
+  entityFiltersToCarrierParams,
+  parseEntityFiltersFromSearchParams,
+  type EntityFilterValues,
+} from "@/lib/filters/entity-filter-params";
 import {
   createCarrierRequest,
   fetchCarriers,
@@ -43,15 +55,74 @@ function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof ApiClientError ? error.message : fallback;
 }
 
-export function CarriersPageContent() {
-  const { filterCarriers, role } = useRoleScope();
+type CarriersPageContentProps = {
+  showScopeBanner?: boolean;
+  compact?: boolean;
+};
+
+function CarriersPageContentInner({
+  showScopeBanner = true,
+  compact = false,
+}: CarriersPageContentProps) {
+  const searchParams = useSearchParams();
+  const searchParamKey = searchParams.toString();
+  const urlEntityFilters = useMemo(
+    () =>
+      parseEntityFiltersFromSearchParams(new URLSearchParams(searchParamKey)),
+    [searchParamKey],
+  );
+  const urlExcelFilters = useMemo(
+    () =>
+      parseCarrierExcelFiltersFromSearchParams(
+        new URLSearchParams(searchParamKey),
+      ),
+    [searchParamKey],
+  );
+
+  return (
+    <CarriersPageState
+      key={searchParamKey}
+      initialEntityFilters={urlEntityFilters}
+      initialExcelFilters={urlExcelFilters}
+      showScopeBanner={showScopeBanner && !compact}
+      compact={compact}
+    />
+  );
+}
+
+function CarriersPageState({
+  initialEntityFilters,
+  initialExcelFilters,
+  showScopeBanner,
+  compact,
+}: {
+  initialEntityFilters: EntityFilterValues;
+  initialExcelFilters: CarrierExcelFilterState;
+  showScopeBanner: boolean;
+  compact: boolean;
+}) {
+  const { role } = useRoleScope();
   const canManageCarriers = role !== DISPATCHER;
+  const [draftFilters, setDraftFilters] = useState<EntityFilterValues>(
+    initialEntityFilters,
+  );
+  const [appliedFilters, setAppliedFilters] = useState<EntityFilterValues>(
+    initialEntityFilters,
+  );
+  const [excelAppliedFilters, setExcelAppliedFilters] =
+    useState<CarrierExcelFilterState>(initialExcelFilters);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<CarrierModalMode>("create");
   const [selectedCarrier, setSelectedCarrier] = useState<Carrier | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const loadCarriers = useCallback(() => fetchCarriers(), []);
+  const loadCarriers = useCallback(() => {
+    const params = compact
+      ? carrierExcelFiltersToParams(excelAppliedFilters)
+      : entityFiltersToCarrierParams(appliedFilters);
+
+    return fetchCarriers(params);
+  }, [appliedFilters, compact, excelAppliedFilters]);
 
   const {
     data: carriers = [],
@@ -59,8 +130,15 @@ export function CarriersPageContent() {
     isLoading,
     isEmpty,
     reload,
-  } = useApiData(loadCarriers, []);
-  const { teams, dispatchers, reload: reloadEntityOptions } = useEntityOptions();
+  } = useApiData(loadCarriers, [
+    compact ? excelAppliedFilters : appliedFilters,
+    compact,
+  ]);
+  const {
+    teams,
+    dispatchers,
+    reload: reloadEntityOptions,
+  } = useEntityOptions();
 
   const refreshCarriers = useCallback(async () => {
     await Promise.all([reload(), reloadEntityOptions()]);
@@ -68,10 +146,7 @@ export function CarriersPageContent() {
 
   useRealtimeRefresh(["Carrier"], refreshCarriers);
 
-  const visibleCarriers = useMemo(
-    () => filterCarriers(carriers),
-    [carriers, filterCarriers],
-  );
+  const visibleCarriers = carriers;
 
   const pageState: PageContentState = isLoading
     ? "loading"
@@ -177,7 +252,10 @@ export function CarriersPageContent() {
     }
 
     try {
-      await reassignCarrierRequest(selectedCarrier.id, { teamId, dispatcherId });
+      await reassignCarrierRequest(selectedCarrier.id, {
+        teamId,
+        dispatcherId,
+      });
       showToast(
         `Carrier "${selectedCarrier.carrierName}" reassigned to ${values.assignedDispatcher}.`,
       );
@@ -210,19 +288,40 @@ export function CarriersPageContent() {
     <>
       <PageShell
         title="Carriers"
-        description="Manage carrier profiles, assignments, and dispatch fees."
+        description={
+          compact
+            ? undefined
+            : "Manage carrier profiles, assignments, and dispatch fees."
+        }
+        actions={
+          compact || canManageCarriers ? (
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {compact ? (
+                <CarriersExcelFilterControls
+                  appliedFilters={excelAppliedFilters}
+                  onApplyFilters={setExcelAppliedFilters}
+                />
+              ) : null}
+              {canManageCarriers ? (
+                <Button type="button" onClick={() => openModal("create")}>
+                  Create Carrier
+                </Button>
+              ) : null}
+            </div>
+          ) : undefined
+        }
       >
-        <RoleScopeBanner />
+        {showScopeBanner ? <RoleScopeBanner /> : null}
 
-        {canManageCarriers ? (
-          <div className="flex justify-end">
-            <Button type="button" onClick={() => openModal("create")}>
-              Create Carrier
-            </Button>
-          </div>
+        {!compact ? (
+          <EntityFilterBar
+            values={draftFilters}
+            onChange={setDraftFilters}
+            onApply={() => setAppliedFilters(draftFilters)}
+            showCarrier={false}
+            statusMode="carrier"
+          />
         ) : null}
-
-        <EntityFilterBar />
 
         <PageContentGate
           state={pageState}
@@ -231,10 +330,13 @@ export function CarriersPageContent() {
           emptyTitle="No carriers found"
           emptyDescription="Create a carrier profile to manage assignments and dispatch fees."
           emptyActionLabel={canManageCarriers ? "Create Carrier" : undefined}
-          onEmptyAction={canManageCarriers ? () => openModal("create") : undefined}
+          onEmptyAction={
+            canManageCarriers ? () => openModal("create") : undefined
+          }
           errorTitle="Unable to load carriers"
           errorDescription={
-            error ?? "Carrier records could not be loaded. Try again in a moment."
+            error ??
+            "Carrier records could not be loaded. Try again in a moment."
           }
         >
           <CarriersTable
@@ -256,7 +358,28 @@ export function CarriersPageContent() {
         onToggleStatus={handleToggleStatus}
       />
 
-      <AppToast message={toastMessage} onDismiss={() => setToastMessage(null)} />
+      <AppToast
+        message={toastMessage}
+        onDismiss={() => setToastMessage(null)}
+      />
     </>
+  );
+}
+
+export function CarriersPageContent({
+  showScopeBanner = true,
+  compact = false,
+}: CarriersPageContentProps = {}) {
+  return (
+    <Suspense
+      fallback={
+        <div className="py-10 text-sm text-[#64748B]">Loading carriers...</div>
+      }
+    >
+      <CarriersPageContentInner
+        showScopeBanner={showScopeBanner}
+        compact={compact}
+      />
+    </Suspense>
   );
 }

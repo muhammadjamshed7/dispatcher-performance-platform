@@ -28,7 +28,8 @@ export function AdminDashboardHeader({
             Admin Dashboard
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-[#64748B]">
-            Real-time performance overview and key insights across your organization.
+            Real-time performance overview and key insights across your
+            organization.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -49,7 +50,9 @@ export function AdminDashboardHeader({
             disabled={isRefreshing}
             className="h-10 rounded-[10px] bg-[#2563EB] text-white hover:bg-[#1D4ED8]"
           >
-            <RefreshCw className={`size-4 ${isRefreshing ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`size-4 ${isRefreshing ? "animate-spin" : ""}`}
+            />
             Refresh
           </Button>
         </div>

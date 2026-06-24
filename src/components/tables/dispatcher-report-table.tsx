@@ -13,7 +13,7 @@ import { formatPercent } from "@/lib/utils/format-percent";
 import { formatRatePerMile } from "@/lib/utils/format-rate-per-mile";
 
 type DispatcherReportTableProps = {
-  rows : DispatcherReportRow[];
+  rows: DispatcherReportRow[];
   title?: string;
 };
 
@@ -46,7 +46,9 @@ export function DispatcherReportTable({
           <TableBody>
             {rows.map((row) => (
               <TableRow key={row.id}>
-                <TableCell className="font-medium">{row.dispatcherName}</TableCell>
+                <TableCell className="font-medium">
+                  {row.dispatcherName}
+                </TableCell>
                 <TableCell>{row.teamName}</TableCell>
                 <TableCell>{row.deliveredLoads}</TableCell>
                 <TableCell>{row.cancelledLoads}</TableCell>
@@ -54,7 +56,9 @@ export function DispatcherReportTable({
                 <TableCell>{row.notWorkingCount}</TableCell>
                 <TableCell>{formatCurrencyCompact(row.revenue)}</TableCell>
                 <TableCell>{formatCurrencyCompact(row.dispatchFees)}</TableCell>
-                <TableCell>{formatRatePerMile(row.averageRatePerMile)}</TableCell>
+                <TableCell>
+                  {formatRatePerMile(row.averageRatePerMile)}
+                </TableCell>
                 <TableCell>{formatPercent(row.cancellationRate)}</TableCell>
                 <TableCell>{formatPercent(row.bookingEfficiency)}</TableCell>
               </TableRow>

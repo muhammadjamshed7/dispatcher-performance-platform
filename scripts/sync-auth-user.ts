@@ -1,9 +1,6 @@
 import "dotenv/config";
 
-import {
-  PrismaClient,
-  type UserRole,
-} from "../src/generated/prisma/client";
+import { PrismaClient, type UserRole } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { createClient } from "@supabase/supabase-js";
 import pg from "pg";
@@ -29,7 +26,9 @@ function createDb() {
 
 function formatNameFromEmail(email: string): string {
   const local = email.split("@")[0] ?? "User";
-  return local.replaceAll(".", " ").replace(/\b\w/g, (char) => char.toUpperCase());
+  return local
+    .replaceAll(".", " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 async function main() {
@@ -96,7 +95,7 @@ async function main() {
 
   let teamId: string | undefined;
 
-  if (role === "TEAM_LEAD") {
+  if (role === "TEAM_LEAD" || role === "DISPATCHER") {
     const team =
       (await db.team.findFirst({
         where: {
@@ -148,8 +147,27 @@ async function main() {
     });
   }
 
+  if (role === "DISPATCHER" && teamId) {
+    await db.dispatcher.upsert({
+      where: { userId: user.id },
+      create: {
+        organizationId: organization.id,
+        userId: user.id,
+        teamId,
+        status: "ACTIVE",
+      },
+      update: {
+        teamId,
+        status: "ACTIVE",
+        deletedAt: null,
+      },
+    });
+  }
+
   console.log(`Linked ${email} as ${role} (user id: ${user.id}).`);
-  console.log("Password is managed in Supabase Auth only — not stored in this app.");
+  console.log(
+    "Password is managed in Supabase Auth only — not stored in this app.",
+  );
 
   await db.$disconnect();
 }

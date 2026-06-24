@@ -18,6 +18,7 @@ import {
 } from "@/lib/api/resources";
 import { isPublicAuthPath } from "@/lib/auth/roles";
 import { hasSupabaseAuthCookiesInDocument } from "@/lib/supabase/auth-cookies";
+import { setDefaultCurrency } from "@/lib/utils/format-currency";
 
 type SessionContextValue = {
   session: SessionUser | null;
@@ -36,6 +37,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const refreshSession = useCallback(async () => {
     const nextSession = await fetchSession().catch(() => null);
+    setDefaultCurrency(nextSession?.currency);
     setSessionState(nextSession);
   }, []);
 
@@ -73,10 +75,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     await logoutRequest();
+    setDefaultCurrency(null);
     setSessionState(null);
   }, []);
 
   const setSession = useCallback((nextSession: SessionUser | null) => {
+    setDefaultCurrency(nextSession?.currency);
     setSessionState(nextSession);
   }, []);
 

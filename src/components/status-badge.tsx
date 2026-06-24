@@ -25,9 +25,7 @@ type StatusBadgeProps = {
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
   const variant =
-    status in STATUS_VARIANTS
-      ? STATUS_VARIANTS[status as Status]
-      : "outline";
+    status in STATUS_VARIANTS ? STATUS_VARIANTS[status as Status] : "outline";
 
   return (
     <Badge variant={variant} className={cn(className)}>

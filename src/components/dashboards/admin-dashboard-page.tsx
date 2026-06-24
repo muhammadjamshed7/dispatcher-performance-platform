@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Truck } from "lucide-react";
 
@@ -66,13 +66,10 @@ const LoadStatusDonutChart = dynamic(
 function AdminDashboardPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [appliedFilters, setAppliedFilters] = useState<AdminDashboardFilterState>(() =>
-    parseAdminDashboardFiltersFromSearchParams(searchParams),
+  const appliedFilters = useMemo(
+    () => parseAdminDashboardFiltersFromSearchParams(searchParams),
+    [searchParams],
   );
-
-  useEffect(() => {
-    setAppliedFilters(parseAdminDashboardFiltersFromSearchParams(searchParams));
-  }, [searchParams]);
 
   const loadDashboard = useCallback(
     () => fetchAdminDashboard(dashboardFiltersToParams(appliedFilters)),
@@ -104,7 +101,6 @@ function AdminDashboardPageContent() {
   };
 
   function handleApplyFilters(nextFilters: AdminDashboardFilterState) {
-    setAppliedFilters(nextFilters);
     const params = adminDashboardFiltersToSearchParams(nextFilters);
     const query = params.toString();
     router.replace(query ? `/admin/dashboard?${query}` : "/admin/dashboard", {
@@ -192,7 +188,11 @@ function AdminDashboardPageContent() {
 
 export function AdminDashboardPage() {
   return (
-    <Suspense fallback={<div className="py-10 text-sm text-[#64748B]">Loading dashboard...</div>}>
+    <Suspense
+      fallback={
+        <div className="py-10 text-sm text-[#64748B]">Loading dashboard...</div>
+      }
+    >
       <AdminDashboardPageContent />
     </Suspense>
   );

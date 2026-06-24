@@ -48,19 +48,26 @@ export function TeamDetailView({ team }: TeamDetailViewProps) {
         </CardHeader>
         <CardContent className="grid gap-3 text-sm sm:grid-cols-2">
           <p>
-            <span className="text-muted-foreground">Team Lead:</span> {team.teamLeadName}
+            <span className="text-muted-foreground">Team Lead:</span>{" "}
+            {team.teamLeadName}
           </p>
           <p>
             <span className="text-muted-foreground">Status:</span>{" "}
-            <Badge variant={team.status === TEAM_STATUS_ACTIVE ? "default" : "secondary"}>
+            <Badge
+              variant={
+                team.status === TEAM_STATUS_ACTIVE ? "default" : "secondary"
+              }
+            >
               {team.status}
             </Badge>
           </p>
           <p>
-            <span className="text-muted-foreground">Dispatchers:</span> {team.dispatchersCount}
+            <span className="text-muted-foreground">Dispatchers:</span>{" "}
+            {team.dispatchersCount}
           </p>
           <p>
-            <span className="text-muted-foreground">Carriers:</span> {team.carriersCount}
+            <span className="text-muted-foreground">Carriers:</span>{" "}
+            {team.carriersCount}
           </p>
           <p>
             <span className="text-muted-foreground">Created:</span>{" "}
@@ -79,7 +86,8 @@ export function TeamDetailView({ team }: TeamDetailViewProps) {
           ) : (
             teamDispatchers.map((dispatcher) => (
               <p key={dispatcher.id}>
-                {dispatcher.fullName} · {dispatcher.assignedCarriersCount} carriers
+                {dispatcher.fullName} · {dispatcher.assignedCarriersCount}{" "}
+                carriers
               </p>
             ))
           )}

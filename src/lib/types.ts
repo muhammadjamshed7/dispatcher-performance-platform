@@ -56,13 +56,20 @@ export type Dispatcher = {
   createdAt: string;
 };
 
+export type CreateDispatcherResult = {
+  dispatcher: Dispatcher;
+  temporaryPassword: string;
+};
+
 export type Carrier = {
   id: string;
   carrierName: string;
   driverName: string;
   mcNumber: string;
   truckType: TruckType;
+  assignedTeamId: string;
   assignedTeamName: string;
+  assignedDispatcherId: string | null;
   assignedDispatcherName: string;
   dispatchFeePercentage: number;
   status: TeamStatus;
@@ -73,8 +80,11 @@ export type Carrier = {
 export type DailyActivity = {
   id: string;
   date: string;
+  carrierId: string;
   carrierName: string;
+  dispatcherId: string;
   dispatcherName: string;
+  teamId: string;
   teamName: string;
   truckType: TruckType;
   status: LoadActivityStatus;
@@ -182,7 +192,12 @@ export type AdminDashboardBundle = {
   filterOptions: {
     teams: { id: string; name: string }[];
     dispatchers: { id: string; name: string; teamId: string }[];
-    carriers: { id: string; name: string; teamId: string; dispatcherId: string | null }[];
+    carriers: {
+      id: string;
+      name: string;
+      teamId: string;
+      dispatcherId: string | null;
+    }[];
     truckTypes: { value: string; label: string }[];
     statuses: { value: string; label: string }[];
   };
@@ -314,6 +329,7 @@ export type DispatcherDashboardBundle = {
 
 export type DispatcherRanking = {
   rank: number;
+  id: string;
   name: string;
   team: string;
   carriers: number;
@@ -405,6 +421,101 @@ export type ReportBundle = {
   teams: TeamReportRow[];
 };
 
+export type FinanceFilterOptions = {
+  carriers: { id: string; name: string }[];
+  statuses: { value: LoadActivityStatus; label: string }[];
+};
+
+export type FinanceAppliedFilters = {
+  dateRange: string;
+  dateFrom: string;
+  dateTo: string;
+  carrierId: string | null;
+  status: LoadActivityStatus | null;
+};
+
+export type FinanceSummary = {
+  totalRevenue: number;
+  totalDispatchFee: number;
+  deliveredLoads: number;
+  cancelledLoads: number;
+  notBookedCount: number;
+  notWorkingCount: number;
+  averageRatePerMile: number | null;
+  bookingEfficiency: number;
+  currentMonthRevenue: number;
+  currentMonthDispatchFee: number;
+  monthOverMonthRevenueChange: number | null;
+  monthOverMonthDispatchFeeChange: number | null;
+};
+
+export type FinanceCarrierRow = {
+  id: string;
+  carrierName: string;
+  driverName: string;
+  truckType: TruckType;
+  deliveredLoads: number;
+  totalLoadAmount: number;
+  dispatchFeeEarned: number;
+  averageRatePerMile: number | null;
+};
+
+export type FinanceLoadRow = {
+  id: string;
+  date: string;
+  carrierName: string;
+  origin: string | null;
+  destination: string | null;
+  miles: number | null;
+  loadAmount: number | null;
+  ratePerMile: number | null;
+  dispatchFee: number | null;
+  status: LoadActivityStatus;
+};
+
+export type FinanceMonthlyEarnings = {
+  monthKey: string;
+  monthLabel: string;
+  revenue: number;
+  dispatchFee: number;
+};
+
+export type FinanceAssignedCarrier = {
+  id: string;
+  carrierName: string;
+  driverName: string;
+  truckType: TruckType;
+};
+
+export type DispatcherFinanceProfile = {
+  id: string;
+  fullName: string;
+  email: string;
+  phoneNumber: string;
+  teamName: string;
+  role: string;
+  status: TeamStatus;
+  assignedCarriersCount: number;
+  assignedCarriers: FinanceAssignedCarrier[];
+};
+
+export type FinancePaymentTracking = {
+  paidAmount: number | null;
+  pendingAmount: number | null;
+  message: string;
+};
+
+export type DispatcherFinanceBundle = {
+  profile: DispatcherFinanceProfile;
+  filters: FinanceAppliedFilters;
+  filterOptions: FinanceFilterOptions;
+  summary: FinanceSummary;
+  monthlyEarnings: FinanceMonthlyEarnings[];
+  carrierBreakdown: FinanceCarrierRow[];
+  loadHistory: FinanceLoadRow[];
+  paymentTracking: FinancePaymentTracking;
+};
+
 export type AppSettings = {
   dispatchFeeCalculation: {
     method: string;
@@ -415,12 +526,20 @@ export type AppSettings = {
   allowedTruckTypes: TruckType[];
   allowedStatusReasons: StatusReason[];
   timezone: string;
+  currency: string;
   csvExport: {
     includeHeaders: boolean;
     dateFormat: string;
     maxRows: number;
     fileNamePrefix: string;
   };
+};
+
+export type DispatchFeeRules = {
+  method: "percentage";
+  defaultPercentage: number;
+  minimumFee: number;
+  roundToNearestDollar: boolean;
 };
 
 export type FilterOption = {
@@ -440,4 +559,16 @@ export type RoleScope = {
   dispatcherName: string | null;
   scopeLabel: string;
   isCompanyWide: boolean;
+};
+
+export type SearchResultGroup = {
+  id: string;
+  label: string;
+  href: string;
+};
+
+export type SearchResults = {
+  carriers: SearchResultGroup[];
+  dispatchers: SearchResultGroup[];
+  activities: SearchResultGroup[];
 };

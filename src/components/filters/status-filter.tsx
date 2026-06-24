@@ -24,11 +24,7 @@ export function StatusFilter({
 }: StatusFilterProps) {
   return (
     <FilterField label="Status">
-      <Select
-        value={value}
-        onValueChange={onValueChange}
-        disabled={disabled}
-      >
+      <Select value={value} onValueChange={onValueChange} disabled={disabled}>
         <SelectTrigger className="w-full" size="sm">
           <SelectValue placeholder="Status" />
         </SelectTrigger>

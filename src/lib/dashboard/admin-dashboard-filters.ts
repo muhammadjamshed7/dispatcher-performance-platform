@@ -1,6 +1,7 @@
 import type { Status } from "@/lib/constants/statuses";
 import type { TruckType } from "@/lib/constants/truck-types";
 import { TRUCK_TYPES } from "@/lib/constants/truck-types";
+import { resolveDateRange } from "@/lib/utils/resolve-date-range";
 import { formatDateRangeLabel } from "@/lib/utils/resolve-date-range-preset";
 
 export type AdminDashboardDatePreset =
@@ -58,11 +59,6 @@ export const DASHBOARD_STATUS_FILTER_OPTIONS: DashboardStatusFilterOption[] = [
   { key: "CANCELED", label: "Canceled", statuses: ["CANCELLED"] },
   { key: "BOOKED", label: "Booked", statuses: ["NOT_WORKING"] },
   { key: "NOT_BOOKED", label: "Not Booked", statuses: ["NOT_BOOKED"] },
-  {
-    key: "BOOKED_BUT_CANCELED",
-    label: "Booked but Canceled",
-    statuses: [],
-  },
 ];
 
 export const DASHBOARD_TRUCK_TYPE_OPTIONS = TRUCK_TYPES.map((type) => ({
@@ -73,66 +69,25 @@ export const DASHBOARD_TRUCK_TYPE_OPTIONS = TRUCK_TYPES.map((type) => ({
     .replace(/\b\w/g, (char) => char.toUpperCase()),
 }));
 
-function formatDateKey(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
 export function resolveAdminDateRange(filters: AdminDashboardFilterState): {
   dateFrom: string;
   dateTo: string;
 } {
-  const now = new Date();
-  const dateTo = formatDateKey(now);
-
-  switch (filters.dateRange) {
-    case "today":
-      return { dateFrom: dateTo, dateTo };
-    case "this-week": {
-      const start = new Date(now);
-      const weekday = now.getUTCDay();
-      const mondayOffset = weekday === 0 ? 6 : weekday - 1;
-      start.setUTCDate(now.getUTCDate() - mondayOffset);
-      return { dateFrom: formatDateKey(start), dateTo };
-    }
-    case "last-7-days": {
-      const start = new Date(now);
-      start.setUTCDate(now.getUTCDate() - 6);
-      return { dateFrom: formatDateKey(start), dateTo };
-    }
-    case "last-month": {
-      const start = new Date(
-        Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1),
-      );
-      const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0));
-      return { dateFrom: formatDateKey(start), dateTo: formatDateKey(end) };
-    }
-    case "custom": {
-      if (filters.customDateFrom && filters.customDateTo) {
-        return {
-          dateFrom: filters.customDateFrom,
-          dateTo: filters.customDateTo,
-        };
-      }
-      return {
-        dateFrom: filters.customDateFrom || dateTo,
-        dateTo: filters.customDateTo || dateTo,
-      };
-    }
-    case "this-month":
-    default: {
-      const start = new Date(
-        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
-      );
-      return { dateFrom: formatDateKey(start), dateTo };
-    }
-  }
+  return resolveDateRange(filters.dateRange, {
+    customDateFrom: filters.customDateFrom,
+    customDateTo: filters.customDateTo,
+    weekStart: "monday",
+    customIncompleteFallback: "partial",
+  });
 }
 
 export function resolveStatusKeysToBackend(statusKeys: string[]): Status[] {
   const statuses = new Set<Status>();
 
   for (const key of statusKeys) {
-    const option = DASHBOARD_STATUS_FILTER_OPTIONS.find((item) => item.key === key);
+    const option = DASHBOARD_STATUS_FILTER_OPTIONS.find(
+      (item) => item.key === key,
+    );
     if (!option) continue;
     for (const status of option.statuses) {
       statuses.add(status);
@@ -183,7 +138,14 @@ export function dashboardFiltersToParams(
 
 function parseCsv(value: string | null): string[] {
   if (!value?.trim()) return [];
-  return [...new Set(value.split(",").map((part) => part.trim()).filter(Boolean))];
+  return [
+    ...new Set(
+      value
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean),
+    ),
+  ];
 }
 
 export function parseAdminDashboardFiltersFromSearchParams(
@@ -192,18 +154,22 @@ export function parseAdminDashboardFiltersFromSearchParams(
   const dateRange = (params.get("dateRange") ??
     "this-month") as AdminDashboardDatePreset;
 
-  const truckTypes = parseCsv(params.get("truckTypes")).filter((value): value is TruckType =>
-    TRUCK_TYPES.includes(value as TruckType),
+  const truckTypes = parseCsv(params.get("truckTypes")).filter(
+    (value): value is TruckType => TRUCK_TYPES.includes(value as TruckType),
   );
 
   return {
-    dateRange: ADMIN_DATE_PRESET_OPTIONS.some((option) => option.value === dateRange)
+    dateRange: ADMIN_DATE_PRESET_OPTIONS.some(
+      (option) => option.value === dateRange,
+    )
       ? dateRange
       : "this-month",
     customDateFrom: params.get("customDateFrom") ?? "",
     customDateTo: params.get("customDateTo") ?? "",
     teamIds: parseCsv(params.get("teams") ?? params.get("teamIds")),
-    dispatcherIds: parseCsv(params.get("dispatchers") ?? params.get("dispatcherIds")),
+    dispatcherIds: parseCsv(
+      params.get("dispatchers") ?? params.get("dispatcherIds"),
+    ),
     carrierIds: parseCsv(params.get("carriers") ?? params.get("carrierIds")),
     truckTypes,
     statusKeys: parseCsv(params.get("statuses") ?? params.get("statusKeys")),
@@ -220,7 +186,8 @@ export function adminDashboardFiltersToSearchParams(
   }
 
   if (filters.dateRange === "custom") {
-    if (filters.customDateFrom) params.set("customDateFrom", filters.customDateFrom);
+    if (filters.customDateFrom)
+      params.set("customDateFrom", filters.customDateFrom);
     if (filters.customDateTo) params.set("customDateTo", filters.customDateTo);
   }
 
@@ -243,7 +210,9 @@ export function adminDashboardFiltersToSearchParams(
   return params;
 }
 
-export function countActiveFilterGroups(filters: AdminDashboardFilterState): number {
+export function countActiveFilterGroups(
+  filters: AdminDashboardFilterState,
+): number {
   let count = 0;
 
   if (filters.dateRange !== DEFAULT_ADMIN_DASHBOARD_FILTERS.dateRange) {
@@ -258,13 +227,9 @@ export function countActiveFilterGroups(filters: AdminDashboardFilterState): num
   return count;
 }
 
-export function isDefaultAdminDashboardFilters(
+export function getDateFilterChipLabel(
   filters: AdminDashboardFilterState,
-): boolean {
-  return countActiveFilterGroups(filters) === 0;
-}
-
-export function getDateFilterChipLabel(filters: AdminDashboardFilterState): string {
+): string {
   const { dateFrom, dateTo } = resolveAdminDateRange(filters);
   return formatDateRangeLabel(dateFrom, dateTo);
 }
@@ -273,7 +238,8 @@ export function getStatusFilterChipLabel(statusKeys: string[]): string {
   const labels = statusKeys
     .map(
       (key) =>
-        DASHBOARD_STATUS_FILTER_OPTIONS.find((option) => option.key === key)?.label,
+        DASHBOARD_STATUS_FILTER_OPTIONS.find((option) => option.key === key)
+          ?.label,
     )
     .filter(Boolean);
 

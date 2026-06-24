@@ -1,11 +1,17 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { Suspense, useCallback, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { PageContentGate } from "@/components/feedback/page-content-gate";
 import type { PageContentState } from "@/components/feedback/page-content-gate";
 import { AppToast } from "@/components/feedback/app-toast";
 import { EntityFilterBar } from "@/components/filters/entity-filter-bar";
+import {
+  entityFiltersToDispatcherParams,
+  parseEntityFiltersFromSearchParams,
+  type EntityFilterValues,
+} from "@/lib/filters/entity-filter-params";
 import { RoleScopeBanner } from "@/components/layout/role-scope-banner";
 import {
   DispatcherModal,
@@ -17,6 +23,14 @@ import {
 } from "@/components/tables/dispatchers-table";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useApiData } from "@/hooks/use-api-data";
 import { useRoleScope } from "@/hooks/use-role-scope";
 import { ApiClientError } from "@/lib/api/client";
@@ -27,9 +41,8 @@ import {
   toggleDispatcherStatusRequest,
   updateDispatcherRequest,
 } from "@/lib/api/resources";
-import {
-  TEAM_STATUS_ACTIVE,
-} from "@/lib/constants/team-statuses";
+import { TEAM_STATUS_ACTIVE } from "@/lib/constants/team-statuses";
+import { ADMIN } from "@/lib/constants/roles";
 import type { Dispatcher } from "@/lib/types";
 import type { DispatcherFormValues } from "@/lib/validation/dispatcher-form";
 
@@ -37,15 +50,51 @@ function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof ApiClientError ? error.message : fallback;
 }
 
-export function DispatchersPageContent() {
-  const { filterDispatchers } = useRoleScope();
+type CreatedDispatcherCredentials = {
+  fullName: string;
+  email: string;
+  temporaryPassword: string;
+};
+
+function DispatchersPageContentInner() {
+  const searchParams = useSearchParams();
+  const searchParamKey = searchParams.toString();
+  const urlFilters = useMemo(
+    () =>
+      parseEntityFiltersFromSearchParams(new URLSearchParams(searchParamKey)),
+    [searchParamKey],
+  );
+
+  return (
+    <DispatchersPageState key={searchParamKey} initialFilters={urlFilters} />
+  );
+}
+
+function DispatchersPageState({
+  initialFilters,
+}: {
+  initialFilters: EntityFilterValues;
+}) {
+  const router = useRouter();
+  const { filterDispatchers, user } = useRoleScope();
+  const [draftFilters, setDraftFilters] = useState<EntityFilterValues>(
+    initialFilters,
+  );
+  const [appliedFilters, setAppliedFilters] = useState<EntityFilterValues>(
+    initialFilters,
+  );
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<DispatcherModalMode>("create");
   const [selectedDispatcher, setSelectedDispatcher] =
     useState<Dispatcher | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [createdCredentials, setCreatedCredentials] =
+    useState<CreatedDispatcherCredentials | null>(null);
 
-  const loadDispatchers = useCallback(() => fetchDispatchers(), []);
+  const loadDispatchers = useCallback(
+    () => fetchDispatchers(entityFiltersToDispatcherParams(appliedFilters)),
+    [appliedFilters],
+  );
   const loadTeams = useCallback(() => fetchTeams(), []);
   const {
     data: dispatchers = [],
@@ -53,7 +102,7 @@ export function DispatchersPageContent() {
     isLoading,
     isEmpty,
     reload,
-  } = useApiData(loadDispatchers, []);
+  } = useApiData(loadDispatchers, [appliedFilters]);
   const { data: teams = [] } = useApiData(loadTeams, []);
 
   const visibleDispatchers = useMemo(
@@ -86,6 +135,11 @@ export function DispatchersPageContent() {
     dispatcher: Dispatcher,
     action: DispatcherRowAction,
   ) {
+    if (action === "finance") {
+      router.push(`/admin/dispatchers/${dispatcher.id}/finance`);
+      return;
+    }
+
     if (action === "toggle-status") {
       openModal(
         dispatcher.status === TEAM_STATUS_ACTIVE ? "deactivate" : "activate",
@@ -105,7 +159,7 @@ export function DispatchersPageContent() {
     }
 
     try {
-      await createDispatcherRequest({
+      const result = await createDispatcherRequest({
         fullName: values.fullName,
         email: values.email,
         phoneNumber: values.phoneNumber,
@@ -113,7 +167,11 @@ export function DispatchersPageContent() {
         role: values.role,
         status: values.status,
       });
-      showToast(`Dispatcher "${values.fullName}" created successfully.`);
+      setCreatedCredentials({
+        fullName: result.dispatcher.fullName,
+        email: result.dispatcher.email,
+        temporaryPassword: result.temporaryPassword,
+      });
       await reload();
     } catch (err) {
       showToast(getErrorMessage(err, "Failed to create dispatcher."));
@@ -178,7 +236,15 @@ export function DispatchersPageContent() {
           </Button>
         </div>
 
-        <EntityFilterBar />
+        <EntityFilterBar
+          values={draftFilters}
+          onChange={setDraftFilters}
+          onApply={() => setAppliedFilters(draftFilters)}
+          showDateRange={false}
+          showCarrier={false}
+          showTruckType={false}
+          showStatus={false}
+        />
 
         <PageContentGate
           state={pageState}
@@ -190,10 +256,15 @@ export function DispatchersPageContent() {
           onEmptyAction={() => openModal("create")}
           errorTitle="Unable to load dispatchers"
           errorDescription={
-            error ?? "Dispatcher records could not be loaded. Try again in a moment."
+            error ??
+            "Dispatcher records could not be loaded. Try again in a moment."
           }
         >
-          <DispatchersTable dispatchers={visibleDispatchers} onAction={handleRowAction} />
+          <DispatchersTable
+            dispatchers={visibleDispatchers}
+            onAction={handleRowAction}
+            showFinanceAction={user.role === ADMIN}
+          />
         </PageContentGate>
       </PageShell>
 
@@ -207,7 +278,71 @@ export function DispatchersPageContent() {
         onToggleStatus={handleToggleStatus}
       />
 
-      <AppToast message={toastMessage} onDismiss={() => setToastMessage(null)} />
+      <Dialog
+        open={createdCredentials !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCreatedCredentials(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Dispatcher created</DialogTitle>
+            <DialogDescription>
+              Share these credentials with the dispatcher. They can sign in at
+              their portal login page.
+            </DialogDescription>
+          </DialogHeader>
+
+          {createdCredentials ? (
+            <div className="bg-muted/40 space-y-3 rounded-md border p-4 text-sm">
+              <p>
+                <span className="font-medium">Name:</span>{" "}
+                {createdCredentials.fullName}
+              </p>
+              <p>
+                <span className="font-medium">Email:</span>{" "}
+                {createdCredentials.email}
+              </p>
+              <p>
+                <span className="font-medium">Temporary password:</span>{" "}
+                <code className="bg-background rounded px-2 py-1 font-mono text-xs">
+                  {createdCredentials.temporaryPassword}
+                </code>
+              </p>
+              <p className="text-muted-foreground text-xs">
+                Ask them to change this password after their first login.
+              </p>
+            </div>
+          ) : null}
+
+          <DialogFooter>
+            <Button type="button" onClick={() => setCreatedCredentials(null)}>
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AppToast
+        message={toastMessage}
+        onDismiss={() => setToastMessage(null)}
+      />
     </>
+  );
+}
+
+export function DispatchersPageContent() {
+  return (
+    <Suspense
+      fallback={
+        <div className="py-10 text-sm text-[#64748B]">
+          Loading dispatchers...
+        </div>
+      }
+    >
+      <DispatchersPageContentInner />
+    </Suspense>
   );
 }

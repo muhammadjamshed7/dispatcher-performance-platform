@@ -59,7 +59,7 @@ export function DashboardMetricCard({
       {showSparkline ? (
         <div className="mt-4 border-t border-[#F1F5F9] pt-3">
           <div className="mb-2 flex items-center justify-between gap-2">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-[#94A3B8]">
+            <p className="text-[11px] font-medium tracking-wide text-[#94A3B8] uppercase">
               Last 7 days
             </p>
           </div>

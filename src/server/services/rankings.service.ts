@@ -1,7 +1,10 @@
 import "server-only";
 
 import { DELIVERED } from "@/lib/constants/statuses";
-import { db } from "@/lib/db/prisma";
+import { sanitizeFilterId } from "@/lib/constants/filters";
+import { T, db } from "@/lib/db/client";
+import { applyScopeWhere, asFilterable } from "@/lib/db/query";
+import { assertDb, decimalToNumber } from "@/lib/db/utils";
 import type {
   CarrierRanking,
   DispatcherRanking,
@@ -15,12 +18,39 @@ import {
   teamScopeFilter,
 } from "@/server/utils/scope-filters";
 
-function decimalToNumber(value: { toNumber(): number } | null | undefined): number {
-  if (!value) {
-    return 0;
+export type RankingFilters = {
+  teamId?: string;
+  dispatcherId?: string;
+};
+
+function unwrapRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (value === null || value === undefined) {
+    return null;
   }
 
-  return value.toNumber();
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
+function buildScopedRankingFilters(
+  scope: AccessScope,
+  filters: RankingFilters = {},
+): RankingFilters {
+  const teamId = sanitizeFilterId(filters.teamId);
+  const dispatcherId = sanitizeFilterId(filters.dispatcherId);
+
+  if (scope.isCompanyWide) {
+    return { teamId, dispatcherId };
+  }
+
+  if (scope.role === "DISPATCHER") {
+    return {};
+  }
+
+  if (scope.teamId) {
+    return { dispatcherId };
+  }
+
+  return {};
 }
 
 function computeActivityScore(delivered: number, total: number): number {
@@ -33,60 +63,162 @@ function computeActivityScore(delivered: number, total: number): number {
 
 export async function getDispatcherRankings(
   scope: AccessScope,
+  filters: RankingFilters = {},
 ): Promise<DispatcherRanking[]> {
-  const dispatchers = await db.dispatcher.findMany({
-    where: {
-      organizationId: scope.organizationId,
-      status: "ACTIVE",
-      deletedAt: null,
-      ...dispatcherScopeFilter(scope),
-    },
-    include: {
-      user: { select: { fullName: true } },
-      team: { select: { name: true } },
-      _count: { select: { carriers: { where: { status: "ACTIVE", deletedAt: null } } } },
-    },
-  });
+  const scopedFilters = buildScopedRankingFilters(scope, filters);
+
+  let dispatcherQuery = applyScopeWhere(
+    asFilterable(
+      db()
+        .from(T.Dispatcher)
+        .select(
+          "id, user:User!Dispatcher_userId_fkey(fullName), team:Team!Dispatcher_teamId_fkey(name)",
+        )
+        .eq("organizationId", scope.organizationId)
+        .eq("status", "ACTIVE")
+        .is("deletedAt", null),
+    ),
+    dispatcherScopeFilter(scope),
+  );
+
+  if (scopedFilters.teamId) {
+    dispatcherQuery = dispatcherQuery.eq(
+      "teamId",
+      scopedFilters.teamId,
+    ) as typeof dispatcherQuery;
+  }
+
+  if (scopedFilters.dispatcherId) {
+    dispatcherQuery = dispatcherQuery.eq(
+      "id",
+      scopedFilters.dispatcherId,
+    ) as typeof dispatcherQuery;
+  }
+
+  const dispatchers = (assertDb(await dispatcherQuery) ?? []) as Array<{
+    id: string;
+    user: { fullName: string } | Array<{ fullName: string }>;
+    team: { name: string } | Array<{ name: string }>;
+  }>;
+  const dispatcherIds = dispatchers.map((dispatcher) => dispatcher.id);
+  const carrierCountByDispatcher = new Map<string, number>();
+
+  if (dispatcherIds.length > 0) {
+    const carriers = (assertDb(
+      await db()
+        .from(T.Carrier)
+        .select("dispatcherId")
+        .in("dispatcherId", dispatcherIds)
+        .eq("status", "ACTIVE")
+        .is("deletedAt", null),
+    ) ?? []) as Array<{ dispatcherId: string | null }>;
+
+    for (const carrier of carriers) {
+      if (!carrier.dispatcherId) {
+        continue;
+      }
+
+      carrierCountByDispatcher.set(
+        carrier.dispatcherId,
+        (carrierCountByDispatcher.get(carrier.dispatcherId) ?? 0) + 1,
+      );
+    }
+  }
 
   return dispatchers
-    .sort((a, b) => b._count.carriers - a._count.carriers)
+    .map((dispatcher) => ({
+      id: dispatcher.id,
+      name: unwrapRelation(dispatcher.user)?.fullName ?? "",
+      team: unwrapRelation(dispatcher.team)?.name ?? "",
+      carriers: carrierCountByDispatcher.get(dispatcher.id) ?? 0,
+    }))
+    .sort((a, b) => b.carriers - a.carriers)
     .map((dispatcher, index) => ({
       rank: index + 1,
-      name: dispatcher.user.fullName,
-      team: dispatcher.team.name,
-      carriers: dispatcher._count.carriers,
+      ...dispatcher,
     }));
 }
 
-export async function getCarrierRankings(scope: AccessScope): Promise<CarrierRanking[]> {
-  const carriers = await db.carrier.findMany({
-    where: {
-      organizationId: scope.organizationId,
-      deletedAt: null,
-      ...carrierScopeFilter(scope),
-    },
-    include: {
-      dispatcher: { include: { user: { select: { fullName: true } } } },
-      dailyActivities: {
-        where: {
-          organizationId: scope.organizationId,
-          ...activityScopeFilter(scope),
-        },
-        select: { status: true },
-      },
-    },
-  });
+export async function getCarrierRankings(
+  scope: AccessScope,
+  filters: RankingFilters = {},
+): Promise<CarrierRanking[]> {
+  const scopedFilters = buildScopedRankingFilters(scope, filters);
+
+  let carrierQuery = applyScopeWhere(
+    asFilterable(
+      db()
+        .from(T.Carrier)
+        .select(
+          "id, carrierName, dispatcher:Dispatcher!Carrier_dispatcherId_fkey(user:User!Dispatcher_userId_fkey(fullName))",
+        )
+        .eq("organizationId", scope.organizationId)
+        .is("deletedAt", null),
+    ),
+    carrierScopeFilter(scope),
+  );
+
+  if (scopedFilters.teamId) {
+    carrierQuery = carrierQuery.eq("teamId", scopedFilters.teamId) as typeof carrierQuery;
+  }
+
+  if (scopedFilters.dispatcherId) {
+    carrierQuery = carrierQuery.eq(
+      "dispatcherId",
+      scopedFilters.dispatcherId,
+    ) as typeof carrierQuery;
+  }
+
+  const carriers = (assertDb(await carrierQuery) ?? []) as Array<{
+    id: string;
+    carrierName: string;
+    dispatcher:
+      | { user: { fullName: string } | Array<{ fullName: string }> }
+      | Array<{ user: { fullName: string } | Array<{ fullName: string }> }>
+      | null;
+  }>;
+  const carrierIds = carriers.map((carrier) => carrier.id);
+  const activitiesByCarrier = new Map<string, Array<{ status: string }>>();
+
+  if (carrierIds.length > 0) {
+    const activityQuery = applyScopeWhere(
+      asFilterable(
+        db()
+          .from(T.DailyActivity)
+          .select("carrierId, status")
+          .in("carrierId", carrierIds)
+          .eq("organizationId", scope.organizationId),
+      ),
+      activityScopeFilter(scope),
+    );
+
+    const activities = (assertDb(await activityQuery) ?? []) as Array<{
+      carrierId: string;
+      status: string;
+    }>;
+
+    for (const activity of activities) {
+      const list = activitiesByCarrier.get(activity.carrierId) ?? [];
+      list.push({ status: activity.status });
+      activitiesByCarrier.set(activity.carrierId, list);
+    }
+  }
 
   const ranked = carriers
     .map((carrier) => {
-      const total = carrier.dailyActivities.length;
-      const delivered = carrier.dailyActivities.filter(
+      const dailyActivities = activitiesByCarrier.get(carrier.id) ?? [];
+      const total = dailyActivities.length;
+      const delivered = dailyActivities.filter(
         (activity) => activity.status === DELIVERED,
       ).length;
 
+      const dispatcherUser = unwrapRelation(
+        unwrapRelation(carrier.dispatcher)?.user,
+      );
+
       return {
         carrierName: carrier.carrierName,
-        dispatcherName: carrier.dispatcher?.user.fullName ?? "Unassigned",
+        dispatcherName: dispatcherUser?.fullName ?? "Unassigned",
         activityScore: computeActivityScore(delivered, total),
       };
     })
@@ -98,35 +230,77 @@ export async function getCarrierRankings(scope: AccessScope): Promise<CarrierRan
   }));
 }
 
-export async function getTeamRankings(scope: AccessScope): Promise<TeamRanking[]> {
-  const teams = await db.team.findMany({
-    where: {
-      organizationId: scope.organizationId,
-      deletedAt: null,
-      status: "ACTIVE",
-      ...teamScopeFilter(scope),
-    },
-    include: {
-      teamLead: { select: { fullName: true } },
-      dailyActivities: {
-        where: {
-          organizationId: scope.organizationId,
-          ...activityScopeFilter(scope),
-        },
-        select: { status: true, loadAmount: true },
-      },
-    },
-  });
+export async function getTeamRankings(
+  scope: AccessScope,
+  filters: RankingFilters = {},
+): Promise<TeamRanking[]> {
+  const scopedFilters = buildScopedRankingFilters(scope, filters);
+
+  let teamQuery = applyScopeWhere(
+    asFilterable(
+      db()
+        .from(T.Team)
+        .select("id, name, teamLead:User!Team_teamLeadUserId_fkey(fullName)")
+        .eq("organizationId", scope.organizationId)
+        .is("deletedAt", null)
+        .eq("status", "ACTIVE"),
+    ),
+    teamScopeFilter(scope),
+  );
+
+  if (scopedFilters.teamId) {
+    teamQuery = teamQuery.eq("id", scopedFilters.teamId) as typeof teamQuery;
+  }
+
+  const teams = (assertDb(await teamQuery) ?? []) as Array<{
+    id: string;
+    name: string;
+    teamLead: { fullName: string } | Array<{ fullName: string }> | null;
+  }>;
+  const teamIds = teams.map((team) => team.id);
+  const activitiesByTeam = new Map<
+    string,
+    Array<{ status: string; loadAmount: string | null }>
+  >();
+
+  if (teamIds.length > 0) {
+    const activityQuery = applyScopeWhere(
+      asFilterable(
+        db()
+          .from(T.DailyActivity)
+          .select("teamId, status, loadAmount")
+          .in("teamId", teamIds)
+          .eq("organizationId", scope.organizationId),
+      ),
+      activityScopeFilter(scope),
+    );
+
+    const activities = (assertDb(await activityQuery) ?? []) as Array<{
+      teamId: string;
+      status: string;
+      loadAmount: string | null;
+    }>;
+
+    for (const activity of activities) {
+      const list = activitiesByTeam.get(activity.teamId) ?? [];
+      list.push({ status: activity.status, loadAmount: activity.loadAmount });
+      activitiesByTeam.set(activity.teamId, list);
+    }
+  }
 
   const ranked = teams
     .map((team) => {
-      const revenue = team.dailyActivities
+      const dailyActivities = activitiesByTeam.get(team.id) ?? [];
+      const revenue = dailyActivities
         .filter((activity) => activity.status === DELIVERED)
-        .reduce((sum, activity) => sum + decimalToNumber(activity.loadAmount), 0);
+        .reduce(
+          (sum, activity) => sum + (decimalToNumber(activity.loadAmount) ?? 0),
+          0,
+        );
 
       return {
         teamName: team.name,
-        teamLeadName: team.teamLead?.fullName ?? "Unassigned",
+        teamLeadName: unwrapRelation(team.teamLead)?.fullName ?? "Unassigned",
         revenue: Math.round(revenue * 100) / 100,
       };
     })

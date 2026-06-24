@@ -38,7 +38,7 @@ export function RecentActivitiesTable({ rows }: RecentActivitiesTableProps) {
         </Link>
       </div>
       <div className="overflow-x-auto">
-        <table className="min-w-[960px] w-full text-left text-sm">
+        <table className="w-full min-w-[960px] text-left text-sm">
           <thead className="bg-[#F8FAFC] text-xs font-medium text-[#475569]">
             <tr>
               {[

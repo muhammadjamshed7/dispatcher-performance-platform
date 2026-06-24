@@ -12,7 +12,7 @@ import { formatCurrencyCompact } from "@/lib/utils/format-currency";
 import { formatRatePerMile } from "@/lib/utils/format-rate-per-mile";
 
 type CarrierReportTableProps = {
-  rows : CarrierReportRow[];
+  rows: CarrierReportRow[];
   title?: string;
 };
 
@@ -60,7 +60,9 @@ export function CarrierReportTable({
                 <TableCell>{row.notWorkingCount}</TableCell>
                 <TableCell>{formatCurrencyCompact(row.revenue)}</TableCell>
                 <TableCell>{formatCurrencyCompact(row.dispatchFees)}</TableCell>
-                <TableCell>{formatRatePerMile(row.averageRatePerMile)}</TableCell>
+                <TableCell>
+                  {formatRatePerMile(row.averageRatePerMile)}
+                </TableCell>
                 <TableCell>{row.activityScore}</TableCell>
               </TableRow>
             ))}

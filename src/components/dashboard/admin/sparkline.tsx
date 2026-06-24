@@ -64,7 +64,10 @@ export function Sparkline({
             }}
             content={({ active, payload }) => {
               if (!active || !payload?.length) return null;
-              const point = payload[0]?.payload as { label?: string; value?: number };
+              const point = payload[0]?.payload as {
+                label?: string;
+                value?: number;
+              };
               if (point?.value == null) return null;
 
               return (

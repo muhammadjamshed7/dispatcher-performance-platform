@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,10 +16,14 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { useEntityOptions } from "@/hooks/use-entity-options";
+import { useApiData } from "@/hooks/use-api-data";
+import { fetchDispatchFeeRules } from "@/lib/api/resources";
+import { getLoadActivityStatusLabel } from "@/lib/constants/status-labels";
+import { DELIVERED, STATUSES } from "@/lib/constants/statuses";
 import {
-  DELIVERED,
-  STATUSES,
-} from "@/lib/constants/statuses";
+  getCarrierDisplayName,
+  resolveCarrierLabel,
+} from "@/lib/utils/carrier-display";
 import { calculateDispatchFee } from "@/lib/utils/calculate-dispatch-fee";
 import { calculateRatePerMile } from "@/lib/utils/calculate-rate-per-mile";
 import {
@@ -35,20 +39,38 @@ type DailyActivityFormProps = {
   formId: string;
   defaultValues?: DailyActivityFormValues;
   readOnly?: boolean;
-  onSubmit: (values: DailyActivityFormValues) => void;
+  allowedStatusReasons?: string[];
+  carrierLabelFallback?: string;
+  onSubmit: (values: DailyActivityFormValues) => void | Promise<void>;
 };
 
 export function DailyActivityForm({
   formId,
   defaultValues = defaultDailyActivityFormValues,
   readOnly = false,
+  allowedStatusReasons = [],
+  carrierLabelFallback = "",
   onSubmit,
 }: DailyActivityFormProps) {
   const { filterCarriers } = useRoleScope();
-  const { carriers: allCarriers } = useEntityOptions();
+  const { carriers: allCarriers, isLoading: carriersLoading } =
+    useEntityOptions();
+  const loadDispatchFeeRules = useCallback(() => fetchDispatchFeeRules(), []);
+  const { data: dispatchFeeRules } = useApiData(loadDispatchFeeRules, []);
   const availableCarriers = useMemo(
     () => filterCarriers(allCarriers),
     [allCarriers, filterCarriers],
+  );
+
+  const resolvedDefaults = useMemo(
+    () => ({
+      ...defaultDailyActivityFormValues,
+      ...defaultValues,
+      carrierId: defaultValues.carrierId ?? "",
+      reason: defaultValues.reason ?? "",
+      notes: defaultValues.notes ?? "",
+    }),
+    [defaultValues],
   );
 
   const {
@@ -56,24 +78,84 @@ export function DailyActivityForm({
     handleSubmit,
     reset,
     setValue,
-    watch,
+    control,
     formState: { errors },
   } = useForm<DailyActivityFormValues>({
     resolver: zodResolver(dailyActivityFormSchema),
-    defaultValues,
+    defaultValues: resolvedDefaults,
   });
 
-  const status = watch("status");
-  const carrier = watch("carrier");
-  const totalMiles = watch("totalMiles");
-  const loadAmount = watch("loadAmount");
+  const status =
+    useWatch({ control, name: "status" }) ??
+    defaultDailyActivityFormValues.status;
+  const carrierId = useWatch({ control, name: "carrierId" }) ?? "";
+  const totalMiles = useWatch({ control, name: "totalMiles" });
+  const loadAmount = useWatch({ control, name: "loadAmount" });
   const isDelivered = status === DELIVERED;
+
+  const carrierSelectOptions = useMemo(() => {
+    const options = availableCarriers.map((carrier) => ({
+      id: carrier.id,
+      label: getCarrierDisplayName(carrier),
+    }));
+
+    if (
+      carrierId &&
+      !options.some((option) => option.id === carrierId) &&
+      carrierLabelFallback
+    ) {
+      options.unshift({ id: carrierId, label: carrierLabelFallback });
+    }
+
+    return options;
+  }, [availableCarriers, carrierId, carrierLabelFallback]);
+
+  const carrierLabelById = useMemo(
+    () =>
+      new Map(carrierSelectOptions.map((option) => [option.id, option.label])),
+    [carrierSelectOptions],
+  );
+
+  const selectedCarrierLabel = useMemo(
+    () =>
+      resolveCarrierLabel(carrierId, carrierLabelById, carrierLabelFallback),
+    [carrierId, carrierLabelById, carrierLabelFallback],
+  );
+
+  const carrierPlaceholder = carriersLoading
+    ? "Loading carriers..."
+    : "Select carrier";
+
+  function handleStatusChange(nextStatus: DailyActivityFormValues["status"]) {
+    setValue("status", nextStatus, { shouldValidate: true });
+
+    if (nextStatus === DELIVERED) {
+      setValue("reason", "");
+      return;
+    }
+
+    setValue("origin", "");
+    setValue("destination", "");
+    setValue("totalMiles", undefined);
+    setValue("loadAmount", undefined);
+  }
+
+  const parseOptionalNumber = (value: string | number) => {
+    if (value === "" || value === null || value === undefined) {
+      return undefined;
+    }
+
+    const parsed = typeof value === "number" ? value : Number(value);
+    return Number.isNaN(parsed) ? undefined : parsed;
+  };
 
   const dispatchFeePercentage = useMemo(
     () =>
-      availableCarriers.find((item) => item.carrierName === carrier)
-        ?.dispatchFeePercentage ?? 0,
-    [availableCarriers, carrier],
+      availableCarriers.find((item) => item.id === carrierId)
+        ?.dispatchFeePercentage ??
+      dispatchFeeRules?.defaultPercentage ??
+      0,
+    [availableCarriers, carrierId, dispatchFeeRules?.defaultPercentage],
   );
 
   const calculatedRatePerMile = useMemo(() => {
@@ -89,18 +171,27 @@ export function DailyActivityForm({
       return 0;
     }
 
-    return calculateDispatchFee(loadAmount, dispatchFeePercentage);
-  }, [isDelivered, loadAmount, dispatchFeePercentage]);
+    return calculateDispatchFee(loadAmount, dispatchFeePercentage, {
+      minimumFee: dispatchFeeRules?.minimumFee,
+      roundToNearestDollar: dispatchFeeRules?.roundToNearestDollar,
+    });
+  }, [
+    dispatchFeePercentage,
+    dispatchFeeRules?.minimumFee,
+    dispatchFeeRules?.roundToNearestDollar,
+    isDelivered,
+    loadAmount,
+  ]);
 
   useEffect(() => {
-    reset(defaultValues);
-  }, [defaultValues, reset]);
+    reset(resolvedDefaults);
+  }, [resolvedDefaults, reset]);
 
   return (
     <form
       id={formId}
       className="max-h-[65vh] space-y-4 overflow-y-auto pr-1"
-      onSubmit={handleSubmit(onSubmit)}
+      onSubmit={handleSubmit((values) => onSubmit(values))}
       noValidate
     >
       <div className="grid gap-4 sm:grid-cols-2">
@@ -114,64 +205,78 @@ export function DailyActivityForm({
             {...register("date")}
           />
           {errors.date ? (
-            <p className="text-sm text-destructive">{errors.date.message}</p>
+            <p className="text-destructive text-sm">{errors.date.message}</p>
           ) : null}
         </div>
 
         <div className="space-y-2">
           <Label htmlFor={`${formId}-carrier`}>Carrier</Label>
-          <Select
-            value={carrier}
-            onValueChange={(value) => {
-              if (value) {
-                setValue("carrier", value, { shouldValidate: true });
-              }
-            }}
-            disabled={readOnly}
-          >
-            <SelectTrigger id={`${formId}-carrier`} className="w-full">
-              <SelectValue placeholder="Select carrier" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableCarriers.map((item) => (
-                <SelectItem key={item.id} value={item.carrierName}>
-                  {item.carrierName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.carrier ? (
-            <p className="text-sm text-destructive">{errors.carrier.message}</p>
+          <Controller
+            name="carrierId"
+            control={control}
+            render={({ field }) => (
+              <Select
+                value={field.value ? field.value : null}
+                onValueChange={(value) => {
+                  if (value) {
+                    field.onChange(value);
+                  }
+                }}
+                disabled={readOnly || carriersLoading}
+              >
+                <SelectTrigger id={`${formId}-carrier`} className="w-full">
+                  <SelectValue placeholder={carrierPlaceholder}>
+                    {selectedCarrierLabel || null}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {carrierSelectOptions.map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+          {errors.carrierId ? (
+            <p className="text-destructive text-sm">
+              {errors.carrierId.message}
+            </p>
           ) : null}
         </div>
       </div>
 
       <div className="space-y-2">
         <Label htmlFor={`${formId}-status`}>Status</Label>
-        <Select
-          value={status}
-          onValueChange={(value) => {
-            if (value) {
-              setValue("status", value as DailyActivityFormValues["status"], {
-                shouldValidate: true,
-              });
-            }
-          }}
-          disabled={readOnly}
-        >
-          <SelectTrigger id={`${formId}-status`} className="w-full">
-            <SelectValue placeholder="Select status" />
-          </SelectTrigger>
-          <SelectContent>
-            {STATUSES.map((item) => (
-              <SelectItem key={item} value={item}>
-                {item.replaceAll("_", " ")}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Controller
+          name="status"
+          control={control}
+          render={({ field }) => (
+            <Select
+              value={field.value}
+              onValueChange={(value) => {
+                if (value) {
+                  handleStatusChange(value as DailyActivityFormValues["status"]);
+                }
+              }}
+              disabled={readOnly}
+            >
+              <SelectTrigger id={`${formId}-status`} className="w-full">
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                {STATUSES.map((item) => (
+                  <SelectItem key={item} value={item}>
+                    {getLoadActivityStatusLabel(item)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
         {errors.status ? (
-          <p className="text-sm text-destructive">{errors.status.message}</p>
+          <p className="text-destructive text-sm">{errors.status.message}</p>
         ) : null}
       </div>
 
@@ -188,7 +293,9 @@ export function DailyActivityForm({
                 {...register("origin")}
               />
               {errors.origin ? (
-                <p className="text-sm text-destructive">{errors.origin.message}</p>
+                <p className="text-destructive text-sm">
+                  {errors.origin.message}
+                </p>
               ) : null}
             </div>
 
@@ -202,7 +309,7 @@ export function DailyActivityForm({
                 {...register("destination")}
               />
               {errors.destination ? (
-                <p className="text-sm text-destructive">
+                <p className="text-destructive text-sm">
                   {errors.destination.message}
                 </p>
               ) : null}
@@ -219,10 +326,10 @@ export function DailyActivityForm({
                 step="0.1"
                 disabled={readOnly}
                 aria-invalid={Boolean(errors.totalMiles)}
-                {...register("totalMiles", { valueAsNumber: true })}
+                {...register("totalMiles", { setValueAs: parseOptionalNumber })}
               />
               {errors.totalMiles ? (
-                <p className="text-sm text-destructive">
+                <p className="text-destructive text-sm">
                   {errors.totalMiles.message}
                 </p>
               ) : null}
@@ -237,10 +344,10 @@ export function DailyActivityForm({
                 step="0.01"
                 disabled={readOnly}
                 aria-invalid={Boolean(errors.loadAmount)}
-                {...register("loadAmount", { valueAsNumber: true })}
+                {...register("loadAmount", { setValueAs: parseOptionalNumber })}
               />
               {errors.loadAmount ? (
-                <p className="text-sm text-destructive">
+                <p className="text-destructive text-sm">
                   {errors.loadAmount.message}
                 </p>
               ) : null}
@@ -254,7 +361,9 @@ export function DailyActivityForm({
                 {formatRatePerMile(calculatedRatePerMile, "—")}
               </p>
               <p>
-                <span className="text-muted-foreground">Dispatch Fee Earned:</span>{" "}
+                <span className="text-muted-foreground">
+                  Dispatch Fee Earned:
+                </span>{" "}
                 {formatCurrency(calculatedDispatchFee, { nullLabel: "—" })}
               </p>
             </CardContent>
@@ -263,15 +372,41 @@ export function DailyActivityForm({
       ) : (
         <div className="space-y-2">
           <Label htmlFor={`${formId}-reason`}>Reason</Label>
-          <Textarea
-            id={`${formId}-reason`}
-            placeholder="Enter reason"
-            disabled={readOnly}
-            aria-invalid={Boolean(errors.reason)}
-            {...register("reason")}
-          />
+          {allowedStatusReasons.length > 0 ? (
+            <Controller
+              name="reason"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  value={field.value ? field.value : null}
+                  onValueChange={(value) => {
+                    if (value) {
+                      field.onChange(value);
+                    }
+                  }}
+                  disabled={readOnly}
+                >
+                  <SelectTrigger id={`${formId}-reason`} className="w-full">
+                    <SelectValue placeholder="Select reason" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allowedStatusReasons.map((reasonOption) => (
+                      <SelectItem key={reasonOption} value={reasonOption}>
+                        {reasonOption}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          ) : (
+            <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              No status reasons are configured. Ask an admin to add allowed
+              reasons in Settings.
+            </p>
+          )}
           {errors.reason ? (
-            <p className="text-sm text-destructive">{errors.reason.message}</p>
+            <p className="text-destructive text-sm">{errors.reason.message}</p>
           ) : null}
         </div>
       )}

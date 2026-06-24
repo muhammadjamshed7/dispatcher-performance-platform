@@ -36,7 +36,9 @@ export function KpiMonthlyGrowthChart({
     return <KpiChartEmptyState />;
   }
 
-  const [yMin, yMax] = computeGrowthYAxisDomain(data.map((point) => point.growth));
+  const [yMin, yMax] = computeGrowthYAxisDomain(
+    data.map((point) => point.growth),
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -52,7 +54,11 @@ export function KpiMonthlyGrowthChart({
                 <stop offset="100%" stopColor={color} stopOpacity={0.03} />
               </linearGradient>
             </defs>
-            <CartesianGrid stroke="#E2E8F0" strokeDasharray="4 4" vertical={false} />
+            <CartesianGrid
+              stroke="#E2E8F0"
+              strokeDasharray="4 4"
+              vertical={false}
+            />
             <XAxis
               dataKey="month"
               tick={{ fill: "#64748B", fontSize: 11 }}

@@ -1,9 +1,5 @@
 import type { Role } from "@/lib/constants/roles";
-import {
-  INACTIVE,
-  INVITED,
-  PENDING_APPROVAL,
-} from "@/lib/auth/user-statuses";
+import { INACTIVE, INVITED, PENDING_APPROVAL } from "@/lib/auth/user-statuses";
 import type { SessionUser } from "@/lib/auth/session-types";
 
 export function getAccessDeniedMessage(

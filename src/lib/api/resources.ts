@@ -5,13 +5,17 @@ import type {
   AdminDailyReportBundle,
   AppSettings,
   Carrier,
+  CreateDispatcherResult,
   DailyActivity,
   DashboardMetric,
   DispatcherDashboardBundle,
+  DispatcherFinanceBundle,
   Dispatcher,
+  DispatchFeeRules,
   PendingUserRequest,
   RankingRow,
   ReportBundle,
+  SearchResults,
   Team,
 } from "@/lib/types";
 import type { Role } from "@/lib/constants/roles";
@@ -73,18 +77,22 @@ export function updateTeamRequest(id: string, input: Record<string, unknown>) {
   });
 }
 
-export function fetchDispatchers() {
-  return apiFetch<Dispatcher[]>("/api/dispatchers");
+export function fetchDispatchers(params?: Record<string, string>) {
+  const query = params ? `?${new URLSearchParams(params).toString()}` : "";
+  return apiFetch<Dispatcher[]>(`/api/dispatchers${query}`);
 }
 
 export function createDispatcherRequest(input: Record<string, unknown>) {
-  return apiFetch<Dispatcher>("/api/dispatchers", {
+  return apiFetch<CreateDispatcherResult>("/api/dispatchers", {
     method: "POST",
     body: JSON.stringify(input),
   });
 }
 
-export function updateDispatcherRequest(id: string, input: Record<string, unknown>) {
+export function updateDispatcherRequest(
+  id: string,
+  input: Record<string, unknown>,
+) {
   return apiFetch<Dispatcher>(`/api/dispatchers/${id}`, {
     method: "PATCH",
     body: JSON.stringify(input),
@@ -101,8 +109,9 @@ export function toggleDispatcherStatusRequest(
   });
 }
 
-export function fetchCarriers() {
-  return apiFetch<Carrier[]>("/api/carriers");
+export function fetchCarriers(params?: Record<string, string>) {
+  const query = params ? `?${new URLSearchParams(params).toString()}` : "";
+  return apiFetch<Carrier[]>(`/api/carriers${query}`);
 }
 
 export function createCarrierRequest(input: Record<string, unknown>) {
@@ -112,14 +121,20 @@ export function createCarrierRequest(input: Record<string, unknown>) {
   });
 }
 
-export function updateCarrierRequest(id: string, input: Record<string, unknown>) {
+export function updateCarrierRequest(
+  id: string,
+  input: Record<string, unknown>,
+) {
   return apiFetch<Carrier>(`/api/carriers/${id}`, {
     method: "PATCH",
     body: JSON.stringify(input),
   });
 }
 
-export function reassignCarrierRequest(id: string, input: Record<string, unknown>) {
+export function reassignCarrierRequest(
+  id: string,
+  input: Record<string, unknown>,
+) {
   return apiFetch<Carrier>(`/api/carriers/${id}/reassign`, {
     method: "POST",
     body: JSON.stringify(input),
@@ -138,7 +153,10 @@ export function createActivityRequest(input: Record<string, unknown>) {
   });
 }
 
-export function updateActivityRequest(id: string, input: Record<string, unknown>) {
+export function updateActivityRequest(
+  id: string,
+  input: Record<string, unknown>,
+) {
   return apiFetch<DailyActivity>(`/api/activities/${id}`, {
     method: "PATCH",
     body: JSON.stringify(input),
@@ -161,15 +179,23 @@ export function fetchTeamLeadDashboard() {
 
 export function fetchDispatcherDashboard(params?: Record<string, string>) {
   const query = params ? `?${new URLSearchParams(params).toString()}` : "";
-  return apiFetch<DispatcherDashboardBundle>(`/api/dashboard/dispatcher${query}`);
+  return apiFetch<DispatcherDashboardBundle>(
+    `/api/dashboard/dispatcher${query}`,
+  );
 }
 
-export function fetchRankings(type: "dispatcher" | "carrier" | "team") {
-  return apiFetch<RankingRow[]>(`/api/rankings?type=${type}`);
+export function fetchRankings(
+  type: "dispatcher" | "carrier" | "team",
+  params?: Record<string, string>,
+) {
+  const search = new URLSearchParams({ type, ...(params ?? {}) });
+  return apiFetch<RankingRow[]>(`/api/rankings?${search.toString()}`);
 }
 
 export function fetchReports(params: Record<string, string>) {
-  return apiFetch<ReportBundle>(`/api/reports?${new URLSearchParams(params).toString()}`);
+  return apiFetch<ReportBundle>(
+    `/api/reports?${new URLSearchParams(params).toString()}`,
+  );
 }
 
 export function exportReportRequest(input: Record<string, unknown>) {
@@ -184,6 +210,14 @@ export function exportReportRequest(input: Record<string, unknown>) {
 
 export function fetchSettings() {
   return apiFetch<AppSettings>("/api/settings");
+}
+
+export function fetchAllowedStatusReasons() {
+  return apiFetch<string[]>("/api/settings/status-reasons");
+}
+
+export function fetchDispatchFeeRules() {
+  return apiFetch<DispatchFeeRules>("/api/settings/dispatch-fee-rules");
 }
 
 export function updateSettingsRequest(input: Record<string, unknown>) {
@@ -209,4 +243,62 @@ export function rejectUserRequest(id: string, input: Record<string, unknown>) {
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export function forgotPasswordRequest(email: string) {
+  return apiFetch<{ message: string }>("/api/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function updatePasswordRequest(password: string) {
+  return apiFetch<{ message: string }>("/api/auth/update-password", {
+    method: "POST",
+    body: JSON.stringify({ password }),
+  });
+}
+
+export function searchOrganizationRequest(query: string) {
+  return apiFetch<SearchResults>(
+    `/api/search?${new URLSearchParams({ q: query }).toString()}`,
+  );
+}
+
+export function fetchDispatcherFinance(params?: Record<string, string>) {
+  const query = params ? `?${new URLSearchParams(params).toString()}` : "";
+  return apiFetch<DispatcherFinanceBundle>(`/api/dispatcher/finance${query}`);
+}
+
+export function fetchAdminDispatcherFinance(
+  dispatcherId: string,
+  params?: Record<string, string>,
+) {
+  const query = params ? `?${new URLSearchParams(params).toString()}` : "";
+  return apiFetch<DispatcherFinanceBundle>(
+    `/api/admin/dispatchers/${dispatcherId}/finance${query}`,
+  );
+}
+
+export function exportDispatcherFinanceRequest(input: Record<string, unknown>) {
+  return apiFetch<{ csv: string; fileName: string }>(
+    "/api/dispatcher/finance/export",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function exportAdminDispatcherFinanceRequest(
+  dispatcherId: string,
+  input: Record<string, unknown>,
+) {
+  return apiFetch<{ csv: string; fileName: string }>(
+    `/api/admin/dispatchers/${dispatcherId}/finance/export`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
 }

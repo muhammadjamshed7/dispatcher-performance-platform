@@ -1,9 +1,19 @@
+export type CalculateDispatchFeeOptions = {
+  minimumFee?: number;
+  roundToNearestDollar?: boolean;
+};
+
 export function calculateDispatchFee(
   loadAmount: number,
   dispatchFeePercentage: number,
+  options: CalculateDispatchFeeOptions = {},
 ): number {
-  return loadAmount * (dispatchFeePercentage / 100);
-}
+  const percentageFee = loadAmount * (dispatchFeePercentage / 100);
+  const fee = Math.max(percentageFee, options.minimumFee ?? 0);
 
-/** @deprecated Use calculateDispatchFee */
-export const calculateDispatchFeeEarned = calculateDispatchFee;
+  if (options.roundToNearestDollar) {
+    return Math.round(fee);
+  }
+
+  return Math.round(fee * 100) / 100;
+}

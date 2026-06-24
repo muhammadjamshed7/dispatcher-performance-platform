@@ -81,11 +81,19 @@ export function emptyRoleScope(): RoleScope {
 }
 
 export function filterTeamsByScope(teams: Team[], scope: RoleScope): Team[] {
-  if (scope.isCompanyWide || !scope.teamName) {
+  if (scope.isCompanyWide) {
     return teams;
   }
 
-  return teams.filter((team) => team.name === scope.teamName);
+  if (scope.user.teamId) {
+    return teams.filter((team) => team.id === scope.user.teamId);
+  }
+
+  if (scope.teamName) {
+    return teams.filter((team) => team.name === scope.teamName);
+  }
+
+  return teams;
 }
 
 export function filterDispatchersByScope(
@@ -96,14 +104,22 @@ export function filterDispatchersByScope(
     return dispatchers;
   }
 
-  if (scope.role === DISPATCHER && scope.dispatcherName) {
+  if (scope.role === DISPATCHER && scope.user.dispatcherId) {
     return dispatchers.filter(
-      (dispatcher) => dispatcher.fullName === scope.dispatcherName,
+      (dispatcher) => dispatcher.id === scope.user.dispatcherId,
+    );
+  }
+
+  if (scope.user.teamId) {
+    return dispatchers.filter(
+      (dispatcher) => dispatcher.teamName === scope.teamName,
     );
   }
 
   if (scope.teamName) {
-    return dispatchers.filter((dispatcher) => dispatcher.teamName === scope.teamName);
+    return dispatchers.filter(
+      (dispatcher) => dispatcher.teamName === scope.teamName,
+    );
   }
 
   return dispatchers;
@@ -117,9 +133,15 @@ export function filterCarriersByScope(
     return carriers;
   }
 
-  if (scope.role === DISPATCHER && scope.dispatcherName) {
+  if (scope.role === DISPATCHER && scope.user.dispatcherId) {
     return carriers.filter(
-      (carrier) => carrier.assignedDispatcherName === scope.dispatcherName,
+      (carrier) => carrier.assignedDispatcherId === scope.user.dispatcherId,
+    );
+  }
+
+  if (scope.user.teamId) {
+    return carriers.filter(
+      (carrier) => carrier.assignedTeamId === scope.user.teamId,
     );
   }
 
@@ -140,14 +162,22 @@ export function filterActivitiesByScope(
     return activities;
   }
 
-  if (scope.role === DISPATCHER && scope.dispatcherName) {
+  if (scope.role === DISPATCHER && scope.user.dispatcherId) {
     return activities.filter(
-      (activity) => activity.dispatcherName === scope.dispatcherName,
+      (activity) => activity.dispatcherId === scope.user.dispatcherId,
+    );
+  }
+
+  if (scope.user.teamId) {
+    return activities.filter(
+      (activity) => activity.teamId === scope.user.teamId,
     );
   }
 
   if (scope.teamName) {
-    return activities.filter((activity) => activity.teamName === scope.teamName);
+    return activities.filter(
+      (activity) => activity.teamName === scope.teamName,
+    );
   }
 
   return activities;

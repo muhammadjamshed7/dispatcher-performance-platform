@@ -1,20 +1,36 @@
 import "server-only";
 
-import type { LoadActivityStatus } from "@/generated/prisma/client";
+import type { LoadActivityStatus } from "@/lib/db/types";
 import { DELIVERED, STATUSES } from "@/lib/constants/statuses";
 import { TRUCK_TYPES } from "@/lib/constants/truck-types";
-import { db } from "@/lib/db/prisma";
+import { T, db } from "@/lib/db/client";
+import { applyScopeWhere, asFilterable } from "@/lib/db/query";
+import { assertDb, decimalToNumber } from "@/lib/db/utils";
 import type { DispatcherDashboardBundle } from "@/lib/types";
 import type { AccessScope } from "@/server/auth/types";
 import {
+  applyActivityFilters,
   assertFilterAccess,
-  buildActivityWhere,
   formatActivityDate,
+  normalizeActivityFilters,
   parseActivityDate,
   resolveDashboardDateRange,
   type ActivityFilters,
 } from "@/server/utils/activity-filters";
-import { carrierScopeFilter } from "@/server/utils/scope-filters";
+import {
+  activityScopeFilter,
+  carrierScopeFilter,
+} from "@/server/utils/scope-filters";
+import { getOrganizationPreferences } from "@/server/services/settings.service";
+import { getDateKeyInTimeZone } from "@/lib/utils/resolve-date-range";
+
+function unwrapRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
 
 const STATUS_CHART_META: Record<
   LoadActivityStatus,
@@ -28,7 +44,7 @@ const STATUS_CHART_META: Record<
 
 type ActivityRow = {
   id: string;
-  activityDate: Date;
+  activityDate: string;
   carrierId: string;
   status: LoadActivityStatus;
   carrierNameSnapshot: string;
@@ -36,9 +52,9 @@ type ActivityRow = {
   truckTypeSnapshot: string;
   origin: string | null;
   destination: string | null;
-  totalMiles: { toNumber(): number } | null;
-  loadAmount: { toNumber(): number } | null;
-  ratePerMile: { toNumber(): number } | null;
+  totalMiles: string | null;
+  loadAmount: string | null;
+  ratePerMile: string | null;
   reason: string | null;
 };
 
@@ -50,12 +66,8 @@ type CarrierRow = {
   status: string;
 };
 
-function decimalToNumber(value: { toNumber(): number } | null | undefined): number {
-  if (!value) {
-    return 0;
-  }
-
-  return value.toNumber();
+function toAmount(value: string | null | undefined): number {
+  return decimalToNumber(value) ?? 0;
 }
 
 function formatTruckTypeLabel(value: string): string {
@@ -69,61 +81,61 @@ function mapStatusToDisplay(status: LoadActivityStatus): string {
   return STATUS_CHART_META[status].label;
 }
 
-function getMonthToDateRange(): { dateFrom: string; dateTo: string } {
-  const now = new Date();
+function getMonthToDateRange(timezone: string): {
+  dateFrom: string;
+  dateTo: string;
+} {
+  const todayKey = getDateKeyInTimeZone(new Date(), timezone);
+  const now = new Date(`${todayKey}T00:00:00Z`);
   const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   return {
     dateFrom: formatActivityDate(start),
-    dateTo: formatActivityDate(now),
+    dateTo: todayKey,
   };
 }
 
-function getTodayDate(): string {
-  return formatActivityDate(new Date());
+function getTodayDate(timezone: string): string {
+  return getDateKeyInTimeZone(new Date(), timezone);
 }
 
 async function fetchScopedActivities(
   scope: AccessScope,
   filters: ActivityFilters,
 ): Promise<ActivityRow[]> {
-  return db.dailyActivity.findMany({
-    where: buildActivityWhere(scope, filters),
-    orderBy: [{ activityDate: "desc" }, { createdAt: "desc" }],
-    select: {
-      id: true,
-      activityDate: true,
-      carrierId: true,
-      status: true,
-      carrierNameSnapshot: true,
-      driverNameSnapshot: true,
-      truckTypeSnapshot: true,
-      origin: true,
-      destination: true,
-      totalMiles: true,
-      loadAmount: true,
-      ratePerMile: true,
-      reason: true,
-    },
-  });
+  const query = applyActivityFilters(
+    asFilterable(
+      db()
+        .from(T.DailyActivity)
+        .select(
+          "id, activityDate, carrierId, status, carrierNameSnapshot, driverNameSnapshot, truckTypeSnapshot, origin, destination, totalMiles, loadAmount, ratePerMile, reason",
+        )
+        .order("activityDate", { ascending: false })
+        .order("createdAt", { ascending: false }),
+    ),
+    scope,
+    filters,
+  );
+
+  return (assertDb(await query) ?? []) as ActivityRow[];
 }
 
-async function fetchAssignedActiveCarriers(scope: AccessScope): Promise<CarrierRow[]> {
-  return db.carrier.findMany({
-    where: {
-      organizationId: scope.organizationId,
-      status: "ACTIVE",
-      deletedAt: null,
-      ...carrierScopeFilter(scope),
-    },
-    select: {
-      id: true,
-      carrierName: true,
-      driverName: true,
-      truckType: true,
-      status: true,
-    },
-    orderBy: { carrierName: "asc" },
-  });
+async function fetchAssignedActiveCarriers(
+  scope: AccessScope,
+): Promise<CarrierRow[]> {
+  const query = applyScopeWhere(
+    asFilterable(
+      db()
+        .from(T.Carrier)
+        .select("id, carrierName, driverName, truckType, status")
+        .eq("organizationId", scope.organizationId)
+        .eq("status", "ACTIVE")
+        .is("deletedAt", null)
+        .order("carrierName", { ascending: true }),
+    ),
+    carrierScopeFilter(scope),
+  );
+
+  return (assertDb(await query) ?? []) as CarrierRow[];
 }
 
 async function fetchDispatcherName(scope: AccessScope): Promise<string> {
@@ -131,16 +143,19 @@ async function fetchDispatcherName(scope: AccessScope): Promise<string> {
     return "Dispatcher";
   }
 
-  const dispatcher = await db.dispatcher.findFirst({
-    where: {
-      id: scope.dispatcherId,
-      organizationId: scope.organizationId,
-      deletedAt: null,
-    },
-    select: { user: { select: { fullName: true } } },
-  });
+  const result = await db()
+    .from(T.Dispatcher)
+    .select("user:User!Dispatcher_userId_fkey(fullName)")
+    .eq("id", scope.dispatcherId)
+    .eq("organizationId", scope.organizationId)
+    .is("deletedAt", null)
+    .maybeSingle();
 
-  return dispatcher?.user.fullName ?? "Dispatcher";
+  const dispatcher = result.data as {
+    user: { fullName: string } | Array<{ fullName: string }>;
+  } | null;
+
+  return unwrapRelation(dispatcher?.user)?.fullName ?? "Dispatcher";
 }
 
 function buildRevenueTrend(activities: ActivityRow[]) {
@@ -151,8 +166,8 @@ function buildRevenueTrend(activities: ActivityRow[]) {
       continue;
     }
 
-    const dateKey = formatActivityDate(row.activityDate);
-    const amount = decimalToNumber(row.loadAmount);
+    const dateKey = row.activityDate;
+    const amount = toAmount(row.loadAmount);
     revenueByDate.set(dateKey, (revenueByDate.get(dateKey) ?? 0) + amount);
   }
 
@@ -194,11 +209,11 @@ function buildStatusBreakdown(activities: ActivityRow[]) {
 function buildMtdMetrics(mtdActivities: ActivityRow[]) {
   const delivered = mtdActivities.filter((row) => row.status === DELIVERED);
   const personalRevenue = delivered.reduce(
-    (sum, row) => sum + decimalToNumber(row.loadAmount),
+    (sum, row) => sum + toAmount(row.loadAmount),
     0,
   );
   const rateValues = delivered
-    .map((row) => decimalToNumber(row.ratePerMile))
+    .map((row) => toAmount(row.ratePerMile))
     .filter((value) => value > 0);
   const avgRatePerMile =
     rateValues.length > 0
@@ -221,10 +236,13 @@ function buildCarrierPerformance(
   const latestByCarrier = new Map<string, ActivityRow>();
 
   for (const row of mtdActivities) {
-    const existing = mtdByCarrier.get(row.carrierId) ?? { loads: 0, revenue: 0 };
+    const existing = mtdByCarrier.get(row.carrierId) ?? {
+      loads: 0,
+      revenue: 0,
+    };
     existing.loads += 1;
     if (row.status === DELIVERED) {
-      existing.revenue += decimalToNumber(row.loadAmount);
+      existing.revenue += toAmount(row.loadAmount);
     }
     mtdByCarrier.set(row.carrierId, existing);
   }
@@ -246,10 +264,11 @@ function buildCarrierPerformance(
       truckType: formatTruckTypeLabel(carrier.truckType),
       recentStatus: latest ? mapStatusToDisplay(latest.status) : "—",
       lastActivityDate: latest
-        ? parseActivityDate(formatActivityDate(latest.activityDate)).toLocaleDateString(
-            "en-US",
-            { month: "short", day: "numeric", year: "numeric" },
-          )
+        ? parseActivityDate(latest.activityDate).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })
         : null,
       loadsMtd: mtd.loads,
       revenueMtd: Math.round(mtd.revenue * 100) / 100,
@@ -261,17 +280,18 @@ function buildCarrierPerformance(
 function buildRecentActivities(activities: ActivityRow[]) {
   return activities.slice(0, 10).map((row) => ({
     id: row.id,
-    date: parseActivityDate(formatActivityDate(row.activityDate)).toLocaleDateString(
-      "en-US",
-      { month: "short", day: "numeric", year: "numeric" },
-    ),
+    date: parseActivityDate(row.activityDate).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }),
     carrierName: row.carrierNameSnapshot,
     status: mapStatusToDisplay(row.status),
     origin: row.origin,
     destination: row.destination,
-    miles: row.totalMiles ? decimalToNumber(row.totalMiles) : null,
-    loadAmount: row.loadAmount ? decimalToNumber(row.loadAmount) : null,
-    ratePerMile: row.ratePerMile ? decimalToNumber(row.ratePerMile) : null,
+    miles: row.totalMiles ? toAmount(row.totalMiles) : null,
+    loadAmount: row.loadAmount ? toAmount(row.loadAmount) : null,
+    ratePerMile: row.ratePerMile ? toAmount(row.ratePerMile) : null,
     reason: row.reason,
   }));
 }
@@ -285,7 +305,9 @@ function buildTodayCompletion(
   const loggedToday = loggedCarrierIds.size;
   const pendingCount = Math.max(assignedActive - loggedToday, 0);
   const completionPercent =
-    assignedActive > 0 ? Math.round((loggedToday / assignedActive) * 1000) / 10 : 0;
+    assignedActive > 0
+      ? Math.round((loggedToday / assignedActive) * 1000) / 10
+      : 0;
   const isComplete = assignedActive > 0 && pendingCount === 0;
 
   let message = "All assigned carriers have activity logged for today.";
@@ -330,26 +352,34 @@ function buildPendingCarriers(
         truckType: formatTruckTypeLabel(carrier.truckType),
         lastActivityStatus: latest ? mapStatusToDisplay(latest.status) : null,
         lastActivityDate: latest
-          ? parseActivityDate(formatActivityDate(latest.activityDate)).toLocaleDateString(
-              "en-US",
-              { month: "short", day: "numeric", year: "numeric" },
-            )
+          ? parseActivityDate(latest.activityDate).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })
           : null,
       };
     });
 }
 
 async function fetchFilterOptions(scope: AccessScope) {
-  const carriers = await db.carrier.findMany({
-    where: {
-      organizationId: scope.organizationId,
-      deletedAt: null,
-      status: "ACTIVE",
-      ...carrierScopeFilter(scope),
-    },
-    select: { id: true, carrierName: true },
-    orderBy: { carrierName: "asc" },
-  });
+  const query = applyScopeWhere(
+    asFilterable(
+      db()
+        .from(T.Carrier)
+        .select("id, carrierName")
+        .eq("organizationId", scope.organizationId)
+        .eq("status", "ACTIVE")
+        .is("deletedAt", null)
+        .order("carrierName", { ascending: true }),
+    ),
+    carrierScopeFilter(scope),
+  );
+
+  const carriers = (assertDb(await query) ?? []) as Array<{
+    id: string;
+    carrierName: string;
+  }>;
 
   return {
     carriers: carriers.map((carrier) => ({
@@ -372,15 +402,16 @@ export async function getDispatcherDashboardBundle(
   rawFilters: ActivityFilters = {},
 ): Promise<DispatcherDashboardBundle> {
   await assertFilterAccess(scope, rawFilters);
+  const preferences = await getOrganizationPreferences(scope.organizationId);
 
-  const range = resolveDashboardDateRange(rawFilters);
+  const range = resolveDashboardDateRange(rawFilters, preferences.timezone);
   const filters: ActivityFilters = {
     ...rawFilters,
     dateFrom: range.dateFrom,
     dateTo: range.dateTo,
   };
-  const mtdRange = getMonthToDateRange();
-  const today = getTodayDate();
+  const mtdRange = getMonthToDateRange(preferences.timezone);
+  const today = getTodayDate(preferences.timezone);
 
   const [
     dispatcherName,
@@ -401,7 +432,10 @@ export async function getDispatcherDashboardBundle(
   ]);
 
   const mtdMetrics = buildMtdMetrics(mtdActivities);
-  const todayCompletion = buildTodayCompletion(assignedCarriers, todayActivities);
+  const todayCompletion = buildTodayCompletion(
+    assignedCarriers,
+    todayActivities,
+  );
 
   return {
     dispatcherName,

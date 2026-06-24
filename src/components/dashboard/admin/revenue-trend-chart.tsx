@@ -31,7 +31,10 @@ function formatAxis(value: number) {
 }
 
 export function RevenueTrendChart({ data }: RevenueTrendChartProps) {
-  const maxRevenue = data.reduce((max, point) => Math.max(max, point.revenue), 0);
+  const maxRevenue = data.reduce(
+    (max, point) => Math.max(max, point.revenue),
+    0,
+  );
   const yMax = maxRevenue > 0 ? Math.ceil(maxRevenue * 1.1) : 100;
 
   return (
@@ -54,14 +57,21 @@ export function RevenueTrendChart({ data }: RevenueTrendChartProps) {
           <div className={DASHBOARD_EMPTY_STATE_CLASS}>No data available</div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <AreaChart
+              data={data}
+              margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+            >
               <defs>
                 <linearGradient id="revenueFill" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="rgba(37, 99, 235, 0.22)" />
                   <stop offset="100%" stopColor="rgba(37, 99, 235, 0.02)" />
                 </linearGradient>
               </defs>
-              <CartesianGrid stroke="#E2E8F0" strokeDasharray="3 3" vertical={false} />
+              <CartesianGrid
+                stroke="#E2E8F0"
+                strokeDasharray="3 3"
+                vertical={false}
+              />
               <XAxis
                 dataKey="date"
                 tick={{ fill: "#64748B", fontSize: 12 }}

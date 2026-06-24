@@ -35,7 +35,9 @@ export function MonthlyGrowthMetricCard({
             </p>
             <p className="mt-1 text-xs text-[#64748B]">Revenue growth</p>
             {growthLabel ? (
-              <p className="mt-2 text-xs font-medium text-[#22C55E]">{growthLabel}</p>
+              <p className="mt-2 text-xs font-medium text-[#22C55E]">
+                {growthLabel}
+              </p>
             ) : null}
           </div>
         </div>

@@ -5,10 +5,12 @@ import { useCallback, useState } from "react";
 import { PageContentGate } from "@/components/feedback/page-content-gate";
 import type { PageContentState } from "@/components/feedback/page-content-gate";
 import { AppToast } from "@/components/feedback/app-toast";
-import { EntityFilterBar } from "@/components/filters/entity-filter-bar";
 import { RoleScopeBanner } from "@/components/layout/role-scope-banner";
 import { TeamModal, type TeamModalMode } from "@/components/modals/team-modal";
-import { TeamsTable, type TeamRowAction } from "@/components/tables/teams-table";
+import {
+  TeamsTable,
+  type TeamRowAction,
+} from "@/components/tables/teams-table";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
 import { useApiData } from "@/hooks/use-api-data";
@@ -20,7 +22,10 @@ import {
   updateTeamRequest,
 } from "@/lib/api/resources";
 import type { Team } from "@/lib/types";
-import { TEAM_STATUS_INACTIVE } from "@/lib/constants/team-statuses";
+import {
+  TEAM_STATUS_ACTIVE,
+  TEAM_STATUS_INACTIVE,
+} from "@/lib/constants/team-statuses";
 import type { TeamFormValues } from "@/lib/validation/team-form";
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -34,10 +39,13 @@ export function TeamsPageContent() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const loadTeams = useCallback(() => fetchTeams(), []);
-  const { data: teams = [], error, isLoading, isEmpty, reload } = useApiData(
-    loadTeams,
-    [],
-  );
+  const {
+    data: teams = [],
+    error,
+    isLoading,
+    isEmpty,
+    reload,
+  } = useApiData(loadTeams, []);
 
   useRealtimeRefresh(["Team"], reload);
 
@@ -60,7 +68,15 @@ export function TeamsPageContent() {
   }
 
   function handleRowAction(team: Team, action: TeamRowAction) {
-    openModal(action === "deactivate" ? "deactivate" : action, team);
+    if (action === "toggle-status") {
+      openModal(
+        team.status === TEAM_STATUS_ACTIVE ? "deactivate" : "activate",
+        team,
+      );
+      return;
+    }
+
+    openModal(action, team);
   }
 
   async function handleCreate(values: TeamFormValues) {
@@ -93,13 +109,18 @@ export function TeamsPageContent() {
     }
   }
 
-  async function handleDeactivate(team: Team) {
+  async function handleToggleStatus(team: Team) {
+    const isActive = team.status === TEAM_STATUS_ACTIVE;
+    const nextStatus = isActive ? TEAM_STATUS_INACTIVE : TEAM_STATUS_ACTIVE;
+
     try {
-      await updateTeamRequest(team.id, { status: TEAM_STATUS_INACTIVE });
-      showToast(`Team "${team.name}" deactivated.`);
+      await updateTeamRequest(team.id, { status: nextStatus });
+      showToast(
+        `Team "${team.name}" ${isActive ? "deactivated" : "activated"}.`,
+      );
       await reload();
     } catch (err) {
-      showToast(getErrorMessage(err, "Failed to deactivate team."));
+      showToast(getErrorMessage(err, "Failed to update team status."));
     }
   }
 
@@ -117,8 +138,6 @@ export function TeamsPageContent() {
           </Button>
         </div>
 
-        <EntityFilterBar />
-
         <PageContentGate
           state={pageState}
           onRetry={reload}
@@ -128,7 +147,9 @@ export function TeamsPageContent() {
           emptyActionLabel="Create Team"
           onEmptyAction={() => openModal("create")}
           errorTitle="Unable to load teams"
-          errorDescription={error ?? "Team records could not be loaded. Try again in a moment."}
+          errorDescription={
+            error ?? "Team records could not be loaded. Try again in a moment."
+          }
         >
           <TeamsTable teams={teams} onAction={handleRowAction} />
         </PageContentGate>
@@ -141,10 +162,13 @@ export function TeamsPageContent() {
         onOpenChange={setModalOpen}
         onCreate={handleCreate}
         onEdit={handleEdit}
-        onDeactivate={handleDeactivate}
+        onToggleStatus={handleToggleStatus}
       />
 
-      <AppToast message={toastMessage} onDismiss={() => setToastMessage(null)} />
+      <AppToast
+        message={toastMessage}
+        onDismiss={() => setToastMessage(null)}
+      />
     </>
   );
 }

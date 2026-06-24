@@ -22,11 +22,11 @@ import { TEAM_STATUS_ACTIVE } from "@/lib/constants/team-statuses";
 import { formatDateShort } from "@/lib/utils/format-date";
 import { MoreHorizontal } from "lucide-react";
 
-export type TeamRowAction = "view" | "edit" | "deactivate";
+export type TeamRowAction = "view" | "edit" | "toggle-status";
 
 type TeamsTableProps = {
   teams: Team[];
-  onAction: (team : Team, action: TeamRowAction) => void;
+  onAction: (team: Team, action: TeamRowAction) => void;
 };
 
 export function TeamsTable({ teams, onAction }: TeamsTableProps) {
@@ -51,7 +51,10 @@ export function TeamsTable({ teams, onAction }: TeamsTableProps) {
           <TableBody>
             {teams.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                <TableCell
+                  colSpan={7}
+                  className="text-muted-foreground py-8 text-center"
+                >
                   No teams found.
                 </TableCell>
               </TableRow>
@@ -89,17 +92,27 @@ export function TeamsTable({ teams, onAction }: TeamsTableProps) {
                         <MoreHorizontal className="size-4" />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => onAction(team, "view")}>
+                        <DropdownMenuItem
+                          onClick={() => onAction(team, "view")}
+                        >
                           View
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onAction(team, "edit")}>
+                        <DropdownMenuItem
+                          onClick={() => onAction(team, "edit")}
+                        >
                           Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          onClick={() => onAction(team, "deactivate")}
-                          variant="destructive"
+                          onClick={() => onAction(team, "toggle-status")}
+                          variant={
+                            team.status === TEAM_STATUS_ACTIVE
+                              ? "destructive"
+                              : "default"
+                          }
                         >
-                          Deactivate
+                          {team.status === TEAM_STATUS_ACTIVE
+                            ? "Deactivate"
+                            : "Activate"}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

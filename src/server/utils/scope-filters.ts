@@ -1,57 +1,55 @@
 import "server-only";
 
-import type { Prisma } from "@/generated/prisma/client";
 import type { AccessScope } from "@/server/auth/types";
 
-export function teamScopeFilter(scope: AccessScope): Prisma.TeamWhereInput {
+export function teamScopeFilter(scope: AccessScope) {
   if (scope.isCompanyWide) {
-    return { deletedAt: null };
+    return { deletedAt: null as string | null };
   }
 
   if (scope.teamId) {
-    return { id: scope.teamId, deletedAt: null };
+    return { id: scope.teamId, deletedAt: null as string | null };
   }
 
-  return { id: "__none__" };
+  return { id: "__none__", deletedAt: null as string | null };
 }
 
-export function dispatcherScopeFilter(scope: AccessScope): Prisma.DispatcherWhereInput {
-  const base: Prisma.DispatcherWhereInput = { deletedAt: null };
-
+export function dispatcherScopeFilter(scope: AccessScope) {
   if (scope.isCompanyWide) {
-    return base;
+    return { deletedAt: null as string | null };
   }
 
   if (scope.role === "DISPATCHER" && scope.dispatcherId) {
-    return { ...base, id: scope.dispatcherId };
+    return { id: scope.dispatcherId, deletedAt: null as string | null };
   }
 
   if (scope.teamId) {
-    return { ...base, teamId: scope.teamId };
+    return { teamId: scope.teamId, deletedAt: null as string | null };
   }
 
-  return { ...base, id: "__none__" };
+  return { id: "__none__", deletedAt: null as string | null };
 }
 
-export function carrierScopeFilter(scope: AccessScope): Prisma.CarrierWhereInput {
-  const base: Prisma.CarrierWhereInput = { deletedAt: null };
-
+export function carrierScopeFilter(scope: AccessScope) {
   if (scope.isCompanyWide) {
-    return base;
+    return { deletedAt: null as string | null };
   }
 
   if (scope.role === "DISPATCHER" && scope.dispatcherId) {
-    return { ...base, dispatcherId: scope.dispatcherId };
+    return {
+      dispatcherId: scope.dispatcherId,
+      deletedAt: null as string | null,
+    };
   }
 
   if (scope.teamId) {
-    return { ...base, teamId: scope.teamId };
+    return { teamId: scope.teamId, deletedAt: null as string | null };
   }
 
-  return { ...base, id: "__none__" };
+  return { id: "__none__", deletedAt: null as string | null };
 }
 
-export function activityScopeFilter(scope: AccessScope): Prisma.DailyActivityWhereInput {
+export function activityScopeFilter(scope: AccessScope) {
   if (scope.isCompanyWide) {
     return {};
   }

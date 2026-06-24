@@ -9,6 +9,8 @@ import {
 } from "react";
 
 import { useApiData } from "@/hooks/use-api-data";
+import { useSession } from "@/components/auth/session-provider";
+import { ACTIVE } from "@/lib/auth/user-statuses";
 import {
   fetchCarriers,
   fetchDispatchers,
@@ -24,9 +26,14 @@ type EntityOptionsContextValue = {
   reload: () => Promise<void>;
 };
 
-const EntityOptionsContext = createContext<EntityOptionsContextValue | null>(null);
+const EntityOptionsContext = createContext<EntityOptionsContextValue | null>(
+  null,
+);
 
 export function EntityOptionsProvider({ children }: { children: ReactNode }) {
+  const { session, isLoading: sessionLoading } = useSession();
+  const fetchEnabled = !sessionLoading && session?.status === ACTIVE;
+
   const loadTeams = useCallback(() => fetchTeams(), []);
   const loadDispatchers = useCallback(() => fetchDispatchers(), []);
   const loadCarriers = useCallback(() => fetchCarriers(), []);
@@ -35,23 +42,25 @@ export function EntityOptionsProvider({ children }: { children: ReactNode }) {
     data: teams = [],
     isLoading: teamsLoading,
     reload: reloadTeams,
-  } = useApiData(loadTeams, []);
+  } = useApiData(loadTeams, [], { enabled: fetchEnabled });
   const {
     data: dispatchers = [],
     isLoading: dispatchersLoading,
     reload: reloadDispatchers,
-  } = useApiData(loadDispatchers, []);
+  } = useApiData(loadDispatchers, [], { enabled: fetchEnabled });
   const {
     data: carriers = [],
     isLoading: carriersLoading,
     reload: reloadCarriers,
-  } = useApiData(loadCarriers, []);
+  } = useApiData(loadCarriers, [], { enabled: fetchEnabled });
 
   const reload = useCallback(async () => {
     await Promise.all([reloadTeams(), reloadDispatchers(), reloadCarriers()]);
   }, [reloadCarriers, reloadDispatchers, reloadTeams]);
 
-  const isLoading = teamsLoading || dispatchersLoading || carriersLoading;
+  const isLoading =
+    sessionLoading ||
+    (fetchEnabled && (teamsLoading || dispatchersLoading || carriersLoading));
 
   const value = useMemo(
     () => ({
@@ -75,7 +84,9 @@ export function useEntityOptionsContext() {
   const context = useContext(EntityOptionsContext);
 
   if (!context) {
-    throw new Error("useEntityOptions must be used within EntityOptionsProvider.");
+    throw new Error(
+      "useEntityOptions must be used within EntityOptionsProvider.",
+    );
   }
 
   return context;

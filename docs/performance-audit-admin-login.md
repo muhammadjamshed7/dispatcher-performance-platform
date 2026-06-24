@@ -82,12 +82,12 @@ await supabase.auth.getUser();
 
 ### Impact
 
-| Request | Middleware time | % of total |
-|---------|----------------|------------|
-| GET /admin/login | 1.8s | 12% |
-| POST /api/auth/login | 0.8s | 7% |
-| GET /api/auth/me | 0.89s | **53%** |
-| GET /admin/dashboard | ~1s | ~4% |
+| Request              | Middleware time | % of total |
+| -------------------- | --------------- | ---------- |
+| GET /admin/login     | 1.8s            | 12%        |
+| POST /api/auth/login | 0.8s            | 7%         |
+| GET /api/auth/me     | 0.89s           | **53%**    |
+| GET /admin/dashboard | ~1s             | ~4%        |
 
 ### Solution
 
@@ -132,7 +132,9 @@ import { AreaChart, Area } from "recharts";
 import { AreaChart, Area } from "recharts";
 
 // After
-const AreaChart = dynamic(() => import("recharts").then(m => m.AreaChart), { ssr: false });
+const AreaChart = dynamic(() => import("recharts").then((m) => m.AreaChart), {
+  ssr: false,
+});
 ```
 
 ---
@@ -151,12 +153,12 @@ await supabase.auth.signInWithPassword({ email, password });
 
 // Step 2: Get current user
 const sessionUser = await getCurrentUser();
-  // 2a: supabase.auth.getUser()  ← network call
-  // 2b: db.user.findFirst()      ← Prisma query
+// 2a: supabase.auth.getUser()  ← network call
+// 2b: db.user.findFirst()      ← Prisma query
 
 // Step 3: Touch last login
 await touchLastLogin(sessionUser.id);
-  // db.user.update()             ← Prisma query
+// db.user.update()             ← Prisma query
 ```
 
 Steps 2a and 3 are unnecessary round-trips. After `signInWithPassword` succeeds, the session is already established. Step 2a (`getUser()`) is redundant — you already know who just signed in. Step 3 could be batched or deferred.
@@ -179,14 +181,14 @@ Use `getCurrentUserByEmail(parsed.email)` instead of `getCurrentUser()` — no S
 
 `SessionProvider` calls `GET /api/auth/me` on mount via `queueMicrotask`. This means:
 
-| Navigation step | Who checks auth | How many Supabase getUser() calls |
-|----------------|-----------------|-----------------------------------|
-| 1. GET /admin/login | middleware | 1 |
-| 2. POST /api/auth/login | middleware + route handler | 2 |
-| 3. GET /api/auth/me | middleware + route handler | 2 (triggered by SessionProvider) |
-| 4. GET /admin/dashboard | middleware + route handler | 2 (triggered by SessionProvider again) |
-| 5. GET /api/dashboard/admin | middleware + route handler | 2 (triggered by requireAccessScope) |
-| **Total per full login flow** | | **9 Supabase getUser() calls** |
+| Navigation step               | Who checks auth            | How many Supabase getUser() calls      |
+| ----------------------------- | -------------------------- | -------------------------------------- |
+| 1. GET /admin/login           | middleware                 | 1                                      |
+| 2. POST /api/auth/login       | middleware + route handler | 2                                      |
+| 3. GET /api/auth/me           | middleware + route handler | 2 (triggered by SessionProvider)       |
+| 4. GET /admin/dashboard       | middleware + route handler | 2 (triggered by SessionProvider again) |
+| 5. GET /api/dashboard/admin   | middleware + route handler | 2 (triggered by requireAccessScope)    |
+| **Total per full login flow** |                            | **9 Supabase getUser() calls**         |
 
 Each call is a full Supabase Auth network round-trip.
 
@@ -246,12 +248,12 @@ Significant DB load and response time — queries 4–7 run sequentially after 1
 
 ## Summary: Fix Priority
 
-| # | Fix | Est. Time Saved | Effort | Files to Change |
-|---|-----|----------------|--------|-----------------|
-| 1 | Remove `getUser()` from middleware | **-0.5 to -1.8s per request** | 1 line | `src/lib/supabase/middleware.ts:39` |
-| 2 | `next/dynamic` for recharts | **-15 to -20s on first dashboard** | 8 files | `src/components/dashboard/admin/*.tsx` |
-| 3 | Use `getCurrentUserByEmail` instead of `getUser` after login | **-2 to -4s on login** | 1 file | `src/server/auth/auth.service.ts` |
-| 4 | Eliminate redundant session checks (SessionProvider) | **-1.7s per navigation** | 1 file | `src/components/auth/session-provider.tsx` |
-| 5 | Reduce middleware matcher scope (not all routes) | **-0.5 to -1.8s on static assets** | 1 file | `src/middleware.ts` |
-| 6 | Combine dashboard Prisma queries | **-2 to -3s on dashboard** | 1 file | `src/server/services/admin-dashboard.service.ts` |
-| 7 | Single-pass `summarizeActivities` | **-0.5 to -1s CPU** | 1 file | `src/server/services/admin-dashboard.service.ts` |
+| #   | Fix                                                          | Est. Time Saved                    | Effort  | Files to Change                                  |
+| --- | ------------------------------------------------------------ | ---------------------------------- | ------- | ------------------------------------------------ |
+| 1   | Remove `getUser()` from middleware                           | **-0.5 to -1.8s per request**      | 1 line  | `src/lib/supabase/middleware.ts:39`              |
+| 2   | `next/dynamic` for recharts                                  | **-15 to -20s on first dashboard** | 8 files | `src/components/dashboard/admin/*.tsx`           |
+| 3   | Use `getCurrentUserByEmail` instead of `getUser` after login | **-2 to -4s on login**             | 1 file  | `src/server/auth/auth.service.ts`                |
+| 4   | Eliminate redundant session checks (SessionProvider)         | **-1.7s per navigation**           | 1 file  | `src/components/auth/session-provider.tsx`       |
+| 5   | Reduce middleware matcher scope (not all routes)             | **-0.5 to -1.8s on static assets** | 1 file  | `src/middleware.ts`                              |
+| 6   | Combine dashboard Prisma queries                             | **-2 to -3s on dashboard**         | 1 file  | `src/server/services/admin-dashboard.service.ts` |
+| 7   | Single-pass `summarizeActivities`                            | **-0.5 to -1s CPU**                | 1 file  | `src/server/services/admin-dashboard.service.ts` |

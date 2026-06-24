@@ -7,7 +7,8 @@ import type {
   RegistrationRequest,
   Team,
   User,
-} from "@/generated/prisma/client";
+} from "@/lib/db/types";
+import { decimalToNumber, toIsoString } from "@/lib/db/utils";
 import type {
   Carrier as CarrierDto,
   DailyActivity as DailyActivityDto,
@@ -16,14 +17,6 @@ import type {
   Team as TeamDto,
   User as UserDto,
 } from "@/lib/types";
-
-function decimalToNumber(value: { toNumber(): number } | null | undefined): number | null {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  return value.toNumber();
-}
 
 export function mapTeam(
   team: Team & {
@@ -38,7 +31,7 @@ export function mapTeam(
     status: team.status,
     dispatchersCount: team._count?.dispatchers ?? 0,
     carriersCount: team._count?.carriers ?? 0,
-    createdAt: team.createdAt.toISOString(),
+    createdAt: toIsoString(team.createdAt),
   };
 }
 
@@ -58,7 +51,7 @@ export function mapDispatcher(
     role: dispatcher.user.role === "TEAM_LEAD" ? "TEAM_LEAD" : "DISPATCHER",
     status: dispatcher.status,
     assignedCarriersCount: dispatcher._count?.carriers ?? 0,
-    createdAt: dispatcher.createdAt.toISOString(),
+    createdAt: toIsoString(dispatcher.createdAt),
   };
 }
 
@@ -74,20 +67,25 @@ export function mapCarrier(
     driverName: carrier.driverName,
     mcNumber: carrier.mcNumber,
     truckType: carrier.truckType,
+    assignedTeamId: carrier.teamId,
     assignedTeamName: carrier.team.name,
+    assignedDispatcherId: carrier.dispatcherId,
     assignedDispatcherName: carrier.dispatcher?.user.fullName ?? "Unassigned",
     dispatchFeePercentage: decimalToNumber(carrier.dispatchFeePercentage) ?? 0,
     status: carrier.status,
-    createdAt: carrier.createdAt.toISOString(),
+    createdAt: toIsoString(carrier.createdAt),
   };
 }
 
 export function mapDailyActivity(activity: DailyActivity): DailyActivityDto {
   return {
     id: activity.id,
-    date: activity.activityDate.toISOString().slice(0, 10),
+    date: toIsoString(activity.activityDate).slice(0, 10),
+    carrierId: activity.carrierId,
     carrierName: activity.carrierNameSnapshot,
+    dispatcherId: activity.dispatcherId,
     dispatcherName: activity.dispatcherNameSnapshot,
+    teamId: activity.teamId,
     teamName: activity.teamNameSnapshot,
     truckType: activity.truckTypeSnapshot,
     status: activity.status,
@@ -102,16 +100,24 @@ export function mapDailyActivity(activity: DailyActivity): DailyActivityDto {
   };
 }
 
-export function mapRegistrationRequest(request: RegistrationRequest): PendingUserRequest {
+export function mapRegistrationRequest(
+  request: RegistrationRequest,
+): PendingUserRequest {
   return {
     id: request.id,
     fullName: request.fullName,
     email: request.email,
     phoneNumber: request.phoneNumber,
-    requestedRole: request.requestedRole === "TEAM_LEAD" ? "TEAM_LEAD" : "DISPATCHER",
+    requestedRole:
+      request.requestedRole === "TEAM_LEAD" ? "TEAM_LEAD" : "DISPATCHER",
     preferredTeam: request.preferredTeamName,
-    status: request.status === "PENDING" ? "PENDING_APPROVAL" : request.status === "APPROVED" ? "ACTIVE" : "INACTIVE",
-    submittedAt: request.submittedAt.toISOString(),
+    status:
+      request.status === "PENDING"
+        ? "PENDING_APPROVAL"
+        : request.status === "APPROVED"
+          ? "ACTIVE"
+          : "INACTIVE",
+    submittedAt: toIsoString(request.submittedAt),
     notes: request.notes ?? undefined,
   };
 }

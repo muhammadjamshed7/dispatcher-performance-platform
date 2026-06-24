@@ -3,6 +3,7 @@
 This document explains what the **Team Lead** role does, what they can access, and how the application works from a team manager’s perspective.
 
 Related docs:
+
 - [Admin guide](./admin.md)
 - [Dispatcher guide](./dispatcher.md)
 
@@ -12,11 +13,11 @@ Related docs:
 
 The **Team Lead** manages **one team** within the organization. They oversee dispatchers and carriers on their team, review activities, and run team-level reports — but they **cannot** manage other teams, organization settings, or user registration approvals.
 
-| Aspect | Team Lead |
-|--------|-----------|
-| **Scope** | Single team (`teamId` on user record) |
-| **Login URL** | `/team-lead/login` |
-| **Dashboard** | `/team-lead/dashboard` |
+| Aspect          | Team Lead                                                        |
+| --------------- | ---------------------------------------------------------------- |
+| **Scope**       | Single team (`teamId` on user record)                            |
+| **Login URL**   | `/team-lead/login`                                               |
+| **Dashboard**   | `/team-lead/dashboard`                                           |
 | **Primary job** | Run the team: dispatchers, carriers, daily ops, team performance |
 
 The UI shows a **team-scoped banner** (e.g. “Showing data for Team Alpha”). All API responses are filtered to that team automatically.
@@ -25,15 +26,15 @@ The UI shows a **team-scoped banner** (e.g. “Showing data for Team Alpha”). 
 
 ## Team Lead navigation (sidebar)
 
-| Menu item | URL | Purpose |
-|-----------|-----|---------|
-| Dashboard | `/team-lead/dashboard` | Team KPIs and activity preview |
-| Dispatchers | `/team-lead/dispatchers` | Manage team dispatchers |
-| Carriers | `/team-lead/carriers` | Manage team carriers |
-| Activities | `/team-lead/activities` | View and log team activities |
-| Rankings | `/team-lead/rankings` | Team-scoped rankings |
-| Reports | `/team-lead/reports` | Team reports and CSV export |
-| Account | `/team-lead/account` | Profile and session |
+| Menu item   | URL                      | Purpose                        |
+| ----------- | ------------------------ | ------------------------------ |
+| Dashboard   | `/team-lead/dashboard`   | Team KPIs and activity preview |
+| Dispatchers | `/team-lead/dispatchers` | Manage team dispatchers        |
+| Carriers    | `/team-lead/carriers`    | Manage team carriers           |
+| Activities  | `/team-lead/activities`  | View and log team activities   |
+| Rankings    | `/team-lead/rankings`    | Team-scoped rankings           |
+| Reports     | `/team-lead/reports`     | Team reports and CSV export    |
+| Account     | `/team-lead/account`     | Profile and session            |
 
 ### Pages Team Leads cannot access
 
@@ -50,12 +51,12 @@ The team lead dashboard shows **team-level metrics** for the current month (via 
 
 ### KPI cards
 
-| Metric | Meaning |
-|--------|---------|
-| **Team Revenue** | Delivered load revenue for the team |
-| **Team Loads** | Total activity records for the team |
-| **Team Dispatchers** | Count of dispatchers on the team |
-| **Team Carriers** | Count of carriers assigned to the team |
+| Metric               | Meaning                                |
+| -------------------- | -------------------------------------- |
+| **Team Revenue**     | Delivered load revenue for the team    |
+| **Team Loads**       | Total activity records for the team    |
+| **Team Dispatchers** | Count of dispatchers on the team       |
+| **Team Carriers**    | Count of carriers assigned to the team |
 
 ### Activity preview
 
@@ -104,13 +105,13 @@ Team leads manage carriers assigned to **their team**.
 
 ### Actions
 
-| Action | Team Lead |
-|--------|:---------:|
-| Create carrier | ✅ |
-| Edit carrier profile | ✅ |
-| Reassign to another dispatcher on **same team** | ✅ |
-| Reassign to **another team** | ❌ (admin only) |
-| Activate / Deactivate | ✅ |
+| Action                                          |    Team Lead    |
+| ----------------------------------------------- | :-------------: |
+| Create carrier                                  |       ✅        |
+| Edit carrier profile                            |       ✅        |
+| Reassign to another dispatcher on **same team** |       ✅        |
+| Reassign to **another team**                    | ❌ (admin only) |
+| Activate / Deactivate                           |       ✅        |
 
 **Reassign** closes the old assignment history record and opens a new one — full audit trail is kept.
 
@@ -122,12 +123,12 @@ Team leads can **view and create/edit** daily activities for carriers on their t
 
 ### Status types
 
-| Status | Meaning |
-|--------|---------|
-| **Delivered** | Load completed — requires origin, destination, miles, amount |
-| **In Transit** (`NOT_WORKING`) | Load in progress — requires reason |
-| **Pending** (`NOT_BOOKED`) | Not booked yet — requires reason |
-| **Canceled** | Load canceled — requires reason |
+| Status                         | Meaning                                                      |
+| ------------------------------ | ------------------------------------------------------------ |
+| **Delivered**                  | Load completed — requires origin, destination, miles, amount |
+| **In Transit** (`NOT_WORKING`) | Load in progress — requires reason                           |
+| **Pending** (`NOT_BOOKED`)     | Not booked yet — requires reason                             |
+| **Canceled**                   | Load canceled — requires reason                              |
 
 ### Rules
 
@@ -141,11 +142,11 @@ Team leads can **view and create/edit** daily activities for carriers on their t
 
 Same three ranking types as admin, but **filtered to the team**:
 
-| Tab | Shows |
-|-----|-------|
+| Tab         | Shows                                           |
+| ----------- | ----------------------------------------------- |
 | Dispatchers | Team dispatchers ranked by active carrier count |
-| Carriers | Team carriers ranked by delivery score |
-| Teams | Only relevant team data in org context |
+| Carriers    | Team carriers ranked by delivery score          |
+| Teams       | Only relevant team data in org context          |
 
 Use rankings to identify top performers and carriers needing attention.
 
@@ -180,13 +181,13 @@ View profile, role (`TEAM LEAD`), and linked team. Sign out from header.
 
 ## Data the Team Lead sees (scoping)
 
-| Entity | Visibility |
-|--------|------------|
-| Teams | Own team only (read via APIs) |
-| Dispatchers | Dispatchers where `teamId` = lead’s team |
-| Carriers | Carriers on the same team |
-| Activities | Activities on the same team |
-| Reports / Rankings | Same team filter applied server-side |
+| Entity             | Visibility                               |
+| ------------------ | ---------------------------------------- |
+| Teams              | Own team only (read via APIs)            |
+| Dispatchers        | Dispatchers where `teamId` = lead’s team |
+| Carriers           | Carriers on the same team                |
+| Activities         | Activities on the same team              |
+| Reports / Rankings | Same team filter applied server-side     |
 
 Team leads **cannot** filter by another team’s ID — the API returns forbidden if attempted.
 
@@ -214,22 +215,22 @@ Team lead must log in at **`/team-lead/login`**, not admin or dispatcher portals
 
 ## API access (Team Lead)
 
-| Endpoint | Access |
-|----------|--------|
-| `GET /api/dashboard/team-lead` | Team metrics |
-| `GET /api/dispatchers` | Team dispatchers |
-| `POST /api/dispatchers` | Create on own team |
-| `PATCH /api/dispatchers/[id]` | Own team only |
-| `GET/POST /api/carriers` | Team carriers |
-| `PATCH /api/carriers/[id]` | Team carriers |
-| `POST /api/carriers/[id]/reassign` | Within team |
-| `GET/POST/PATCH /api/activities` | Team activities |
-| `GET /api/rankings` | Team-scoped |
-| `GET /api/reports` | Team-scoped |
-| `POST /api/reports/export` | Team-scoped CSV |
-| `GET /api/teams` | Own team in list |
-| `GET/PATCH /api/settings` | ❌ Forbidden |
-| User requests APIs | ❌ Admin only |
+| Endpoint                           | Access             |
+| ---------------------------------- | ------------------ |
+| `GET /api/dashboard/team-lead`     | Team metrics       |
+| `GET /api/dispatchers`             | Team dispatchers   |
+| `POST /api/dispatchers`            | Create on own team |
+| `PATCH /api/dispatchers/[id]`      | Own team only      |
+| `GET/POST /api/carriers`           | Team carriers      |
+| `PATCH /api/carriers/[id]`         | Team carriers      |
+| `POST /api/carriers/[id]/reassign` | Within team        |
+| `GET/POST/PATCH /api/activities`   | Team activities    |
+| `GET /api/rankings`                | Team-scoped        |
+| `GET /api/reports`                 | Team-scoped        |
+| `POST /api/reports/export`         | Team-scoped CSV    |
+| `GET /api/teams`                   | Own team in list   |
+| `GET/PATCH /api/settings`          | ❌ Forbidden       |
+| User requests APIs                 | ❌ Admin only      |
 
 ---
 
@@ -273,16 +274,16 @@ Dispatchers should log one activity per assigned carrier per day. Team lead can:
 
 ## Team Lead vs Admin vs Dispatcher
 
-| Capability | Admin | Team Lead | Dispatcher |
-|------------|:-----:|:---------:|:----------:|
-| See all teams | ✅ | ❌ | ❌ |
-| Manage own team dispatchers | ✅ | ✅ | ❌ |
-| Manage own team carriers | ✅ | ✅ | ❌ |
-| Log team activities | ✅ | ✅ | Own carriers only |
-| Team reports | ✅ | ✅ | ❌ |
-| Approve registrations | ✅ | ❌ | ❌ |
-| Org settings | ✅ | ❌ | ❌ |
-| Self-register | ❌ | ❌ | ✅ |
+| Capability                  | Admin | Team Lead |    Dispatcher     |
+| --------------------------- | :---: | :-------: | :---------------: |
+| See all teams               |  ✅   |    ❌     |        ❌         |
+| Manage own team dispatchers |  ✅   |    ✅     |        ❌         |
+| Manage own team carriers    |  ✅   |    ✅     |        ❌         |
+| Log team activities         |  ✅   |    ✅     | Own carriers only |
+| Team reports                |  ✅   |    ✅     |        ❌         |
+| Approve registrations       |  ✅   |    ❌     |        ❌         |
+| Org settings                |  ✅   |    ❌     |        ❌         |
+| Self-register               |  ❌   |    ❌     |        ✅         |
 
 ---
 

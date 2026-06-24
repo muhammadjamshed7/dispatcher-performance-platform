@@ -3,13 +3,9 @@
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { SessionProvider } from "@/components/auth/session-provider";
 import { RoleGuard } from "@/components/auth/role-guard";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
-import {
-  isPublicAuthPath,
-  ROLE_ROUTE_PREFIX,
-} from "@/lib/auth/roles";
+import { isPublicAuthPath, ROLE_ROUTE_PREFIX } from "@/lib/auth/roles";
 import type { Role } from "@/lib/constants/roles";
 
 type RoleProtectedLayoutProps = {
@@ -17,21 +13,22 @@ type RoleProtectedLayoutProps = {
   children: ReactNode;
 };
 
-export function RoleProtectedLayout({ role, children }: RoleProtectedLayoutProps) {
+export function RoleProtectedLayout({
+  role,
+  children,
+}: RoleProtectedLayoutProps) {
   const pathname = usePathname();
   const prefix = ROLE_ROUTE_PREFIX[role];
   const isAuthPage =
     pathname.startsWith(`/${prefix}`) && isPublicAuthPath(pathname);
 
   if (isAuthPage) {
-    return <SessionProvider>{children}</SessionProvider>;
+    return children;
   }
 
   return (
-    <SessionProvider>
-      <RoleGuard requiredRole={role}>
-        <DashboardShell>{children}</DashboardShell>
-      </RoleGuard>
-    </SessionProvider>
+    <RoleGuard requiredRole={role}>
+      <DashboardShell>{children}</DashboardShell>
+    </RoleGuard>
   );
 }

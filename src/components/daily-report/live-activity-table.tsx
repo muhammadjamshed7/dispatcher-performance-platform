@@ -23,13 +23,15 @@ export function LiveActivityTable({ rows }: LiveActivityTableProps) {
   return (
     <div className="overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
       <div className="border-b border-[#E5E7EB] px-5 py-4">
-        <h3 className="text-base font-semibold text-[#0F172A]">Live Activity</h3>
+        <h3 className="text-base font-semibold text-[#0F172A]">
+          Live Activity
+        </h3>
         <p className="mt-1 text-sm text-[#64748B]">
           Latest activity entries for the selected date and filters
         </p>
       </div>
       <div className="overflow-x-auto">
-        <table className="min-w-[1100px] w-full text-left text-sm">
+        <table className="w-full min-w-[1100px] text-left text-sm">
           <thead className="bg-[#F8FAFC] text-xs font-medium text-[#475569]">
             <tr>
               {[

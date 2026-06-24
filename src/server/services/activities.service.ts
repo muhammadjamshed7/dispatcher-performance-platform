@@ -1,7 +1,7 @@
 import "server-only";
 
 import { z } from "zod";
-import type { LoadActivityStatus } from "@/generated/prisma/client";
+import type { LoadActivityStatus } from "@/lib/db/types";
 import { ForbiddenError } from "@/lib/errors/forbidden-error";
 import { NotFoundError } from "@/lib/errors/not-found-error";
 import { ValidationError } from "@/lib/errors/validation-error";
@@ -13,18 +13,29 @@ import {
   STATUSES,
 } from "@/lib/constants/statuses";
 import { TEAM_LEAD } from "@/lib/constants/roles";
-import { db } from "@/lib/db/prisma";
+import { T, db } from "@/lib/db/client";
+import {
+  assertDb,
+  assertDbVoid,
+  createId,
+  decimalToNumber,
+  nowIso,
+  toDateOnly,
+} from "@/lib/db/utils";
 import type { DailyActivity as DailyActivityDto } from "@/lib/types";
 import { calculateDispatchFee } from "@/lib/utils/calculate-dispatch-fee";
 import { calculateRatePerMile } from "@/lib/utils/calculate-rate-per-mile";
 import type { AccessScope, AuthContextUser } from "@/server/auth/types";
 import { mapDailyActivity } from "@/server/mappers";
 import { writeAuditLog } from "@/server/services/audit.service";
-import { assertAllowedStatusReason } from "@/server/services/settings.service";
+import {
+  assertAllowedStatusReason,
+  getDispatchFeeRules,
+} from "@/server/services/settings.service";
 import {
   activityFiltersSchema,
+  applyActivityFilters,
   assertFilterAccess,
-  buildActivityWhere,
   parseActivityDate,
   type ActivityFilters,
 } from "@/server/utils/activity-filters";
@@ -103,17 +114,76 @@ const createActivityInputSchema = z
   .merge(activityPayloadSchema)
   .superRefine(refineActivityPayload);
 
-const updateActivityInputSchema = activityPayloadSchema
-  .partial()
-  .extend({
-    activityDate: z.string().min(1).optional(),
-  });
+const updateActivityInputSchema = activityPayloadSchema.partial().extend({
+  activityDate: z.string().min(1).optional(),
+});
 
-const validatedActivityPayloadSchema =
-  activityPayloadSchema.superRefine(refineActivityPayload);
+const validatedActivityPayloadSchema = activityPayloadSchema.superRefine(
+  refineActivityPayload,
+);
 
 type CreateActivityInput = z.infer<typeof createActivityInputSchema>;
 type UpdateActivityInput = z.infer<typeof updateActivityInputSchema>;
+
+type CarrierWithRelations = {
+  id: string;
+  teamId: string;
+  dispatcherId: string | null;
+  status: string;
+  deletedAt: string | null;
+  carrierName: string;
+  driverName: string;
+  truckType: string;
+  dispatchFeePercentage: string;
+  team: { id: string; name: string } | { id: string; name: string }[] | null;
+  dispatcher:
+    | {
+        id: string;
+        user: { fullName: string } | { fullName: string }[];
+      }
+    | {
+        id: string;
+        user: { fullName: string } | { fullName: string }[];
+      }[]
+    | null;
+};
+
+function unwrapRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
+function toDecimalString(value: number | null | undefined): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  return String(value);
+}
+
+function applyActivityScope<T extends { eq: (col: string, val: string) => T }>(
+  query: T,
+  scope: AccessScope,
+): T {
+  const scopeFilter = activityScopeFilter(scope);
+
+  if ("dispatcherId" in scopeFilter && scopeFilter.dispatcherId) {
+    return query.eq("dispatcherId", scopeFilter.dispatcherId);
+  }
+
+  if ("teamId" in scopeFilter && scopeFilter.teamId) {
+    return query.eq("teamId", scopeFilter.teamId);
+  }
+
+  if ("id" in scopeFilter && scopeFilter.id) {
+    return query.eq("id", scopeFilter.id);
+  }
+
+  return query;
+}
 
 async function assertCarrierAccess(
   scope: AccessScope,
@@ -122,7 +192,7 @@ async function assertCarrierAccess(
     teamId: string;
     dispatcherId: string | null;
     status: string;
-    deletedAt: Date | null;
+    deletedAt: string | null;
   },
 ): Promise<void> {
   if (carrier.deletedAt || carrier.status !== "ACTIVE") {
@@ -134,11 +204,18 @@ async function assertCarrierAccess(
   }
 
   if (scope.role === TEAM_LEAD && scope.teamId !== carrier.teamId) {
-    throw new ForbiddenError("You can only log activity for carriers on your team.");
+    throw new ForbiddenError(
+      "You can only log activity for carriers on your team.",
+    );
   }
 
-  if (scope.role === "DISPATCHER" && scope.dispatcherId !== carrier.dispatcherId) {
-    throw new ForbiddenError("You can only log activity for your assigned carriers.");
+  if (
+    scope.role === "DISPATCHER" &&
+    scope.dispatcherId !== carrier.dispatcherId
+  ) {
+    throw new ForbiddenError(
+      "You can only log activity for your assigned carriers.",
+    );
   }
 }
 
@@ -147,6 +224,10 @@ function computeFinancials(
   totalMiles: number | undefined,
   loadAmount: number | undefined,
   dispatchFeePercentage: number,
+  feeRules: {
+    minimumFee: number;
+    roundToNearestDollar: boolean;
+  },
 ): { ratePerMile: number | null; dispatchFee: number | null } {
   if (status !== DELIVERED || !totalMiles || !loadAmount) {
     return { ratePerMile: null, dispatchFee: null };
@@ -154,7 +235,10 @@ function computeFinancials(
 
   return {
     ratePerMile: calculateRatePerMile(loadAmount, totalMiles),
-    dispatchFee: calculateDispatchFee(loadAmount, dispatchFeePercentage),
+    dispatchFee: calculateDispatchFee(loadAmount, dispatchFeePercentage, {
+      minimumFee: feeRules.minimumFee,
+      roundToNearestDollar: feeRules.roundToNearestDollar,
+    }),
   };
 }
 
@@ -164,35 +248,56 @@ export async function upsertDailySubmission(
   teamId: string,
   submissionDate: Date,
 ): Promise<void> {
-  const activities = await db.dailyActivity.findMany({
-    where: { dispatcherId, activityDate: submissionDate },
-    select: { carrierId: true },
-  });
+  const dateKey = toDateOnly(submissionDate);
 
+  const activitiesResult = await db()
+    .from(T.DailyActivity)
+    .select("carrierId")
+    .eq("dispatcherId", dispatcherId)
+    .eq("activityDate", dateKey);
+
+  const activities = assertDb(activitiesResult) ?? [];
   const carrierIds = new Set(activities.map((activity) => activity.carrierId));
 
-  await db.dailySubmission.upsert({
-    where: {
-      dispatcherId_submissionDate: {
-        dispatcherId,
-        submissionDate,
-      },
-    },
-    create: {
-      organizationId,
-      dispatcherId,
-      teamId,
-      submissionDate,
-      carrierCount: carrierIds.size,
-      activityCount: activities.length,
-    },
-    update: {
-      teamId,
-      carrierCount: carrierIds.size,
-      activityCount: activities.length,
-      submittedAt: new Date(),
-    },
-  });
+  const upsertPayload = {
+    organizationId,
+    dispatcherId,
+    teamId,
+    submissionDate: dateKey,
+    carrierCount: carrierIds.size,
+    activityCount: activities.length,
+    submittedAt: nowIso(),
+  };
+
+  const existingSubmissionResult = await db()
+    .from(T.DailySubmission)
+    .select("id")
+    .eq("dispatcherId", dispatcherId)
+    .eq("submissionDate", dateKey)
+    .maybeSingle();
+
+  if (existingSubmissionResult.error) {
+    throw new Error(existingSubmissionResult.error.message);
+  }
+
+  if (existingSubmissionResult.data) {
+    const updateResult = await db()
+      .from(T.DailySubmission)
+      .update(upsertPayload)
+      .eq("id", existingSubmissionResult.data.id);
+
+    assertDbVoid(updateResult);
+    return;
+  }
+
+  const insertResult = await db()
+    .from(T.DailySubmission)
+    .insert({
+      id: createId(),
+      ...upsertPayload,
+    });
+
+  assertDbVoid(insertResult);
 }
 
 export async function listActivities(
@@ -202,10 +307,14 @@ export async function listActivities(
   const parsedFilters = activityFiltersSchema.parse(filters);
   await assertFilterAccess(scope, parsedFilters);
 
-  const activities = await db.dailyActivity.findMany({
-    where: buildActivityWhere(scope, parsedFilters),
-    orderBy: [{ activityDate: "desc" }, { createdAt: "desc" }],
-  });
+  let query = db().from(T.DailyActivity).select("*");
+  query = applyActivityFilters(query, scope, parsedFilters);
+
+  const activitiesResult = await query
+    .order("activityDate", { ascending: false })
+    .order("createdAt", { ascending: false });
+
+  const activities = assertDb(activitiesResult) ?? [];
 
   return activities.map(mapDailyActivity);
 }
@@ -217,81 +326,107 @@ export async function createActivity(
 ): Promise<DailyActivityDto> {
   const parsed = createActivityInputSchema.parse(input);
   const activityDate = parseActivityDate(parsed.activityDate);
+  const activityDateKey = toDateOnly(activityDate);
 
-  const carrier = await db.carrier.findFirst({
-    where: {
-      id: parsed.carrierId,
-      organizationId: scope.organizationId,
-      deletedAt: null,
-    },
-    include: {
-      team: { select: { id: true, name: true } },
-      dispatcher: {
-        include: { user: { select: { fullName: true } } },
-      },
-    },
-  });
+  const carrierResult = await db()
+    .from(T.Carrier)
+    .select(
+      "id, teamId, dispatcherId, status, deletedAt, carrierName, driverName, truckType, dispatchFeePercentage, team:Team!Carrier_teamId_fkey(id, name), dispatcher:Dispatcher!Carrier_dispatcherId_fkey(id, user:User!Dispatcher_userId_fkey(fullName))",
+    )
+    .eq("id", parsed.carrierId)
+    .eq("organizationId", scope.organizationId)
+    .is("deletedAt", null)
+    .maybeSingle();
 
-  if (!carrier || !carrier.dispatcherId || !carrier.dispatcher) {
+  if (carrierResult.error) {
+    throw new Error(carrierResult.error.message);
+  }
+
+  const carrierRow = carrierResult.data as CarrierWithRelations | null;
+
+  if (!carrierRow) {
     throw new NotFoundError("Carrier not found.");
   }
 
-  await assertCarrierAccess(scope, carrier);
+  const team = unwrapRelation(carrierRow.team);
+  const dispatcher = unwrapRelation(carrierRow.dispatcher);
+  const dispatcherUser = dispatcher ? unwrapRelation(dispatcher.user) : null;
+
+  if (!carrierRow.dispatcherId || !dispatcher || !dispatcherUser || !team) {
+    throw new NotFoundError("Carrier not found.");
+  }
+
+  await assertCarrierAccess(scope, carrierRow);
 
   if (parsed.reason?.trim()) {
     await assertAllowedStatusReason(scope.organizationId, parsed.reason);
   }
 
-  const duplicate = await db.dailyActivity.findUnique({
-    where: {
-      carrierId_activityDate: {
-        carrierId: parsed.carrierId,
-        activityDate,
-      },
-    },
-  });
+  const duplicateResult = await db()
+    .from(T.DailyActivity)
+    .select("id")
+    .eq("carrierId", parsed.carrierId)
+    .eq("activityDate", activityDateKey)
+    .maybeSingle();
 
-  if (duplicate) {
-    throw new ValidationError("An activity for this carrier on this date already exists.");
+  if (duplicateResult.error) {
+    throw new Error(duplicateResult.error.message);
   }
 
-  const dispatchFeePercentage = carrier.dispatchFeePercentage.toNumber();
+  if (duplicateResult.data) {
+    throw new ValidationError(
+      "An activity for this carrier on this date already exists.",
+    );
+  }
+
+  const feeRules = await getDispatchFeeRules(scope.organizationId);
+  const dispatchFeePercentage =
+    decimalToNumber(carrierRow.dispatchFeePercentage) ??
+    feeRules.defaultPercentage;
   const { ratePerMile, dispatchFee } = computeFinancials(
     parsed.status,
     parsed.totalMiles,
     parsed.loadAmount,
     dispatchFeePercentage,
+    feeRules,
   );
 
-  const activity = await db.dailyActivity.create({
-    data: {
+  const activityResult = await db()
+    .from(T.DailyActivity)
+    .insert({
+      id: createId(),
       organizationId: scope.organizationId,
-      activityDate,
-      carrierId: carrier.id,
-      dispatcherId: carrier.dispatcherId,
-      teamId: carrier.teamId,
+      activityDate: activityDateKey,
+      carrierId: carrierRow.id,
+      dispatcherId: carrierRow.dispatcherId,
+      teamId: carrierRow.teamId,
       status: parsed.status,
-      carrierNameSnapshot: carrier.carrierName,
-      driverNameSnapshot: carrier.driverName,
-      dispatcherNameSnapshot: carrier.dispatcher.user.fullName,
-      teamNameSnapshot: carrier.team.name,
-      truckTypeSnapshot: carrier.truckType,
-      dispatchFeePercentageSnapshot: dispatchFeePercentage,
+      carrierNameSnapshot: carrierRow.carrierName,
+      driverNameSnapshot: carrierRow.driverName,
+      dispatcherNameSnapshot: dispatcherUser.fullName,
+      teamNameSnapshot: team.name,
+      truckTypeSnapshot: carrierRow.truckType,
+      dispatchFeePercentageSnapshot: String(dispatchFeePercentage),
       origin: parsed.origin?.trim() || null,
       destination: parsed.destination?.trim() || null,
-      totalMiles: parsed.totalMiles ?? null,
-      loadAmount: parsed.loadAmount ?? null,
-      ratePerMile,
-      dispatchFee,
+      totalMiles: toDecimalString(parsed.totalMiles),
+      loadAmount: toDecimalString(parsed.loadAmount),
+      ratePerMile: toDecimalString(ratePerMile),
+      dispatchFee: toDecimalString(dispatchFee),
       reason: parsed.reason?.trim() || null,
       notes: parsed.notes?.trim() || null,
-    },
-  });
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    })
+    .select("*")
+    .single();
+
+  const activity = assertDb(activityResult);
 
   await upsertDailySubmission(
     scope.organizationId,
-    carrier.dispatcherId,
-    carrier.teamId,
+    carrierRow.dispatcherId,
+    carrierRow.teamId,
     activityDate,
   );
 
@@ -302,7 +437,7 @@ export async function createActivity(
     entityType: "DailyActivity",
     entityId: activity.id,
     metadata: {
-      carrierId: carrier.id,
+      carrierId: carrierRow.id,
       activityDate: parsed.activityDate,
       status: parsed.status,
     },
@@ -319,13 +454,21 @@ export async function updateActivity(
 ): Promise<DailyActivityDto> {
   const parsed = updateActivityInputSchema.parse(input);
 
-  const existing = await db.dailyActivity.findFirst({
-    where: {
-      id,
-      organizationId: scope.organizationId,
-      ...activityScopeFilter(scope),
-    },
-  });
+  let existingQuery = db()
+    .from(T.DailyActivity)
+    .select("*")
+    .eq("id", id)
+    .eq("organizationId", scope.organizationId);
+
+  existingQuery = applyActivityScope(existingQuery, scope);
+
+  const existingResult = await existingQuery.maybeSingle();
+
+  if (existingResult.error) {
+    throw new Error(existingResult.error.message);
+  }
+
+  const existing = existingResult.data;
 
   if (!existing) {
     throw new NotFoundError("Activity not found.");
@@ -336,78 +479,129 @@ export async function updateActivity(
     origin: parsed.origin ?? existing.origin ?? undefined,
     destination: parsed.destination ?? existing.destination ?? undefined,
     totalMiles:
-      parsed.totalMiles ??
-      (existing.totalMiles ? existing.totalMiles.toNumber() : undefined),
+      parsed.totalMiles ?? decimalToNumber(existing.totalMiles) ?? undefined,
     loadAmount:
-      parsed.loadAmount ??
-      (existing.loadAmount ? existing.loadAmount.toNumber() : undefined),
+      parsed.loadAmount ?? decimalToNumber(existing.loadAmount) ?? undefined,
     reason: parsed.reason ?? existing.reason ?? undefined,
     notes: parsed.notes ?? existing.notes ?? undefined,
   };
 
-  validatedActivityPayloadSchema.parse(merged);
+  const normalized =
+    merged.status === DELIVERED
+      ? {
+          ...merged,
+          reason: undefined,
+        }
+      : {
+          ...merged,
+          origin: undefined,
+          destination: undefined,
+          totalMiles: undefined,
+          loadAmount: undefined,
+        };
 
-  if (merged.reason?.trim()) {
-    await assertAllowedStatusReason(scope.organizationId, merged.reason);
+  validatedActivityPayloadSchema.parse(normalized);
+
+  if (normalized.reason?.trim()) {
+    await assertAllowedStatusReason(scope.organizationId, normalized.reason);
   }
 
   const activityDate = parsed.activityDate
     ? parseActivityDate(parsed.activityDate)
-    : existing.activityDate;
+    : parseActivityDate(existing.activityDate);
+  const activityDateKey = toDateOnly(activityDate);
 
   if (parsed.activityDate) {
-    const duplicate = await db.dailyActivity.findFirst({
-      where: {
-        carrierId: existing.carrierId,
-        activityDate,
-        NOT: { id },
-      },
-    });
+    const duplicateResult = await db()
+      .from(T.DailyActivity)
+      .select("id")
+      .eq("carrierId", existing.carrierId)
+      .eq("activityDate", activityDateKey)
+      .neq("id", id)
+      .maybeSingle();
 
-    if (duplicate) {
-      throw new ValidationError("An activity for this carrier on this date already exists.");
+    if (duplicateResult.error) {
+      throw new Error(duplicateResult.error.message);
+    }
+
+    if (duplicateResult.data) {
+      throw new ValidationError(
+        "An activity for this carrier on this date already exists.",
+      );
     }
   }
 
-  const dispatchFeePercentage = existing.dispatchFeePercentageSnapshot.toNumber();
+  const dispatchFeePercentage =
+    decimalToNumber(existing.dispatchFeePercentageSnapshot) ?? 0;
+  const feeRules = await getDispatchFeeRules(scope.organizationId);
   const { ratePerMile, dispatchFee } = computeFinancials(
-    merged.status,
-    merged.totalMiles,
-    merged.loadAmount,
+    normalized.status,
+    normalized.totalMiles,
+    normalized.loadAmount,
     dispatchFeePercentage,
+    feeRules,
   );
 
-  const activity = await db.dailyActivity.update({
-    where: { id },
-    data: {
-      ...(parsed.activityDate !== undefined ? { activityDate } : {}),
-      ...(parsed.status !== undefined ? { status: parsed.status } : {}),
-      ...(parsed.origin !== undefined ? { origin: parsed.origin?.trim() || null } : {}),
-      ...(parsed.destination !== undefined
-        ? { destination: parsed.destination?.trim() || null }
-        : {}),
-      ...(parsed.totalMiles !== undefined ? { totalMiles: parsed.totalMiles ?? null } : {}),
-      ...(parsed.loadAmount !== undefined ? { loadAmount: parsed.loadAmount ?? null } : {}),
-      ...(parsed.reason !== undefined ? { reason: parsed.reason?.trim() || null } : {}),
-      ...(parsed.notes !== undefined ? { notes: parsed.notes?.trim() || null } : {}),
-      ratePerMile,
-      dispatchFee,
-    },
-  });
+  const updatePayload: Record<string, unknown> = {
+    status: normalized.status,
+    origin:
+      normalized.status === DELIVERED
+        ? normalized.origin?.trim() || null
+        : null,
+    destination:
+      normalized.status === DELIVERED
+        ? normalized.destination?.trim() || null
+        : null,
+    totalMiles:
+      normalized.status === DELIVERED
+        ? toDecimalString(normalized.totalMiles)
+        : null,
+    loadAmount:
+      normalized.status === DELIVERED
+        ? toDecimalString(normalized.loadAmount)
+        : null,
+    ratePerMile: toDecimalString(ratePerMile),
+    dispatchFee: toDecimalString(dispatchFee),
+    reason:
+      normalized.status === DELIVERED
+        ? null
+        : normalized.reason?.trim() || null,
+    updatedAt: nowIso(),
+  };
+
+  if (parsed.activityDate !== undefined) {
+    updatePayload.activityDate = activityDateKey;
+  }
+
+  if (parsed.notes !== undefined) {
+    updatePayload.notes = parsed.notes?.trim() || null;
+  }
+
+  const activityResult = await db()
+    .from(T.DailyActivity)
+    .update(updatePayload)
+    .eq("id", id)
+    .select("*")
+    .single();
+
+  const activity = assertDb(activityResult);
 
   await upsertDailySubmission(
     scope.organizationId,
     existing.dispatcherId,
     existing.teamId,
-    activity.activityDate,
+    activityDate,
   );
 
-  if (parsed.activityDate && activityDate.getTime() !== existing.activityDate.getTime()) {
+  if (
+    parsed.activityDate &&
+    activityDateKey !== toDateOnly(existing.activityDate)
+  ) {
     await upsertDailySubmission(
       scope.organizationId,
       existing.dispatcherId,
       existing.teamId,
-      existing.activityDate,
+      parseActivityDate(existing.activityDate),
     );
   }
 

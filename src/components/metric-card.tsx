@@ -12,13 +12,15 @@ export function MetricCard({ label, value, hint, className }: MetricCardProps) {
   return (
     <Card className={cn(className)}>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
+        <CardTitle className="text-muted-foreground text-sm font-medium">
           {label}
         </CardTitle>
       </CardHeader>
       <CardContent>
         <p className="text-2xl font-semibold tracking-tight">{value}</p>
-        {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
+        {hint ? (
+          <p className="text-muted-foreground mt-1 text-xs">{hint}</p>
+        ) : null}
       </CardContent>
     </Card>
   );

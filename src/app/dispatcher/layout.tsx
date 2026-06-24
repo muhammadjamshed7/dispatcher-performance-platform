@@ -6,5 +6,7 @@ export default function DispatcherLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return <RoleProtectedLayout role={DISPATCHER}>{children}</RoleProtectedLayout>;
+  return (
+    <RoleProtectedLayout role={DISPATCHER}>{children}</RoleProtectedLayout>
+  );
 }

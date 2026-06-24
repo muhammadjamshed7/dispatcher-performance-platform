@@ -10,4 +10,7 @@ export type SessionUser = {
   teamId: string | null;
   teamName?: string | null;
   dispatcherId: string | null;
+  lastLoginAt: string | null;
+  timezone: string;
+  currency: string;
 };

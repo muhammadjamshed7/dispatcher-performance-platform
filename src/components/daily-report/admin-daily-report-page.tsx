@@ -183,7 +183,8 @@ export function AdminDailyReportPage() {
         emptyDescription="There are no daily activity records for the selected date and filters."
         errorTitle="Unable to load daily report"
         errorDescription={
-          error ?? "Daily report data could not be loaded. Try again in a moment."
+          error ??
+          "Daily report data could not be loaded. Try again in a moment."
         }
       >
         <>

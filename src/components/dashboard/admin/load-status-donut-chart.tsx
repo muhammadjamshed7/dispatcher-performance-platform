@@ -41,14 +41,18 @@ export function LoadStatusDonutChart({
                 </PieChart>
               </ResponsiveContainer>
               <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                <p className="text-2xl font-semibold text-[#0F172A]">{totalLoads}</p>
+                <p className="text-2xl font-semibold text-[#0F172A]">
+                  {totalLoads}
+                </p>
                 <p className="text-xs text-[#64748B]">Total Loads</p>
               </div>
             </>
           ) : (
             <div className="flex aspect-square w-full items-center justify-center rounded-full bg-[#F8FAFC]">
               <div className="text-center">
-                <p className="text-2xl font-semibold text-[#0F172A]">{totalLoads}</p>
+                <p className="text-2xl font-semibold text-[#0F172A]">
+                  {totalLoads}
+                </p>
                 <p className="mt-1 text-xs text-[#64748B]">Total Loads</p>
               </div>
             </div>
@@ -75,7 +79,9 @@ export function LoadStatusDonutChart({
                     <span className="truncate text-[#475569]">{item.name}</span>
                   </div>
                   <div className="shrink-0 text-right">
-                    <span className="font-medium text-[#0F172A]">{item.value}</span>
+                    <span className="font-medium text-[#0F172A]">
+                      {item.value}
+                    </span>
                     <span className="ml-2 text-[#64748B]">{item.percent}</span>
                   </div>
                 </div>

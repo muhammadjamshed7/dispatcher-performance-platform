@@ -56,7 +56,7 @@ export function DailyReportTable({
               <TableRow>
                 <TableCell
                   colSpan={14}
-                  className="py-8 text-center text-muted-foreground"
+                  className="text-muted-foreground py-8 text-center"
                 >
                   No report rows found.
                 </TableCell>
@@ -67,7 +67,9 @@ export function DailyReportTable({
                   <TableCell>{row.date}</TableCell>
                   <TableCell>{row.dispatcherName}</TableCell>
                   <TableCell>{row.teamName}</TableCell>
-                  <TableCell className="font-medium">{row.carrierName}</TableCell>
+                  <TableCell className="font-medium">
+                    {row.carrierName}
+                  </TableCell>
                   <TableCell>{row.truckType.replaceAll("_", " ")}</TableCell>
                   <TableCell>
                     <StatusBadge status={row.status} />

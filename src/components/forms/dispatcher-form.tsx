@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useEntityOptions } from "@/hooks/use-entity-options";
+import { useRoleScope } from "@/hooks/use-role-scope";
+import { ADMIN, DISPATCHER } from "@/lib/constants/roles";
 import {
   DISPATCHER_ROLES,
   defaultDispatcherFormValues,
@@ -36,21 +38,24 @@ export function DispatcherForm({
   onSubmit,
 }: DispatcherFormProps) {
   const { teams } = useEntityOptions();
+  const { user } = useRoleScope();
+  const assignableRoles =
+    user.role === ADMIN ? DISPATCHER_ROLES : ([DISPATCHER] as const);
   const {
     register,
     handleSubmit,
     reset,
     setValue,
-    watch,
+    control,
     formState: { errors },
   } = useForm<DispatcherFormValues>({
     resolver: zodResolver(dispatcherFormSchema),
     defaultValues,
   });
 
-  const team = watch("team");
-  const role = watch("role");
-  const status = watch("status");
+  const team = useWatch({ control, name: "team" });
+  const role = useWatch({ control, name: "role" });
+  const status = useWatch({ control, name: "status" });
 
   useEffect(() => {
     reset(defaultValues);
@@ -73,7 +78,7 @@ export function DispatcherForm({
           {...register("fullName")}
         />
         {errors.fullName ? (
-          <p className="text-sm text-destructive">{errors.fullName.message}</p>
+          <p className="text-destructive text-sm">{errors.fullName.message}</p>
         ) : null}
       </div>
 
@@ -88,7 +93,7 @@ export function DispatcherForm({
           {...register("email")}
         />
         {errors.email ? (
-          <p className="text-sm text-destructive">{errors.email.message}</p>
+          <p className="text-destructive text-sm">{errors.email.message}</p>
         ) : null}
       </div>
 
@@ -126,7 +131,7 @@ export function DispatcherForm({
           </SelectContent>
         </Select>
         {errors.team ? (
-          <p className="text-sm text-destructive">{errors.team.message}</p>
+          <p className="text-destructive text-sm">{errors.team.message}</p>
         ) : null}
       </div>
 
@@ -147,7 +152,7 @@ export function DispatcherForm({
             <SelectValue placeholder="Select role" />
           </SelectTrigger>
           <SelectContent>
-            {DISPATCHER_ROLES.map((item) => (
+            {assignableRoles.map((item) => (
               <SelectItem key={item} value={item}>
                 {item.replace("_", " ")}
               </SelectItem>
@@ -155,7 +160,7 @@ export function DispatcherForm({
           </SelectContent>
         </Select>
         {errors.role ? (
-          <p className="text-sm text-destructive">{errors.role.message}</p>
+          <p className="text-destructive text-sm">{errors.role.message}</p>
         ) : null}
       </div>
 
@@ -184,7 +189,7 @@ export function DispatcherForm({
           </SelectContent>
         </Select>
         {errors.status ? (
-          <p className="text-sm text-destructive">{errors.status.message}</p>
+          <p className="text-destructive text-sm">{errors.status.message}</p>
         ) : null}
       </div>
     </form>

@@ -45,7 +45,7 @@ export function getPublicEnv(): PublicEnv {
   if (isProductionRuntime()) {
     if (!env.NEXT_PUBLIC_SUPABASE_URL || !env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
       throw new ConfigurationError(
-        "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY on your deployment.",
+        "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.",
       );
     }
   }
@@ -60,45 +60,16 @@ const localDatabaseUrl = "postgresql://localhost:5432/postgres";
 const serverEnvSchema = z.object({
   DATABASE_URL: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
   DIRECT_URL: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
-  SUPABASE_SERVICE_ROLE_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
-  SESSION_COOKIE_NAME: z.preprocess(
+  SUPABASE_SERVICE_ROLE_KEY: z.preprocess(
     emptyToUndefined,
-    z.string().min(1).default("dpp_session"),
-  ),
-  AUTH_REDIRECT_URL: z.preprocess(
-    emptyToUndefined,
-    z.url().default("http://localhost:3000/"),
-  ),
-  APP_ENCRYPTION_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
-  CSRF_SECRET: z.preprocess(emptyToUndefined, z.string().optional()),
-  REPORT_EXPORT_MAX_ROWS: z.preprocess(
-    emptyToUndefined,
-    z.coerce.number().int().positive().default(10_000),
-  ),
-  REPORT_EXPORT_STORAGE_BUCKET: z.preprocess(
-    emptyToUndefined,
-    z.string().default("report-exports"),
-  ),
-  DEFAULT_TIMEZONE: z.preprocess(
-    emptyToUndefined,
-    z.string().default("America/Chicago"),
-  ),
-  DEFAULT_CURRENCY: z.preprocess(emptyToUndefined, z.string().default("USD")),
-  RESEND_API_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
-  FROM_EMAIL: z.preprocess(emptyToUndefined, z.string().email().optional()),
-  SENTRY_DSN: z.preprocess(emptyToUndefined, z.url().optional()),
-  LOG_LEVEL: z.preprocess(
-    emptyToUndefined,
-    z.enum(["debug", "info", "warn", "error"]).default("info"),
+    z.string().optional(),
   ),
 });
 
-export type ServerEnv = Omit<
-  z.infer<typeof serverEnvSchema>,
-  "DATABASE_URL" | "DIRECT_URL"
-> & {
+export type ServerEnv = {
   DATABASE_URL: string;
   DIRECT_URL: string;
+  SUPABASE_SERVICE_ROLE_KEY?: string;
 };
 
 function assertServerRuntime() {
@@ -116,18 +87,6 @@ export function getServerEnv(): ServerEnv {
     DATABASE_URL: process.env.DATABASE_URL,
     DIRECT_URL: process.env.DIRECT_URL,
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
-    SESSION_COOKIE_NAME: process.env.SESSION_COOKIE_NAME,
-    AUTH_REDIRECT_URL: process.env.AUTH_REDIRECT_URL,
-    APP_ENCRYPTION_KEY: process.env.APP_ENCRYPTION_KEY,
-    CSRF_SECRET: process.env.CSRF_SECRET,
-    REPORT_EXPORT_MAX_ROWS: process.env.REPORT_EXPORT_MAX_ROWS,
-    REPORT_EXPORT_STORAGE_BUCKET: process.env.REPORT_EXPORT_STORAGE_BUCKET,
-    DEFAULT_TIMEZONE: process.env.DEFAULT_TIMEZONE,
-    DEFAULT_CURRENCY: process.env.DEFAULT_CURRENCY,
-    RESEND_API_KEY: process.env.RESEND_API_KEY,
-    FROM_EMAIL: process.env.FROM_EMAIL,
-    SENTRY_DSN: process.env.SENTRY_DSN,
-    LOG_LEVEL: process.env.LOG_LEVEL,
   });
 
   const databaseUrl = parsed.DATABASE_URL ?? parsed.DIRECT_URL;
@@ -136,20 +95,20 @@ export function getServerEnv(): ServerEnv {
   if (isProductionRuntime()) {
     if (!databaseUrl) {
       throw new ConfigurationError(
-        "Database is not configured. Set DATABASE_URL (Supabase pooler URL recommended) on your deployment.",
+        "Database is not configured. Set DATABASE_URL on your deployment.",
       );
     }
 
     if (!parsed.SUPABASE_SERVICE_ROLE_KEY) {
       throw new ConfigurationError(
-        "Supabase service role key is not configured. Set SUPABASE_SERVICE_ROLE_KEY on your deployment.",
+        "Supabase service role key is not configured. Set SUPABASE_SERVICE_ROLE_KEY.",
       );
     }
   }
 
   return {
-    ...parsed,
     DATABASE_URL: databaseUrl ?? localDatabaseUrl,
     DIRECT_URL: directUrl ?? localDatabaseUrl,
+    SUPABASE_SERVICE_ROLE_KEY: parsed.SUPABASE_SERVICE_ROLE_KEY,
   };
 }

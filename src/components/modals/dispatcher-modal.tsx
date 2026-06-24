@@ -32,7 +32,7 @@ type DispatcherModalProps = {
   onOpenChange: (open: boolean) => void;
   onCreate?: (values: DispatcherFormValues) => void;
   onEdit?: (values: DispatcherFormValues) => void;
-  onToggleStatus?: (dispatcher : Dispatcher) => void;
+  onToggleStatus?: (dispatcher: Dispatcher) => void;
 };
 
 const FORM_ID = "dispatcher-form";
@@ -112,9 +112,9 @@ export function DispatcherModal({
         {mode === "view" && dispatcher ? (
           <DispatcherDetailView dispatcher={dispatcher} />
         ) : isStatusModal ? (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             {mode === "activate" ? "Activate" : "Deactivate"}{" "}
-            <span className="font-medium text-foreground">
+            <span className="text-foreground font-medium">
               {dispatcher?.fullName}
             </span>
             ? This will set the status to{" "}
@@ -132,7 +132,11 @@ export function DispatcherModal({
         )}
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
             Cancel
           </Button>
 

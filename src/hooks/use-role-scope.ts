@@ -28,14 +28,17 @@ export function useRoleScope(): RoleScope & {
   const { session } = useSession();
 
   return useMemo(() => {
-    const scope = session ? buildRoleScopeFromSession(session) : emptyRoleScope();
+    const scope = session
+      ? buildRoleScopeFromSession(session)
+      : emptyRoleScope();
 
     return {
       ...scope,
       filterTeams: (teams: Team[]) => filterTeamsByScope(teams, scope),
       filterDispatchers: (dispatchers: Dispatcher[]) =>
         filterDispatchersByScope(dispatchers, scope),
-      filterCarriers: (carriers: Carrier[]) => filterCarriersByScope(carriers, scope),
+      filterCarriers: (carriers: Carrier[]) =>
+        filterCarriersByScope(carriers, scope),
       filterActivities: (activities: DailyActivity[]) =>
         filterActivitiesByScope(activities, scope),
     };

@@ -1,19 +1,23 @@
 import "server-only";
 
 import { z } from "zod";
-import type { TeamStatus } from "@/generated/prisma/client";
+import { T, db } from "@/lib/db/client";
+import type { Dispatcher, TeamStatus, User, UserRole } from "@/lib/db/types";
+import { assertDb, assertDbVoid, createId, nowIso } from "@/lib/db/utils";
 import { ForbiddenError } from "@/lib/errors/forbidden-error";
 import { NotFoundError } from "@/lib/errors/not-found-error";
 import { ValidationError } from "@/lib/errors/validation-error";
 import { DISPATCHER, TEAM_LEAD } from "@/lib/constants/roles";
 import { TEAM_STATUSES } from "@/lib/constants/team-statuses";
-import { db } from "@/lib/db/prisma";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Dispatcher as DispatcherDto } from "@/lib/types";
 import type { AccessScope, AuthContextUser } from "@/server/auth/types";
 import { mapDispatcher } from "@/server/mappers";
 import { writeAuditLog } from "@/server/services/audit.service";
+import { sanitizeFilterId } from "@/lib/constants/filters";
+import { assertFilterAccess } from "@/server/utils/activity-filters";
 import { dispatcherScopeFilter } from "@/server/utils/scope-filters";
+import { buildIlikeOr } from "@/server/utils/text-search";
 
 const DISPATCHER_ROLES = [DISPATCHER, TEAM_LEAD] as const;
 
@@ -31,13 +35,133 @@ const updateDispatcherInputSchema = createDispatcherInputSchema.partial();
 type CreateDispatcherInput = z.infer<typeof createDispatcherInputSchema>;
 type UpdateDispatcherInput = z.infer<typeof updateDispatcherInputSchema>;
 
+import { DISPATCHER_WITH_USER_AND_TEAM } from "@/lib/db/embeds";
+import { asFilterable, type FilterableQuery } from "@/lib/db/query";
+
+type DispatcherRow = Dispatcher & {
+  user: Pick<
+    User,
+    "fullName" | "email" | "phoneNumber" | "role" | "supabaseUserId"
+  >;
+  team: Pick<{ name: string }, "name">;
+  _count?: { carriers: number };
+};
+
+function applyDispatcherScopeQuery<T extends FilterableQuery>(
+  query: T,
+  scope: AccessScope,
+  options: { includeDeleted?: boolean } = {},
+): T {
+  const filter = dispatcherScopeFilter(scope);
+  let scopedQuery = query.eq("organizationId", scope.organizationId);
+
+  for (const [column, value] of Object.entries(filter)) {
+    if (column === "deletedAt" && options.includeDeleted) {
+      continue;
+    }
+
+    if (value === null) {
+      scopedQuery = scopedQuery.is(column, null);
+    } else {
+      scopedQuery = scopedQuery.eq(column, value);
+    }
+  }
+
+  return scopedQuery as T;
+}
+
+async function ignoreDbError(promise: PromiseLike<unknown>): Promise<void> {
+  try {
+    await promise;
+  } catch {
+    // best-effort rollback
+  }
+}
+
+function unwrapRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
+function normalizeDispatcherRow(row: DispatcherRow): DispatcherRow {
+  const user = unwrapRelation(row.user);
+  const team = unwrapRelation(row.team);
+
+  return {
+    ...row,
+    user: user ?? {
+      fullName: "",
+      email: "",
+      phoneNumber: null,
+      role: "DISPATCHER" as UserRole,
+      supabaseUserId: null,
+    },
+    team: team ?? { name: "" },
+  };
+}
+
+async function fetchCarrierCounts(
+  organizationId: string,
+  dispatcherIds: string[],
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+
+  for (const dispatcherId of dispatcherIds) {
+    counts.set(dispatcherId, 0);
+  }
+
+  if (dispatcherIds.length === 0) {
+    return counts;
+  }
+
+  const result = await db()
+    .from(T.Carrier)
+    .select("dispatcherId")
+    .eq("organizationId", organizationId)
+    .is("deletedAt", null)
+    .in("dispatcherId", dispatcherIds);
+
+  for (const row of assertDb(result) ?? []) {
+    if (!row.dispatcherId) {
+      continue;
+    }
+
+    counts.set(row.dispatcherId, (counts.get(row.dispatcherId) ?? 0) + 1);
+  }
+
+  return counts;
+}
+
+async function enrichDispatchersWithCounts(
+  organizationId: string,
+  dispatchers: DispatcherRow[],
+): Promise<DispatcherRow[]> {
+  const counts = await fetchCarrierCounts(
+    organizationId,
+    dispatchers.map((dispatcher) => dispatcher.id),
+  );
+
+  return dispatchers.map((dispatcher) => ({
+    ...dispatcher,
+    _count: { carriers: counts.get(dispatcher.id) ?? 0 },
+  }));
+}
+
 function generateTemporaryPassword(): string {
   return `${crypto.randomUUID().replaceAll("-", "").slice(0, 10)}Aa1!`;
 }
 
-function assertRoleAssignment(scope: AccessScope, role: typeof DISPATCHER | typeof TEAM_LEAD): void {
+function assertRoleAssignment(
+  scope: AccessScope,
+  role: typeof DISPATCHER | typeof TEAM_LEAD,
+): void {
   if (role === TEAM_LEAD && !scope.isCompanyWide) {
-    throw new ForbiddenError("Only administrators can assign the team lead role.");
+    throw new ForbiddenError(
+      "Only administrators can assign the team lead role.",
+    );
   }
 }
 
@@ -57,122 +181,194 @@ function assertTeamAssignment(scope: AccessScope, teamId: string): void {
   }
 }
 
-const dispatcherInclude = {
-  user: { select: { fullName: true, email: true, phoneNumber: true, role: true } },
-  team: { select: { name: true } },
-  _count: { select: { carriers: true } },
-} as const;
-
-export async function listDispatchers(scope: AccessScope): Promise<DispatcherDto[]> {
-  const dispatchers = await db.dispatcher.findMany({
-    where: {
-      organizationId: scope.organizationId,
-      ...dispatcherScopeFilter(scope),
-    },
-    include: dispatcherInclude,
-    orderBy: { user: { fullName: "asc" } },
+export async function listDispatchers(
+  scope: AccessScope,
+  filters: { q?: string; teamId?: string; dispatcherId?: string } = {},
+): Promise<DispatcherDto[]> {
+  await assertFilterAccess(scope, {
+    teamId: filters.teamId,
+    dispatcherId: filters.dispatcherId,
   });
 
-  return dispatchers.map(mapDispatcher);
+  const teamId = sanitizeFilterId(filters.teamId);
+  const dispatcherId = sanitizeFilterId(filters.dispatcherId);
+
+  let query = applyDispatcherScopeQuery(
+    asFilterable(db().from(T.Dispatcher).select(DISPATCHER_WITH_USER_AND_TEAM)),
+    scope,
+    { includeDeleted: true },
+  );
+
+  if (teamId) {
+    query = query.eq("teamId", teamId) as typeof query;
+  }
+
+  if (dispatcherId) {
+    query = query.eq("id", dispatcherId) as typeof query;
+  }
+
+  if (filters.q) {
+    query = query.or(buildIlikeOr(["fullName", "email"], filters.q), {
+      referencedTable: "user",
+    }) as typeof query;
+  }
+
+  const rows = (assertDb(await query) ?? []) as DispatcherRow[];
+  const normalized = rows.map(normalizeDispatcherRow);
+  normalized.sort((a, b) => a.user.fullName.localeCompare(b.user.fullName));
+
+  const enriched = await enrichDispatchersWithCounts(
+    scope.organizationId,
+    normalized,
+  );
+
+  return enriched.map(mapDispatcher);
 }
 
-async function getDispatcherRecord(scope: AccessScope, id: string) {
-  const dispatcher = await db.dispatcher.findFirst({
-    where: {
-      id,
-      organizationId: scope.organizationId,
-      ...dispatcherScopeFilter(scope),
-    },
-    include: dispatcherInclude,
-  });
+async function getDispatcherRecord(
+  scope: AccessScope,
+  id: string,
+  options: { includeDeleted?: boolean } = {},
+): Promise<DispatcherRow> {
+  const result = await applyDispatcherScopeQuery(
+    db().from(T.Dispatcher).select(DISPATCHER_WITH_USER_AND_TEAM).eq("id", id),
+    scope,
+    options,
+  ).maybeSingle();
 
-  if (!dispatcher) {
+  if (result.error) {
+    throw new Error(result.error.message);
+  }
+
+  if (!result.data) {
     throw new NotFoundError("Dispatcher not found.");
   }
 
-  return dispatcher;
+  const [enriched] = await enrichDispatchersWithCounts(scope.organizationId, [
+    normalizeDispatcherRow(result.data as DispatcherRow),
+  ]);
+
+  return enriched;
 }
 
 export async function createDispatcher(
   scope: AccessScope,
   actor: AuthContextUser,
   input: CreateDispatcherInput,
-): Promise<DispatcherDto> {
+): Promise<{ dispatcher: DispatcherDto; temporaryPassword: string }> {
   requireAdminOrTeamLead(scope);
   const parsed = createDispatcherInputSchema.parse(input);
 
   assertRoleAssignment(scope, parsed.role);
   assertTeamAssignment(scope, parsed.teamId);
 
-  const team = await db.team.findFirst({
-    where: {
-      id: parsed.teamId,
-      organizationId: scope.organizationId,
-      deletedAt: null,
-      status: "ACTIVE",
-    },
-  });
+  const teamResult = await db()
+    .from(T.Team)
+    .select("id")
+    .eq("id", parsed.teamId)
+    .eq("organizationId", scope.organizationId)
+    .is("deletedAt", null)
+    .eq("status", "ACTIVE")
+    .maybeSingle();
 
-  if (!team) {
+  if (!teamResult.data) {
     throw new ValidationError("Team not found or inactive.");
   }
 
-  const existingUser = await db.user.findFirst({
-    where: {
-      organizationId: scope.organizationId,
-      email: parsed.email.toLowerCase(),
-      deletedAt: null,
-    },
-  });
+  const existingUserResult = await db()
+    .from(T.User)
+    .select("id")
+    .eq("organizationId", scope.organizationId)
+    .eq("email", parsed.email.toLowerCase())
+    .is("deletedAt", null)
+    .maybeSingle();
 
-  if (existingUser) {
+  if (existingUserResult.data) {
     throw new ValidationError("A user with this email already exists.");
   }
 
   const temporaryPassword = generateTemporaryPassword();
   const supabase = createSupabaseAdminClient();
-  const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-    email: parsed.email.toLowerCase(),
-    password: temporaryPassword,
-    email_confirm: true,
-    user_metadata: {
-      fullName: parsed.fullName,
-    },
-  });
+  const { data: authData, error: authError } =
+    await supabase.auth.admin.createUser({
+      email: parsed.email.toLowerCase(),
+      password: temporaryPassword,
+      email_confirm: true,
+      user_metadata: {
+        fullName: parsed.fullName,
+      },
+    });
 
   if (authError || !authData.user) {
-    throw new ValidationError(authError?.message ?? "Failed to create auth user.");
+    throw new ValidationError(
+      authError?.message ?? "Failed to create auth user.",
+    );
   }
 
-  let dispatcher;
+  let dispatcher: DispatcherRow;
+  let createdUserId: string | null = null;
+  let createdDispatcherId: string | null = null;
 
   try {
-    dispatcher = await db.$transaction(async (tx) => {
-    const user = await tx.user.create({
-      data: {
+    const userId = createId();
+    const dispatcherId = createId();
+    createdUserId = userId;
+    createdDispatcherId = dispatcherId;
+    const timestamp = nowIso();
+
+    const userResult = await db()
+      .from(T.User)
+      .insert({
+        id: userId,
         organizationId: scope.organizationId,
         supabaseUserId: authData.user.id,
         email: parsed.email.toLowerCase(),
         fullName: parsed.fullName,
         phoneNumber: parsed.phoneNumber ?? null,
-        role: parsed.role,
+        role: parsed.role as UserRole,
         status: "ACTIVE",
         teamId: parsed.teamId,
-      },
-    });
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      });
 
-    return tx.dispatcher.create({
-      data: {
+    assertDbVoid(userResult);
+
+    const dispatcherResult = await db()
+      .from(T.Dispatcher)
+      .insert({
+        id: dispatcherId,
         organizationId: scope.organizationId,
-        userId: user.id,
+        userId,
         teamId: parsed.teamId,
         status: parsed.status as TeamStatus,
-      },
-      include: dispatcherInclude,
-    });
-    });
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      })
+      .select(DISPATCHER_WITH_USER_AND_TEAM)
+      .single();
+
+    dispatcher = normalizeDispatcherRow(
+      assertDb(dispatcherResult) as DispatcherRow,
+    );
+    const [enriched] = await enrichDispatchersWithCounts(scope.organizationId, [
+      dispatcher,
+    ]);
+    dispatcher = enriched;
   } catch (error) {
-    await supabase.auth.admin.deleteUser(authData.user.id).catch(() => undefined);
+    if (createdDispatcherId) {
+      await ignoreDbError(
+        db().from(T.Dispatcher).delete().eq("id", createdDispatcherId),
+      );
+    }
+
+    if (createdUserId) {
+      await ignoreDbError(db().from(T.User).delete().eq("id", createdUserId));
+    }
+
+    await supabase.auth.admin
+      .deleteUser(authData.user.id)
+      .catch(() => undefined);
     throw error;
   }
 
@@ -185,7 +381,10 @@ export async function createDispatcher(
     metadata: { email: parsed.email, teamId: parsed.teamId },
   });
 
-  return mapDispatcher(dispatcher);
+  return {
+    dispatcher: mapDispatcher(dispatcher),
+    temporaryPassword,
+  };
 }
 
 export async function updateDispatcher(
@@ -206,57 +405,170 @@ export async function updateDispatcher(
   if (parsed.teamId) {
     assertTeamAssignment(scope, parsed.teamId);
 
-    const team = await db.team.findFirst({
-      where: {
-        id: parsed.teamId,
-        organizationId: scope.organizationId,
-        deletedAt: null,
-      },
-    });
+    const teamResult = await db()
+      .from(T.Team)
+      .select("id")
+      .eq("id", parsed.teamId)
+      .eq("organizationId", scope.organizationId)
+      .is("deletedAt", null)
+      .maybeSingle();
 
-    if (!team) {
+    if (!teamResult.data) {
       throw new ValidationError("Team not found.");
+    }
+
+    if (parsed.teamId !== existing.teamId) {
+      const assignedCarrierResult = await db()
+        .from(T.Carrier)
+        .select("id")
+        .eq("organizationId", scope.organizationId)
+        .eq("dispatcherId", id)
+        .is("deletedAt", null)
+        .limit(1);
+
+      if (assignedCarrierResult.error) {
+        throw new Error(assignedCarrierResult.error.message);
+      }
+
+      if ((assignedCarrierResult.data ?? []).length > 0) {
+        throw new ValidationError(
+          "Reassign this dispatcher's carriers before moving them to another team.",
+        );
+      }
     }
   }
 
-  if (parsed.email && parsed.email.toLowerCase() !== existing.user.email) {
-    const duplicate = await db.user.findFirst({
-      where: {
-        organizationId: scope.organizationId,
-        email: parsed.email.toLowerCase(),
-        deletedAt: null,
-        NOT: { id: existing.userId },
-      },
-    });
+  const nextEmail = parsed.email?.toLowerCase();
+  const emailChanged = Boolean(nextEmail && nextEmail !== existing.user.email);
 
-    if (duplicate) {
+  if (emailChanged && nextEmail) {
+    const duplicateResult = await db()
+      .from(T.User)
+      .select("id")
+      .eq("organizationId", scope.organizationId)
+      .eq("email", nextEmail)
+      .is("deletedAt", null)
+      .neq("id", existing.userId)
+      .maybeSingle();
+
+    if (duplicateResult.data) {
       throw new ValidationError("A user with this email already exists.");
     }
   }
 
-  const dispatcher = await db.$transaction(async (tx) => {
-    await tx.user.update({
-      where: { id: existing.userId, organizationId: scope.organizationId },
-      data: {
+  const previousUser = {
+    fullName: existing.user.fullName,
+    email: existing.user.email,
+    phoneNumber: existing.user.phoneNumber,
+    role: existing.user.role,
+    teamId: existing.teamId,
+  };
+  const previousDispatcher = {
+    teamId: existing.teamId,
+    status: existing.status,
+  };
+
+  let dispatcher: DispatcherRow;
+  const supabase = emailChanged ? createSupabaseAdminClient() : null;
+  let authEmailUpdated = false;
+
+  try {
+    const timestamp = nowIso();
+
+    if (emailChanged && nextEmail) {
+      if (!existing.user.supabaseUserId) {
+        throw new ValidationError(
+          "This dispatcher is not linked to a Supabase account, so the email cannot be changed.",
+        );
+      }
+
+      const { error: authUpdateError } =
+        await supabase!.auth.admin.updateUserById(
+          existing.user.supabaseUserId,
+          { email: nextEmail },
+        );
+
+      if (authUpdateError) {
+        throw new ValidationError(authUpdateError.message);
+      }
+
+      authEmailUpdated = true;
+    }
+
+    const userUpdateResult = await db()
+      .from(T.User)
+      .update({
         ...(parsed.fullName !== undefined ? { fullName: parsed.fullName } : {}),
-        ...(parsed.email !== undefined ? { email: parsed.email.toLowerCase() } : {}),
+        ...(nextEmail !== undefined ? { email: nextEmail } : {}),
         ...(parsed.phoneNumber !== undefined
           ? { phoneNumber: parsed.phoneNumber || null }
           : {}),
-        ...(parsed.role !== undefined ? { role: parsed.role } : {}),
+        ...(parsed.role !== undefined ? { role: parsed.role as UserRole } : {}),
         ...(parsed.teamId !== undefined ? { teamId: parsed.teamId } : {}),
-      },
-    });
+        updatedAt: timestamp,
+      })
+      .eq("id", existing.userId)
+      .eq("organizationId", scope.organizationId);
 
-    return tx.dispatcher.update({
-      where: { id, organizationId: scope.organizationId },
-      data: {
+    assertDbVoid(userUpdateResult);
+
+    const dispatcherUpdateResult = await db()
+      .from(T.Dispatcher)
+      .update({
         ...(parsed.teamId !== undefined ? { teamId: parsed.teamId } : {}),
-        ...(parsed.status !== undefined ? { status: parsed.status as TeamStatus } : {}),
-      },
-      include: dispatcherInclude,
-    });
-  });
+        ...(parsed.status !== undefined
+          ? { status: parsed.status as TeamStatus }
+          : {}),
+        updatedAt: timestamp,
+      })
+      .eq("id", id)
+      .eq("organizationId", scope.organizationId)
+      .select(DISPATCHER_WITH_USER_AND_TEAM)
+      .single();
+
+    dispatcher = normalizeDispatcherRow(
+      assertDb(dispatcherUpdateResult) as DispatcherRow,
+    );
+    const [enriched] = await enrichDispatchersWithCounts(scope.organizationId, [
+      dispatcher,
+    ]);
+    dispatcher = enriched;
+  } catch (error) {
+    if (authEmailUpdated && supabase && existing.user.supabaseUserId) {
+      await supabase.auth.admin
+        .updateUserById(existing.user.supabaseUserId, {
+          email: previousUser.email,
+        })
+        .catch(() => undefined);
+    }
+
+    await ignoreDbError(
+      db()
+        .from(T.User)
+        .update({
+          fullName: previousUser.fullName,
+          email: previousUser.email,
+          phoneNumber: previousUser.phoneNumber,
+          role: previousUser.role,
+          teamId: previousUser.teamId,
+          updatedAt: nowIso(),
+        })
+        .eq("id", existing.userId),
+    );
+
+    await ignoreDbError(
+      db()
+        .from(T.Dispatcher)
+        .update({
+          teamId: previousDispatcher.teamId,
+          status: previousDispatcher.status,
+          updatedAt: nowIso(),
+        })
+        .eq("id", id),
+    );
+
+    throw error;
+  }
 
   await writeAuditLog({
     organizationId: scope.organizationId,
@@ -276,22 +588,89 @@ export async function activateDispatcher(
   id: string,
 ): Promise<DispatcherDto> {
   requireAdminOrTeamLead(scope);
-  await getDispatcherRecord(scope, id);
-
-  const dispatcher = await db.$transaction(async (tx) => {
-    const record = await tx.dispatcher.update({
-      where: { id, organizationId: scope.organizationId },
-      data: { status: "ACTIVE", deletedAt: null },
-      include: dispatcherInclude,
-    });
-
-    await tx.user.update({
-      where: { id: record.userId, organizationId: scope.organizationId },
-      data: { status: "ACTIVE", deletedAt: null },
-    });
-
-    return record;
+  const existing = await getDispatcherRecord(scope, id, {
+    includeDeleted: true,
   });
+
+  const teamResult = await db()
+    .from(T.Team)
+    .select("id")
+    .eq("id", existing.teamId)
+    .eq("organizationId", scope.organizationId)
+    .eq("status", "ACTIVE")
+    .is("deletedAt", null)
+    .maybeSingle();
+
+  if (!teamResult.data) {
+    throw new ValidationError(
+      "Activate the dispatcher's assigned team before activating the dispatcher.",
+    );
+  }
+
+  let dispatcher: DispatcherRow;
+  const previousUserStatus = existing.userId
+    ? await db()
+        .from(T.User)
+        .select("status, deletedAt")
+        .eq("id", existing.userId)
+        .eq("organizationId", scope.organizationId)
+        .maybeSingle()
+    : null;
+
+  try {
+    const timestamp = nowIso();
+
+    const dispatcherUpdateResult = await db()
+      .from(T.Dispatcher)
+      .update({ status: "ACTIVE", deletedAt: null, updatedAt: timestamp })
+      .eq("id", id)
+      .eq("organizationId", scope.organizationId)
+      .select(DISPATCHER_WITH_USER_AND_TEAM)
+      .single();
+
+    dispatcher = normalizeDispatcherRow(
+      assertDb(dispatcherUpdateResult) as DispatcherRow,
+    );
+
+    const userUpdateResult = await db()
+      .from(T.User)
+      .update({ status: "ACTIVE", deletedAt: null, updatedAt: timestamp })
+      .eq("id", dispatcher.userId)
+      .eq("organizationId", scope.organizationId);
+
+    assertDbVoid(userUpdateResult);
+
+    const [enriched] = await enrichDispatchersWithCounts(scope.organizationId, [
+      dispatcher,
+    ]);
+    dispatcher = enriched;
+  } catch (error) {
+    await ignoreDbError(
+      db()
+        .from(T.Dispatcher)
+        .update({
+          status: existing.status,
+          deletedAt: existing.deletedAt,
+          updatedAt: nowIso(),
+        })
+        .eq("id", id),
+    );
+
+    if (previousUserStatus?.data) {
+      await ignoreDbError(
+        db()
+          .from(T.User)
+          .update({
+            status: previousUserStatus.data.status,
+            deletedAt: previousUserStatus.data.deletedAt,
+            updatedAt: nowIso(),
+          })
+          .eq("id", existing.userId),
+      );
+    }
+
+    throw error;
+  }
 
   await writeAuditLog({
     organizationId: scope.organizationId,
@@ -311,22 +690,51 @@ export async function deactivateDispatcher(
   id: string,
 ): Promise<DispatcherDto> {
   requireAdminOrTeamLead(scope);
-  await getDispatcherRecord(scope, id);
+  const existing = await getDispatcherRecord(scope, id);
 
-  const dispatcher = await db.$transaction(async (tx) => {
-    const record = await tx.dispatcher.update({
-      where: { id, organizationId: scope.organizationId },
-      data: { status: "INACTIVE", deletedAt: new Date() },
-      include: dispatcherInclude,
-    });
+  let dispatcher: DispatcherRow;
 
-    await tx.user.update({
-      where: { id: record.userId, organizationId: scope.organizationId },
-      data: { status: "INACTIVE" },
-    });
+  try {
+    const timestamp = nowIso();
 
-    return record;
-  });
+    const dispatcherUpdateResult = await db()
+      .from(T.Dispatcher)
+      .update({ status: "INACTIVE", deletedAt: null, updatedAt: timestamp })
+      .eq("id", id)
+      .eq("organizationId", scope.organizationId)
+      .select(DISPATCHER_WITH_USER_AND_TEAM)
+      .single();
+
+    dispatcher = normalizeDispatcherRow(
+      assertDb(dispatcherUpdateResult) as DispatcherRow,
+    );
+
+    const userUpdateResult = await db()
+      .from(T.User)
+      .update({ status: "INACTIVE", updatedAt: timestamp })
+      .eq("id", dispatcher.userId)
+      .eq("organizationId", scope.organizationId);
+
+    assertDbVoid(userUpdateResult);
+
+    const [enriched] = await enrichDispatchersWithCounts(scope.organizationId, [
+      dispatcher,
+    ]);
+    dispatcher = enriched;
+  } catch (error) {
+    await ignoreDbError(
+      db()
+        .from(T.Dispatcher)
+        .update({
+          status: existing.status,
+          deletedAt: existing.deletedAt,
+          updatedAt: nowIso(),
+        })
+        .eq("id", id),
+    );
+
+    throw error;
+  }
 
   await writeAuditLog({
     organizationId: scope.organizationId,

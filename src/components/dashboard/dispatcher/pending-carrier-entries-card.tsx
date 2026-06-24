@@ -26,16 +26,20 @@ export function PendingCarrierEntriesCard({
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="min-w-[720px] w-full text-left text-sm">
+          <table className="w-full min-w-[720px] text-left text-sm">
             <thead className="bg-[#F8FAFC] text-xs font-medium text-[#475569]">
               <tr>
-                {["Carrier", "Driver", "Truck Type", "Last Activity", "Action"].map(
-                  (column) => (
-                    <th key={column} className="px-5 py-3 font-medium">
-                      {column}
-                    </th>
-                  ),
-                )}
+                {[
+                  "Carrier",
+                  "Driver",
+                  "Truck Type",
+                  "Last Activity",
+                  "Action",
+                ].map((column) => (
+                  <th key={column} className="px-5 py-3 font-medium">
+                    {column}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -47,8 +51,12 @@ export function PendingCarrierEntriesCard({
                   <td className="h-14 px-5 font-medium text-[#0F172A]">
                     {carrier.carrierName}
                   </td>
-                  <td className="h-14 px-5 text-[#475569]">{carrier.driverName}</td>
-                  <td className="h-14 px-5 text-[#475569]">{carrier.truckType}</td>
+                  <td className="h-14 px-5 text-[#475569]">
+                    {carrier.driverName}
+                  </td>
+                  <td className="h-14 px-5 text-[#475569]">
+                    {carrier.truckType}
+                  </td>
                   <td className="h-14 px-5 text-[#475569]">
                     {carrier.lastActivityStatus && carrier.lastActivityDate
                       ? `${carrier.lastActivityStatus} · ${carrier.lastActivityDate}`

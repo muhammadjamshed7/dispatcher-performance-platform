@@ -4,12 +4,31 @@ export type FormatCurrencyOptions = {
   nullLabel?: string;
 };
 
+let defaultCurrency = "USD";
+
+export function setDefaultCurrency(currency: string | null | undefined): void {
+  if (!currency) {
+    defaultCurrency = "USD";
+    return;
+  }
+
+  try {
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+    }).format(0);
+    defaultCurrency = currency.toUpperCase();
+  } catch {
+    defaultCurrency = "USD";
+  }
+}
+
 export function formatCurrency(
   value: number | null | undefined,
   options: FormatCurrencyOptions = {},
 ): string {
   const {
-    currency = "USD",
+    currency = defaultCurrency,
     maximumFractionDigits = 2,
     nullLabel = "N/A",
   } = options;

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { z } from "zod";
-import type { LoadActivityStatus } from "@/generated/prisma/client";
+import type { LoadActivityStatus } from "@/lib/db/types";
 import {
   CANCELLED,
   DELIVERED,
@@ -9,13 +9,12 @@ import {
   NOT_WORKING,
   STATUSES,
 } from "@/lib/constants/statuses";
-import { db } from "@/lib/db/prisma";
+import { T, db } from "@/lib/db/client";
+import { assertDb, decimalToNumber } from "@/lib/db/utils";
 import type { AdminDailyReportBundle } from "@/lib/types";
 import type { AccessScope } from "@/server/auth/types";
-import {
-  formatActivityDate,
-  parseActivityDate,
-} from "@/server/utils/activity-filters";
+import { getOrganizationPreferences } from "@/server/services/settings.service";
+import { getDateKeyInTimeZone } from "@/lib/utils/resolve-date-range";
 
 const dailyReportFiltersSchema = z.object({
   date: z.string().min(1),
@@ -36,47 +35,63 @@ const STATUS_META: Record<
   NOT_WORKING: { label: "Not Working", color: "#3B82F6" },
 };
 
-function decimalToNumber(value: { toNumber(): number } | null | undefined): number {
-  if (!value) {
-    return 0;
-  }
-
-  return value.toNumber();
+function toAmount(value: string | null | undefined): number {
+  return decimalToNumber(value) ?? 0;
 }
 
-function formatTime(value: Date): string {
-  return value.toLocaleTimeString("en-US", {
+function formatTime(value: string): string {
+  return new Date(value).toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
   });
 }
 
+function unwrapRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
 async function loadFilterOptions(organizationId: string) {
-  const [teams, dispatchers] = await Promise.all([
-    db.team.findMany({
-      where: { organizationId, deletedAt: null, status: "ACTIVE" },
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    }),
-    db.dispatcher.findMany({
-      where: { organizationId, deletedAt: null, status: "ACTIVE" },
-      select: {
-        id: true,
-        teamId: true,
-        user: { select: { fullName: true } },
-      },
-      orderBy: { user: { fullName: "asc" } },
-    }),
+  const [teamsResult, dispatchersResult] = await Promise.all([
+    db()
+      .from(T.Team)
+      .select("id, name")
+      .eq("organizationId", organizationId)
+      .is("deletedAt", null)
+      .eq("status", "ACTIVE")
+      .order("name", { ascending: true }),
+    db()
+      .from(T.Dispatcher)
+      .select("id, teamId, user:User!Dispatcher_userId_fkey(fullName)")
+      .eq("organizationId", organizationId)
+      .is("deletedAt", null)
+      .eq("status", "ACTIVE"),
   ]);
 
-  return {
-    teams,
-    dispatchers: dispatchers.map((dispatcher) => ({
+  const teams = assertDb(teamsResult) ?? [];
+  const dispatchersRaw = assertDb(dispatchersResult) ?? [];
+
+  const dispatchers = (
+    dispatchersRaw as Array<{
+      id: string;
+      teamId: string;
+      user: { fullName: string } | Array<{ fullName: string }>;
+    }>
+  )
+    .map((dispatcher) => ({
       id: dispatcher.id,
-      name: dispatcher.user.fullName,
+      name: unwrapRelation(dispatcher.user)?.fullName ?? "",
       teamId: dispatcher.teamId,
-    })),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  return {
+    teams: teams as Array<{ id: string; name: string }>,
+    dispatchers,
     statuses: STATUSES.map((status) => ({
       value: status,
       label: STATUS_META[status].label,
@@ -88,7 +103,8 @@ export async function getAdminDailyReportBundle(
   scope: AccessScope,
   rawFilters: Partial<AdminDailyReportFilters> = {},
 ): Promise<AdminDailyReportBundle> {
-  const today = formatActivityDate(new Date());
+  const preferences = await getOrganizationPreferences(scope.organizationId);
+  const today = getDateKeyInTimeZone(new Date(), preferences.timezone);
   const parsed = dailyReportFiltersSchema.parse({
     date: rawFilters.date ?? today,
     teamId: rawFilters.teamId,
@@ -96,49 +112,60 @@ export async function getAdminDailyReportBundle(
     status: rawFilters.status,
   });
 
-  const activityDate = parseActivityDate(parsed.date);
+  let activityQuery = db()
+    .from(T.DailyActivity)
+    .select(
+      "id, createdAt, status, teamNameSnapshot, dispatcherNameSnapshot, carrierNameSnapshot, loadAmount, dispatchFee, origin, destination, dispatcherId, carrierId",
+    )
+    .eq("organizationId", scope.organizationId)
+    .eq("activityDate", parsed.date)
+    .order("createdAt", { ascending: false });
 
-  const where = {
-    organizationId: scope.organizationId,
-    activityDate,
-    ...(parsed.teamId ? { teamId: parsed.teamId } : {}),
-    ...(parsed.dispatcherId ? { dispatcherId: parsed.dispatcherId } : {}),
-    ...(parsed.status ? { status: parsed.status } : {}),
-  };
+  if (parsed.teamId) {
+    activityQuery = activityQuery.eq("teamId", parsed.teamId);
+  }
 
-  const [activities, filterOptions] = await Promise.all([
-    db.dailyActivity.findMany({
-      where,
-      orderBy: [{ createdAt: "desc" }],
-      select: {
-        id: true,
-        createdAt: true,
-        status: true,
-        teamNameSnapshot: true,
-        dispatcherNameSnapshot: true,
-        carrierNameSnapshot: true,
-        loadAmount: true,
-        dispatchFee: true,
-        origin: true,
-        destination: true,
-        dispatcherId: true,
-        carrierId: true,
-      },
-    }),
+  if (parsed.dispatcherId) {
+    activityQuery = activityQuery.eq("dispatcherId", parsed.dispatcherId);
+  }
+
+  if (parsed.status) {
+    activityQuery = activityQuery.eq("status", parsed.status);
+  }
+
+  const [activitiesResult, filterOptions] = await Promise.all([
+    activityQuery,
     loadFilterOptions(scope.organizationId),
   ]);
 
+  const activities = (assertDb(activitiesResult) ?? []) as Array<{
+    id: string;
+    createdAt: string;
+    status: LoadActivityStatus;
+    teamNameSnapshot: string;
+    dispatcherNameSnapshot: string;
+    carrierNameSnapshot: string;
+    loadAmount: string | null;
+    dispatchFee: string | null;
+    origin: string | null;
+    destination: string | null;
+    dispatcherId: string;
+    carrierId: string;
+  }>;
+
   const delivered = activities.filter((row) => row.status === DELIVERED);
   const totalRevenue = delivered.reduce(
-    (sum, row) => sum + decimalToNumber(row.loadAmount),
+    (sum, row) => sum + toAmount(row.loadAmount),
     0,
   );
   const dispatchFees = delivered.reduce(
-    (sum, row) => sum + decimalToNumber(row.dispatchFee),
+    (sum, row) => sum + toAmount(row.dispatchFee),
     0,
   );
 
-  const activeDispatcherIds = new Set(activities.map((row) => row.dispatcherId));
+  const activeDispatcherIds = new Set(
+    activities.map((row) => row.dispatcherId),
+  );
   const activeCarrierIds = new Set(activities.map((row) => row.carrierId));
 
   const teamDeliveredMap = new Map<string, number>();
@@ -147,7 +174,7 @@ export async function getAdminDailyReportBundle(
   for (const row of delivered) {
     const team = row.teamNameSnapshot;
     teamDeliveredMap.set(team, (teamDeliveredMap.get(team) ?? 0) + 1);
-    const amount = decimalToNumber(row.loadAmount);
+    const amount = toAmount(row.loadAmount);
     teamRevenueMap.set(team, (teamRevenueMap.get(team) ?? 0) + amount);
   }
 
@@ -204,8 +231,7 @@ export async function getAdminDailyReportBundle(
       team: row.teamNameSnapshot,
       carrier: row.carrierNameSnapshot,
       status: STATUS_META[row.status].label,
-      loadAmount:
-        row.status === DELIVERED ? decimalToNumber(row.loadAmount) : null,
+      loadAmount: row.status === DELIVERED ? toAmount(row.loadAmount) : null,
       origin: row.origin,
       destination: row.destination,
     })),

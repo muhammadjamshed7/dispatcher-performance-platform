@@ -12,10 +12,18 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { Team } from "@/lib/types";
-import { TEAM_STATUS_INACTIVE } from "@/lib/constants/team-statuses";
+import {
+  TEAM_STATUS_ACTIVE,
+  TEAM_STATUS_INACTIVE,
+} from "@/lib/constants/team-statuses";
 import type { TeamFormValues } from "@/lib/validation/team-form";
 
-export type TeamModalMode = "create" | "edit" | "view" | "deactivate";
+export type TeamModalMode =
+  | "create"
+  | "edit"
+  | "view"
+  | "activate"
+  | "deactivate";
 
 type TeamModalProps = {
   open: boolean;
@@ -24,7 +32,7 @@ type TeamModalProps = {
   onOpenChange: (open: boolean) => void;
   onCreate?: (values: TeamFormValues) => void;
   onEdit?: (values: TeamFormValues) => void;
-  onDeactivate?: (team : Team) => void;
+  onToggleStatus?: (team: Team) => void;
 };
 
 const FORM_ID = "team-form";
@@ -47,12 +55,13 @@ export function TeamModal({
   onOpenChange,
   onCreate,
   onEdit,
-  onDeactivate,
+  onToggleStatus,
 }: TeamModalProps) {
   const titles: Record<TeamModalMode, string> = {
     create: "Create Team",
     edit: "Edit Team",
     view: "View Team",
+    activate: "Activate Team",
     deactivate: "Deactivate Team",
   };
 
@@ -60,6 +69,7 @@ export function TeamModal({
     create: "Create a new dispatcher team.",
     edit: "Update team name and status.",
     view: "Team details and assignment preview.",
+    activate: "Activate this team and make it available for assignments.",
     deactivate: "Deactivate this team and mark it inactive.",
   };
 
@@ -76,12 +86,14 @@ export function TeamModal({
     }
   }
 
-  function handleDeactivate() {
+  function handleToggleStatus() {
     if (team) {
-      onDeactivate?.(team);
+      onToggleStatus?.(team);
       onOpenChange(false);
     }
   }
+
+  const isStatusModal = mode === "activate" || mode === "deactivate";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -93,10 +105,12 @@ export function TeamModal({
 
         {mode === "view" && team ? (
           <TeamDetailView team={team} />
-        ) : mode === "deactivate" ? (
-          <p className="text-sm text-muted-foreground">
-            Deactivate <span className="font-medium text-foreground">{team?.name}</span>?
-            This will set the team status to {TEAM_STATUS_INACTIVE}.
+        ) : isStatusModal ? (
+          <p className="text-muted-foreground text-sm">
+            {mode === "activate" ? "Activate" : "Deactivate"}{" "}
+            <span className="text-foreground font-medium">{team?.name}</span>?
+            This will set the team status to{" "}
+            {mode === "activate" ? TEAM_STATUS_ACTIVE : TEAM_STATUS_INACTIVE}.
           </p>
         ) : (
           <TeamForm
@@ -108,7 +122,11 @@ export function TeamModal({
         )}
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
             Cancel
           </Button>
 
@@ -124,9 +142,13 @@ export function TeamModal({
             </Button>
           ) : null}
 
-          {mode === "deactivate" ? (
-            <Button type="button" variant="destructive" onClick={handleDeactivate}>
-              Deactivate
+          {isStatusModal ? (
+            <Button
+              type="button"
+              variant={mode === "deactivate" ? "destructive" : "default"}
+              onClick={handleToggleStatus}
+            >
+              {mode === "activate" ? "Activate" : "Deactivate"}
             </Button>
           ) : null}
         </DialogFooter>

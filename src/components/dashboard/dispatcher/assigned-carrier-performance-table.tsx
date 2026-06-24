@@ -38,7 +38,7 @@ export function AssignedCarrierPerformanceTable({
         </p>
       </div>
       <div className="overflow-x-auto">
-        <table className="min-w-[960px] w-full text-left text-sm">
+        <table className="w-full min-w-[960px] text-left text-sm">
           <thead className="bg-[#F8FAFC] text-xs font-medium text-[#475569]">
             <tr>
               {[
@@ -64,8 +64,8 @@ export function AssignedCarrierPerformanceTable({
                   colSpan={8}
                   className="h-24 px-5 text-center text-sm text-[#64748B]"
                 >
-                  No assigned carriers found. Contact your Team Lead or Admin to assign
-                  carriers.
+                  No assigned carriers found. Contact your Team Lead or Admin to
+                  assign carriers.
                 </td>
               </tr>
             ) : (
@@ -81,7 +81,9 @@ export function AssignedCarrierPerformanceTable({
                   <td className="h-14 px-5 text-[#475569]">{row.truckType}</td>
                   <td className="h-14 px-5">
                     {row.recentStatus !== "—" ? (
-                      <StatusBadge status={row.recentStatus as ActivityDisplayStatus} />
+                      <StatusBadge
+                        status={row.recentStatus as ActivityDisplayStatus}
+                      />
                     ) : (
                       <span className="text-[#64748B]">—</span>
                     )}

@@ -48,7 +48,7 @@ import {
   fetchUserRequests,
   rejectUserRequest,
 } from "@/lib/api/resources";
-import { DISPATCHER } from "@/lib/constants/roles";
+import { DISPATCHER, TEAM_LEAD } from "@/lib/constants/roles";
 import { formatDate } from "@/lib/utils/format-date";
 import type { PendingUserRequest } from "@/lib/types";
 
@@ -88,11 +88,13 @@ function resolveDefaultTeamId(
 }
 
 export function UserRequestsPageContent() {
-  const [selectedRequest, setSelectedRequest] = useState<PendingUserRequest | null>(
-    null,
-  );
+  const [selectedRequest, setSelectedRequest] =
+    useState<PendingUserRequest | null>(null);
   const [modalAction, setModalAction] = useState<ModalAction>(null);
   const [assignedTeamId, setAssignedTeamId] = useState<string>("");
+  const [approvedRole, setApprovedRole] = useState<
+    typeof DISPATCHER | typeof TEAM_LEAD
+  >(DISPATCHER);
   const [modalError, setModalError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -122,7 +124,9 @@ export function UserRequestsPageContent() {
         : "ready";
 
   const pendingCount = useMemo(
-    () => requests.filter((request) => request.status === "PENDING_APPROVAL").length,
+    () =>
+      requests.filter((request) => request.status === "PENDING_APPROVAL")
+        .length,
     [requests],
   );
 
@@ -134,6 +138,7 @@ export function UserRequestsPageContent() {
     setSelectedRequest(request);
     setModalAction(action);
     setAssignedTeamId(resolveDefaultTeamId(request, teams));
+    setApprovedRole(DISPATCHER);
     setModalError(null);
     setApprovedCredentials(null);
   };
@@ -163,14 +168,16 @@ export function UserRequestsPageContent() {
           (selectedRequest ? resolveDefaultTeamId(selectedRequest, teams) : "");
 
         if (!teamId) {
-          setModalError("No teams are available. Create a team before approving users.");
+          setModalError(
+            "No teams are available. Create a team before approving users.",
+          );
           return;
         }
 
         const temporaryPassword = generateTemporaryPassword();
 
         await approveUserRequest(selectedRequest.id, {
-          role: DISPATCHER,
+          role: approvedRole,
           teamId,
           temporaryPassword,
         });
@@ -180,7 +187,9 @@ export function UserRequestsPageContent() {
           email: selectedRequest.email,
           temporaryPassword,
         });
-        showToast(`Approved "${selectedRequest.fullName}". Share the temporary password securely.`);
+        showToast(
+          `Approved "${selectedRequest.fullName}". Share the temporary password securely.`,
+        );
         await reload();
         return;
       }
@@ -254,9 +263,9 @@ export function UserRequestsPageContent() {
             error ?? "User requests could not be loaded. Try again in a moment."
           }
         >
-          <div className="rounded-lg border bg-card">
+          <div className="bg-card rounded-lg border">
             <div className="flex items-center justify-between border-b px-4 py-3">
-              <p className="text-sm text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 {pendingCount} pending request{pendingCount === 1 ? "" : "s"}
               </p>
             </div>
@@ -277,10 +286,14 @@ export function UserRequestsPageContent() {
                 <TableBody>
                   {requests.map((request) => (
                     <TableRow key={request.id}>
-                      <TableCell className="font-medium">{request.fullName}</TableCell>
+                      <TableCell className="font-medium">
+                        {request.fullName}
+                      </TableCell>
                       <TableCell>{request.email}</TableCell>
                       <TableCell>{request.phoneNumber}</TableCell>
-                      <TableCell>{request.requestedRole.replaceAll("_", " ")}</TableCell>
+                      <TableCell>
+                        {request.requestedRole.replaceAll("_", " ")}
+                      </TableCell>
                       <TableCell>{request.preferredTeam ?? "—"}</TableCell>
                       <TableCell>
                         <StatusBadge status={request.status} />
@@ -290,21 +303,31 @@ export function UserRequestsPageContent() {
                         <DropdownMenu>
                           <DropdownMenuTrigger
                             render={
-                              <Button variant="ghost" size="icon-sm" type="button" />
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                type="button"
+                              />
                             }
                           >
                             <MoreHorizontal className="size-4" />
                             <span className="sr-only">Open actions</span>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openModal(request, "view")}>
+                            <DropdownMenuItem
+                              onClick={() => openModal(request, "view")}
+                            >
                               <Eye className="mr-2 size-4" />
                               View
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => openModal(request, "approve")}>
+                            <DropdownMenuItem
+                              onClick={() => openModal(request, "approve")}
+                            >
                               Approve
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => openModal(request, "reject")}>
+                            <DropdownMenuItem
+                              onClick={() => openModal(request, "reject")}
+                            >
                               Reject
                             </DropdownMenuItem>
                           </DropdownMenuContent>
@@ -319,7 +342,10 @@ export function UserRequestsPageContent() {
         </PageContentGate>
       </PageShell>
 
-      <Dialog open={modalAction !== null} onOpenChange={(open) => !open && closeModal()}>
+      <Dialog
+        open={modalAction !== null}
+        onOpenChange={(open) => !open && closeModal()}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{modalTitle}</DialogTitle>
@@ -329,28 +355,30 @@ export function UserRequestsPageContent() {
           </DialogHeader>
 
           {modalError ? (
-            <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <p className="border-destructive/30 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm">
               {modalError}
             </p>
           ) : null}
 
           {approvedCredentials ? (
-            <div className="space-y-3 rounded-md border bg-muted/40 p-4 text-sm">
+            <div className="bg-muted/40 space-y-3 rounded-md border p-4 text-sm">
               <p>
-                <span className="font-medium">Name:</span> {approvedCredentials.fullName}
+                <span className="font-medium">Name:</span>{" "}
+                {approvedCredentials.fullName}
               </p>
               <p>
-                <span className="font-medium">Email:</span> {approvedCredentials.email}
+                <span className="font-medium">Email:</span>{" "}
+                {approvedCredentials.email}
               </p>
               <p>
                 <span className="font-medium">Temporary password:</span>{" "}
-                <code className="rounded bg-background px-2 py-1 font-mono text-xs">
+                <code className="bg-background rounded px-2 py-1 font-mono text-xs">
                   {approvedCredentials.temporaryPassword}
                 </code>
               </p>
-              <p className="text-xs text-muted-foreground">
-                The dispatcher can sign in at /dispatcher/login. Ask them to change this
-                password after their first login.
+              <p className="text-muted-foreground text-xs">
+                The dispatcher can sign in at /dispatcher/login. Ask them to
+                change this password after their first login.
               </p>
             </div>
           ) : null}
@@ -358,13 +386,16 @@ export function UserRequestsPageContent() {
           {selectedRequest && !approvedCredentials ? (
             <div className="space-y-3 text-sm">
               <p>
-                <span className="font-medium">Name:</span> {selectedRequest.fullName}
+                <span className="font-medium">Name:</span>{" "}
+                {selectedRequest.fullName}
               </p>
               <p>
-                <span className="font-medium">Email:</span> {selectedRequest.email}
+                <span className="font-medium">Email:</span>{" "}
+                {selectedRequest.email}
               </p>
               <p>
-                <span className="font-medium">Phone:</span> {selectedRequest.phoneNumber}
+                <span className="font-medium">Phone:</span>{" "}
+                {selectedRequest.phoneNumber}
               </p>
               <p>
                 <span className="font-medium">Requested role:</span>{" "}
@@ -372,15 +403,31 @@ export function UserRequestsPageContent() {
               </p>
               {selectedRequest.notes ? (
                 <p>
-                  <span className="font-medium">Notes:</span> {selectedRequest.notes}
+                  <span className="font-medium">Notes:</span>{" "}
+                  {selectedRequest.notes}
                 </p>
               ) : null}
 
               {modalAction === "approve" ? (
-                <p>
-                  <span className="font-medium">Approved role:</span> Dispatcher
-                  (self-registered users access the dispatcher portal only)
-                </p>
+                <div className="space-y-2">
+                  <p className="font-medium">Approved role</p>
+                  <Select
+                    value={approvedRole}
+                    onValueChange={(value) => {
+                      if (value === DISPATCHER || value === TEAM_LEAD) {
+                        setApprovedRole(value);
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Choose role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={DISPATCHER}>Dispatcher</SelectItem>
+                      <SelectItem value={TEAM_LEAD}>Team Lead</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               ) : null}
 
               {modalAction === "approve" ? (
@@ -408,7 +455,9 @@ export function UserRequestsPageContent() {
                     </SelectContent>
                   </Select>
                   {teams.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">Loading teams…</p>
+                    <p className="text-muted-foreground text-xs">
+                      Loading teams…
+                    </p>
                   ) : null}
                 </div>
               ) : null}
@@ -423,7 +472,10 @@ export function UserRequestsPageContent() {
               <Button
                 type="button"
                 onClick={handleConfirmAction}
-                disabled={isSubmitting || (modalAction === "approve" && teams.length === 0)}
+                disabled={
+                  isSubmitting ||
+                  (modalAction === "approve" && teams.length === 0)
+                }
               >
                 {isSubmitting ? "Processing…" : "Confirm"}
               </Button>
@@ -432,7 +484,10 @@ export function UserRequestsPageContent() {
         </DialogContent>
       </Dialog>
 
-      <AppToast message={toastMessage} onDismiss={() => setToastMessage(null)} />
+      <AppToast
+        message={toastMessage}
+        onDismiss={() => setToastMessage(null)}
+      />
     </>
   );
 }

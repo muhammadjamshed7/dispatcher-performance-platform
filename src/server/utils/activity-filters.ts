@@ -1,16 +1,21 @@
 import "server-only";
 
 import { z } from "zod";
-import type { Prisma } from "@/generated/prisma/client";
 import { STATUSES } from "@/lib/constants/statuses";
 import { TRUCK_TYPES } from "@/lib/constants/truck-types";
+import { isFilterAll, sanitizeFilterId } from "@/lib/constants/filters";
+import { T, db } from "@/lib/db/client";
+import { toDateOnly } from "@/lib/db/utils";
 import type { AccessScope } from "@/server/auth/types";
 import { activityScopeFilter } from "@/server/utils/scope-filters";
 import { ForbiddenError } from "@/lib/errors/forbidden-error";
 import { ValidationError } from "@/lib/errors/validation-error";
-import { db } from "@/lib/db/prisma";
+import { getDateKeyInTimeZone } from "@/lib/utils/resolve-date-range";
+import { buildIlikeOr } from "@/server/utils/text-search";
 
 export const activityFiltersSchema = z.object({
+  q: z.string().trim().min(1).max(100).optional(),
+  activityId: z.string().optional(),
   dateFrom: z.string().optional(),
   dateTo: z.string().optional(),
   status: z.enum(STATUSES).optional(),
@@ -28,41 +33,61 @@ export const activityFiltersSchema = z.object({
 
 export type ActivityFilters = z.infer<typeof activityFiltersSchema>;
 
+import type { FilterableQuery } from "@/lib/db/query";
+
 function parseCsvParam(value?: string): string[] {
   if (!value?.trim()) {
     return [];
   }
 
-  return [...new Set(value.split(",").map((part) => part.trim()).filter(Boolean))];
+  return [
+    ...new Set(
+      value
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean),
+    ),
+  ].filter((part) => !isFilterAll(part));
 }
 
 export function normalizeActivityFilters(filters: ActivityFilters) {
+  const teamId = sanitizeFilterId(filters.teamId);
+  const dispatcherId = sanitizeFilterId(filters.dispatcherId);
+  const carrierId = sanitizeFilterId(filters.carrierId);
+  const activityId = sanitizeFilterId(filters.activityId);
+  const truckType = filters.truckType;
+
   const teamIds = [
     ...parseCsvParam(filters.teamIds),
-    ...(filters.teamId ? [filters.teamId] : []),
+    ...(teamId ? [teamId] : []),
   ];
   const dispatcherIds = [
     ...parseCsvParam(filters.dispatcherIds),
-    ...(filters.dispatcherId ? [filters.dispatcherId] : []),
+    ...(dispatcherId ? [dispatcherId] : []),
   ];
   const carrierIds = [
     ...parseCsvParam(filters.carrierIds),
-    ...(filters.carrierId ? [filters.carrierId] : []),
+    ...(carrierId ? [carrierId] : []),
   ];
   const truckTypes = [
     ...parseCsvParam(filters.truckTypes),
-    ...(filters.truckType ? [filters.truckType] : []),
-  ] as typeof TRUCK_TYPES[number][];
+    ...(truckType ? [truckType] : []),
+  ] as (typeof TRUCK_TYPES)[number][];
   const statuses = [
     ...parseCsvParam(filters.statuses),
     ...(filters.status ? [filters.status] : []),
-  ] as typeof STATUSES[number][];
+  ] as (typeof STATUSES)[number][];
 
   return {
     ...filters,
+    teamId,
+    dispatcherId,
+    carrierId,
+    truckType,
     teamIds: [...new Set(teamIds)],
     dispatcherIds: [...new Set(dispatcherIds)],
     carrierIds: [...new Set(carrierIds)],
+    activityId,
     truckTypes: [...new Set(truckTypes)],
     statuses: [...new Set(statuses)],
     statusKeys: parseCsvParam(filters.statusKeys),
@@ -119,111 +144,156 @@ export async function assertFilterAccess(
   scope: AccessScope,
   filters: ActivityFilters,
 ): Promise<void> {
-  if (filters.teamId && !scope.isCompanyWide && scope.teamId !== filters.teamId) {
+  const teamId = sanitizeFilterId(filters.teamId);
+  const dispatcherId = sanitizeFilterId(filters.dispatcherId);
+  const carrierId = sanitizeFilterId(filters.carrierId);
+
+  if (teamId && !scope.isCompanyWide && scope.teamId !== teamId) {
     throw new ForbiddenError("You cannot filter by another team.");
   }
 
   if (
-    filters.dispatcherId &&
+    dispatcherId &&
     scope.role === "DISPATCHER" &&
-    scope.dispatcherId !== filters.dispatcherId
+    scope.dispatcherId !== dispatcherId
   ) {
     throw new ForbiddenError("You cannot filter by another dispatcher.");
   }
 
   if (scope.role === "TEAM_LEAD" && scope.teamId) {
-    if (filters.dispatcherId) {
-      const dispatcher = await db.dispatcher.findFirst({
-        where: {
-          id: filters.dispatcherId,
-          organizationId: scope.organizationId,
-          teamId: scope.teamId,
-          deletedAt: null,
-        },
-        select: { id: true },
-      });
+    if (dispatcherId) {
+      const dispatcherResult = await db()
+        .from(T.Dispatcher)
+        .select("id")
+        .eq("id", dispatcherId)
+        .eq("organizationId", scope.organizationId)
+        .eq("teamId", scope.teamId)
+        .is("deletedAt", null)
+        .maybeSingle();
 
-      if (!dispatcher) {
+      if (dispatcherResult.error) {
+        throw new Error(dispatcherResult.error.message);
+      }
+
+      if (!dispatcherResult.data) {
         throw new ForbiddenError("You cannot filter by that dispatcher.");
       }
     }
 
-    if (filters.carrierId) {
-      const carrier = await db.carrier.findFirst({
-        where: {
-          id: filters.carrierId,
-          organizationId: scope.organizationId,
-          teamId: scope.teamId,
-          deletedAt: null,
-        },
-        select: { id: true },
-      });
+    if (carrierId) {
+      const carrierResult = await db()
+        .from(T.Carrier)
+        .select("id")
+        .eq("id", carrierId)
+        .eq("organizationId", scope.organizationId)
+        .eq("teamId", scope.teamId)
+        .is("deletedAt", null)
+        .maybeSingle();
 
-      if (!carrier) {
+      if (carrierResult.error) {
+        throw new Error(carrierResult.error.message);
+      }
+
+      if (!carrierResult.data) {
         throw new ForbiddenError("You cannot filter by that carrier.");
       }
     }
   }
 }
 
-export function buildActivityWhere(
+export function applyActivityFilters<T extends FilterableQuery>(
+  query: T,
   scope: AccessScope,
   filters: ActivityFilters,
-): Prisma.DailyActivityWhereInput {
+): T {
   const normalized = normalizeActivityFilters(filters);
-  const where: Prisma.DailyActivityWhereInput = {
-    organizationId: scope.organizationId,
-    ...activityScopeFilter(scope),
-  };
+  let scopedQuery = query.eq("organizationId", scope.organizationId);
 
-  if (filters.dateFrom || filters.dateTo) {
-    where.activityDate = {};
+  const scopeFilter = activityScopeFilter(scope);
 
-    if (filters.dateFrom) {
-      where.activityDate.gte = parseActivityDate(filters.dateFrom);
-    }
+  if ("dispatcherId" in scopeFilter && scopeFilter.dispatcherId) {
+    scopedQuery = scopedQuery.eq("dispatcherId", scopeFilter.dispatcherId);
+  } else if ("teamId" in scopeFilter && scopeFilter.teamId) {
+    scopedQuery = scopedQuery.eq("teamId", scopeFilter.teamId);
+  } else if ("id" in scopeFilter && scopeFilter.id) {
+    scopedQuery = scopedQuery.eq("id", scopeFilter.id);
+  }
 
-    if (filters.dateTo) {
-      where.activityDate.lte = parseActivityDate(filters.dateTo);
-    }
+  if (normalized.activityId) {
+    return scopedQuery.eq("id", normalized.activityId) as T;
+  }
+
+  if (filters.dateFrom) {
+    scopedQuery = scopedQuery.gte(
+      "activityDate",
+      toDateOnly(parseActivityDate(filters.dateFrom)),
+    );
+  }
+
+  if (filters.dateTo) {
+    scopedQuery = scopedQuery.lte(
+      "activityDate",
+      toDateOnly(parseActivityDate(filters.dateTo)),
+    );
   }
 
   if (normalized.statuses.length === 1) {
-    where.status = normalized.statuses[0];
+    scopedQuery = scopedQuery.eq("status", normalized.statuses[0]);
   } else if (normalized.statuses.length > 1) {
-    where.status = { in: normalized.statuses };
+    scopedQuery = scopedQuery.in("status", normalized.statuses);
   } else if (normalized.statusKeys.length > 0) {
-    where.status = { in: [] };
+    scopedQuery = scopedQuery.in("status", []);
   }
 
   if (normalized.teamIds.length === 1) {
-    where.teamId = normalized.teamIds[0];
+    scopedQuery = scopedQuery.eq("teamId", normalized.teamIds[0]);
   } else if (normalized.teamIds.length > 1) {
-    where.teamId = { in: normalized.teamIds };
+    scopedQuery = scopedQuery.in("teamId", normalized.teamIds);
   }
 
   if (normalized.dispatcherIds.length === 1) {
-    where.dispatcherId = normalized.dispatcherIds[0];
+    scopedQuery = scopedQuery.eq("dispatcherId", normalized.dispatcherIds[0]);
   } else if (normalized.dispatcherIds.length > 1) {
-    where.dispatcherId = { in: normalized.dispatcherIds };
+    scopedQuery = scopedQuery.in("dispatcherId", normalized.dispatcherIds);
   }
 
   if (normalized.carrierIds.length === 1) {
-    where.carrierId = normalized.carrierIds[0];
+    scopedQuery = scopedQuery.eq("carrierId", normalized.carrierIds[0]);
   } else if (normalized.carrierIds.length > 1) {
-    where.carrierId = { in: normalized.carrierIds };
+    scopedQuery = scopedQuery.in("carrierId", normalized.carrierIds);
   }
 
   if (normalized.truckTypes.length === 1) {
-    where.truckTypeSnapshot = normalized.truckTypes[0];
+    scopedQuery = scopedQuery.eq("truckTypeSnapshot", normalized.truckTypes[0]);
   } else if (normalized.truckTypes.length > 1) {
-    where.truckTypeSnapshot = { in: normalized.truckTypes };
+    scopedQuery = scopedQuery.in("truckTypeSnapshot", normalized.truckTypes);
   }
 
-  return where;
+  if (normalized.q) {
+    scopedQuery = scopedQuery.or(
+      buildIlikeOr(
+        [
+          "carrierNameSnapshot",
+          "driverNameSnapshot",
+          "dispatcherNameSnapshot",
+          "teamNameSnapshot",
+          "origin",
+          "destination",
+          "reason",
+          "notes",
+        ],
+        normalized.q,
+      ),
+    );
+  }
+
+  return scopedQuery as T;
 }
 
-export function resolveDashboardDateRange(filters: ActivityFilters): {
+export function resolveDashboardDateRange(
+  filters: ActivityFilters,
+  timezone?: string,
+): {
   dateFrom: string;
   dateTo: string;
 } {
@@ -231,15 +301,12 @@ export function resolveDashboardDateRange(filters: ActivityFilters): {
     return { dateFrom: filters.dateFrom, dateTo: filters.dateTo };
   }
 
-  const now = new Date();
+  const todayKey = getDateKeyInTimeZone(new Date(), timezone ?? "UTC");
+  const now = new Date(`${todayKey}T00:00:00Z`);
   const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const end = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-  );
-
   return {
     dateFrom: formatActivityDate(start),
-    dateTo: formatActivityDate(end),
+    dateTo: todayKey,
   };
 }
 

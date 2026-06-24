@@ -26,7 +26,7 @@ export function AppToast({ message, onDismiss }: AppToastProps) {
   return (
     <div
       className={cn(
-        "fixed right-4 bottom-4 z-50 max-w-sm rounded-lg border bg-card px-4 py-3 text-sm shadow-lg",
+        "bg-card fixed right-4 bottom-4 z-50 max-w-sm rounded-lg border px-4 py-3 text-sm shadow-lg",
       )}
       role="status"
     >

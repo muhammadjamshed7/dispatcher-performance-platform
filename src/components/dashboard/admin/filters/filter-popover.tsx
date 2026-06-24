@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { Button } from "@/components/ui/button";
@@ -38,9 +38,25 @@ export function FilterPopover({
   onClose,
 }: FilterPopoverProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ top: 80, right: 16 });
+
+  useLayoutEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const anchorRect = anchorRef.current?.getBoundingClientRect();
+    setPosition({
+      top: anchorRect ? anchorRect.bottom + 8 : 80,
+      right: anchorRect
+        ? Math.max(16, window.innerWidth - anchorRect.right)
+        : 16,
+    });
+  }, [anchorRef, open, draftFilters]);
 
   const teamOptions = useMemo(
-    () => filterOptions.teams.map((team) => ({ value: team.id, label: team.name })),
+    () =>
+      filterOptions.teams.map((team) => ({ value: team.id, label: team.name })),
     [filterOptions.teams],
   );
 
@@ -82,7 +98,11 @@ export function FilterPopover({
 
       return true;
     });
-  }, [draftFilters.dispatcherIds, draftFilters.teamIds, filterOptions.carriers]);
+  }, [
+    draftFilters.dispatcherIds,
+    draftFilters.teamIds,
+    filterOptions.carriers,
+  ]);
 
   const carrierOptions = useMemo(
     () =>
@@ -122,12 +142,6 @@ export function FilterPopover({
     return null;
   }
 
-  const anchorRect = anchorRef.current?.getBoundingClientRect();
-  const top = anchorRect ? anchorRect.bottom + 8 : 80;
-  const right = anchorRect
-    ? Math.max(16, window.innerWidth - anchorRect.right)
-    : 16;
-
   function patchDraft(next: Partial<AdminDashboardFilterState>) {
     const merged = { ...draftFilters, ...next };
 
@@ -138,22 +152,32 @@ export function FilterPopover({
       const validDispatchers = filterOptions.dispatchers.filter((dispatcher) =>
         teamIds.length === 0 ? true : teamIds.includes(dispatcher.teamId),
       );
-      const validDispatcherIds = new Set(validDispatchers.map((dispatcher) => dispatcher.id));
+      const validDispatcherIds = new Set(
+        validDispatchers.map((dispatcher) => dispatcher.id),
+      );
 
       const validCarriers = filterOptions.carriers.filter((carrier) => {
-        if (teamIds.length > 0 && !teamIds.includes(carrier.teamId)) return false;
+        if (teamIds.length > 0 && !teamIds.includes(carrier.teamId))
+          return false;
         if (
           dispatcherIds.length > 0 &&
-          (!carrier.dispatcherId || !dispatcherIds.includes(carrier.dispatcherId))
+          (!carrier.dispatcherId ||
+            !dispatcherIds.includes(carrier.dispatcherId))
         ) {
           return false;
         }
         return true;
       });
-      const validCarrierIds = new Set(validCarriers.map((carrier) => carrier.id));
+      const validCarrierIds = new Set(
+        validCarriers.map((carrier) => carrier.id),
+      );
 
-      merged.dispatcherIds = dispatcherIds.filter((id) => validDispatcherIds.has(id));
-      merged.carrierIds = merged.carrierIds.filter((id) => validCarrierIds.has(id));
+      merged.dispatcherIds = dispatcherIds.filter((id) =>
+        validDispatcherIds.has(id),
+      );
+      merged.carrierIds = merged.carrierIds.filter((id) =>
+        validCarrierIds.has(id),
+      );
     }
 
     onDraftChange(merged);
@@ -162,13 +186,15 @@ export function FilterPopover({
   return createPortal(
     <div
       ref={panelRef}
-      style={{ top, right }}
+      style={{ top: position.top, right: position.right }}
       className={cn(
-        "fixed z-50 flex w-[min(400px,calc(100vw-2rem))] max-h-[70vh] flex-col overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-[0_20px_50px_rgba(15,23,42,0.15)]",
+        "fixed z-50 flex max-h-[70vh] w-[min(400px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-[0_20px_50px_rgba(15,23,42,0.15)]",
       )}
     >
       <div className="border-b border-[#F1F5F9] px-5 py-4">
-        <h2 className="text-base font-semibold text-[#0F172A]">Dashboard Filters</h2>
+        <h2 className="text-base font-semibold text-[#0F172A]">
+          Dashboard Filters
+        </h2>
         <p className="mt-1 text-xs text-[#64748B]">
           Choose date range and checkbox filters, then apply.
         </p>
@@ -214,7 +240,9 @@ export function FilterPopover({
           }))}
           selectedValues={draftFilters.truckTypes}
           onChange={(truckTypes) =>
-            patchDraft({ truckTypes: truckTypes as AdminDashboardFilterState["truckTypes"] })
+            patchDraft({
+              truckTypes: truckTypes as AdminDashboardFilterState["truckTypes"],
+            })
           }
         />
         <Separator className="bg-[#F1F5F9]" />

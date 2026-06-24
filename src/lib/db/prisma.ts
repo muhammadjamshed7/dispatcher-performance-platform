@@ -1,5 +1,10 @@
 import "server-only";
 
+/**
+ * Legacy Prisma client — kept for scripts and migrations only.
+ * Runtime API/services use Supabase via `@/lib/db/client`.
+ */
+
 import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
 import { PrismaClient } from "@/generated/prisma/client";

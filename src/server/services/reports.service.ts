@@ -1,7 +1,8 @@
 import "server-only";
 
 import { z } from "zod";
-import type { DailyActivity, LoadActivityStatus, Prisma } from "@/generated/prisma/client";
+import { format as formatDate } from "date-fns";
+import type { DailyActivity, LoadActivityStatus } from "@/lib/db/types";
 import { ValidationError } from "@/lib/errors/validation-error";
 import {
   CANCELLED,
@@ -10,6 +11,8 @@ import {
   NOT_WORKING,
   STATUSES,
 } from "@/lib/constants/statuses";
+import { computeAverageRatePerMile } from "@/lib/utils/compute-finance-metrics";
+import { sanitizeFilterId } from "@/lib/constants/filters";
 import { TRUCK_TYPES } from "@/lib/constants/truck-types";
 import {
   CUSTOM,
@@ -20,7 +23,15 @@ import {
   WEEKLY,
   type ReportPeriod,
 } from "@/lib/constants/report-periods";
-import { db } from "@/lib/db/prisma";
+import { T, db } from "@/lib/db/client";
+import { applyScopeWhere, asFilterable, type FilterableQuery } from "@/lib/db/query";
+import {
+  assertDb,
+  assertDbVoid,
+  createId,
+  decimalToNumber,
+  nowIso,
+} from "@/lib/db/utils";
 import type {
   CarrierReportRow,
   DispatcherReportRow,
@@ -31,8 +42,13 @@ import type {
 import type { AccessScope, AuthContextUser } from "@/server/auth/types";
 import { mapDailyActivity } from "@/server/mappers";
 import { writeAuditLog } from "@/server/services/audit.service";
-import { assertFilterAccess } from "@/server/utils/activity-filters";
+import {
+  assertFilterAccess,
+  formatActivityDate,
+} from "@/server/utils/activity-filters";
 import { activityScopeFilter } from "@/server/utils/scope-filters";
+import { getOrganizationPreferences } from "@/server/services/settings.service";
+import { getDateKeyInTimeZone } from "@/lib/utils/resolve-date-range";
 
 const reportFiltersSchema = z.object({
   dateFrom: z.string().optional(),
@@ -46,16 +62,16 @@ const reportFiltersSchema = z.object({
 
 type ReportFilters = z.infer<typeof reportFiltersSchema>;
 
-function decimalToNumber(value: { toNumber(): number } | null | undefined): number {
-  if (!value) {
-    return 0;
-  }
-
-  return value.toNumber();
+function toAmount(value: string | null | undefined): number {
+  return decimalToNumber(value) ?? 0;
 }
 
-function startOfDay(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+function unwrapRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  return Array.isArray(value) ? (value[0] ?? null) : value;
 }
 
 function parseDate(dateStr: string): Date {
@@ -71,15 +87,9 @@ function parseDate(dateStr: string): Date {
 function resolveDateRange(
   period: ReportPeriod,
   filters: ReportFilters,
+  timezone: string,
 ): { start: Date; end: Date } {
-  if (filters.dateFrom && filters.dateTo) {
-    return {
-      start: parseDate(filters.dateFrom),
-      end: parseDate(filters.dateTo),
-    };
-  }
-
-  const today = startOfDay(new Date());
+  const today = parseDate(getDateKeyInTimeZone(new Date(), timezone));
 
   switch (period) {
     case DAILY:
@@ -91,7 +101,9 @@ function resolveDateRange(
     }
     case MONTHLY:
       return {
-        start: new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1)),
+        start: new Date(
+          Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1),
+        ),
         end: today,
       };
     case HISTORICAL:
@@ -101,92 +113,118 @@ function resolveDateRange(
       };
     case CUSTOM: {
       if (!filters.dateFrom || !filters.dateTo) {
-        throw new ValidationError("Custom reports require dateFrom and dateTo.");
+        throw new ValidationError(
+          "Custom reports require dateFrom and dateTo.",
+        );
       }
 
-      return {
+      const range = {
         start: parseDate(filters.dateFrom),
         end: parseDate(filters.dateTo),
       };
+
+      if (range.start > range.end) {
+        throw new ValidationError(
+          "Report start date cannot be after end date.",
+        );
+      }
+
+      return range;
     }
     default:
       throw new ValidationError("Unsupported report period.");
   }
 }
 
-
-function buildActivityWhere(
+function applyReportActivityFilters<T extends FilterableQuery>(
+  query: T,
   scope: AccessScope,
   range: { start: Date; end: Date },
   filters: ReportFilters,
-): Prisma.DailyActivityWhereInput {
-  const where: Prisma.DailyActivityWhereInput = {
-    organizationId: scope.organizationId,
-    ...activityScopeFilter(scope),
-    activityDate: {
-      gte: range.start,
-      lte: range.end,
-    },
-  };
+): T {
+  let q: FilterableQuery = query
+    .eq("organizationId", scope.organizationId)
+    .gte("activityDate", formatActivityDate(range.start))
+    .lte("activityDate", formatActivityDate(range.end));
+
+  q = applyScopeWhere(q, activityScopeFilter(scope));
 
   if (filters.status) {
-    where.status = filters.status;
+    q = q.eq("status", filters.status);
   }
 
-  if (filters.teamId) {
-    where.teamId = filters.teamId;
+  const teamId = sanitizeFilterId(filters.teamId);
+  const dispatcherId = sanitizeFilterId(filters.dispatcherId);
+  const carrierId = sanitizeFilterId(filters.carrierId);
+
+  if (teamId) {
+    q = q.eq("teamId", teamId);
   }
 
-  if (filters.dispatcherId) {
-    where.dispatcherId = filters.dispatcherId;
+  if (dispatcherId) {
+    q = q.eq("dispatcherId", dispatcherId);
   }
 
-  if (filters.carrierId) {
-    where.carrierId = filters.carrierId;
+  if (carrierId) {
+    q = q.eq("carrierId", carrierId);
   }
 
   if (filters.truckType) {
-    where.truckTypeSnapshot = filters.truckType;
+    q = q.eq("truckTypeSnapshot", filters.truckType);
   }
 
-  return where;
+  return q as T;
 }
 
-function countByStatus(activities: DailyActivity[], status: LoadActivityStatus): number {
+function countByStatus(
+  activities: DailyActivity[],
+  status: LoadActivityStatus,
+): number {
   return activities.filter((activity) => activity.status === status).length;
 }
 
 function averageRatePerMile(activities: DailyActivity[]): number | null {
-  const rates = activities
-    .filter((activity) => activity.status === DELIVERED)
-    .map((activity) => decimalToNumber(activity.ratePerMile))
-    .filter((value) => value > 0);
-
-  if (rates.length === 0) {
-    return null;
-  }
-
-  const average = rates.reduce((sum, value) => sum + value, 0) / rates.length;
-  return Math.round(average * 100) / 100;
+  return computeAverageRatePerMile(
+    activities.map((activity) => ({
+      status: activity.status,
+      loadAmount: toAmount(activity.loadAmount),
+      totalMiles: toAmount(activity.totalMiles),
+    })),
+  );
 }
 
-function buildSummary(activities: DailyActivity[], activeCarriers: number): ReportSummary {
-  const delivered = activities.filter((activity) => activity.status === DELIVERED);
+function buildSummary(
+  activities: DailyActivity[],
+  activeCarriers: number,
+): ReportSummary {
+  const delivered = activities.filter(
+    (activity) => activity.status === DELIVERED,
+  );
 
   return {
-    revenue: Math.round(
-      delivered.reduce((sum, activity) => sum + decimalToNumber(activity.loadAmount), 0) * 100,
-    ) / 100,
-    dispatchFees: Math.round(
-      delivered.reduce((sum, activity) => sum + decimalToNumber(activity.dispatchFee), 0) * 100,
-    ) / 100,
+    revenue:
+      Math.round(
+        delivered.reduce(
+          (sum, activity) => sum + toAmount(activity.loadAmount),
+          0,
+        ) * 100,
+      ) / 100,
+    dispatchFees:
+      Math.round(
+        delivered.reduce(
+          (sum, activity) => sum + toAmount(activity.dispatchFee),
+          0,
+        ) * 100,
+      ) / 100,
     deliveredLoads: delivered.length,
     cancelledLoads: countByStatus(activities, CANCELLED),
     activeCarriers,
   };
 }
 
-function buildDispatcherRows(activities: DailyActivity[]): DispatcherReportRow[] {
+function buildDispatcherRows(
+  activities: DailyActivity[],
+): DispatcherReportRow[] {
   const grouped = new Map<
     string,
     {
@@ -216,10 +254,10 @@ function buildDispatcherRows(activities: DailyActivity[]): DispatcherReportRow[]
       const total = group.activities.length;
       const revenue = group.activities
         .filter((activity) => activity.status === DELIVERED)
-        .reduce((sum, activity) => sum + decimalToNumber(activity.loadAmount), 0);
+        .reduce((sum, activity) => sum + toAmount(activity.loadAmount), 0);
       const dispatchFees = group.activities
         .filter((activity) => activity.status === DELIVERED)
-        .reduce((sum, activity) => sum + decimalToNumber(activity.dispatchFee), 0);
+        .reduce((sum, activity) => sum + toAmount(activity.dispatchFee), 0);
       const actionable = delivered + cancelled + notBooked;
 
       return {
@@ -277,10 +315,10 @@ function buildCarrierRows(activities: DailyActivity[]): CarrierReportRow[] {
       const total = group.activities.length;
       const revenue = group.activities
         .filter((activity) => activity.status === DELIVERED)
-        .reduce((sum, activity) => sum + decimalToNumber(activity.loadAmount), 0);
+        .reduce((sum, activity) => sum + toAmount(activity.loadAmount), 0);
       const dispatchFees = group.activities
         .filter((activity) => activity.status === DELIVERED)
-        .reduce((sum, activity) => sum + decimalToNumber(activity.dispatchFee), 0);
+        .reduce((sum, activity) => sum + toAmount(activity.dispatchFee), 0);
 
       return {
         id,
@@ -336,10 +374,10 @@ function buildTeamRows(activities: DailyActivity[]): TeamReportRow[] {
     const total = group.activities.length;
     const revenue = group.activities
       .filter((activity) => activity.status === DELIVERED)
-      .reduce((sum, activity) => sum + decimalToNumber(activity.loadAmount), 0);
+      .reduce((sum, activity) => sum + toAmount(activity.loadAmount), 0);
     const dispatchFees = group.activities
       .filter((activity) => activity.status === DELIVERED)
-      .reduce((sum, activity) => sum + decimalToNumber(activity.dispatchFee), 0);
+      .reduce((sum, activity) => sum + toAmount(activity.dispatchFee), 0);
 
     return {
       id,
@@ -352,7 +390,8 @@ function buildTeamRows(activities: DailyActivity[]): TeamReportRow[] {
       revenue: Math.round(revenue * 100) / 100,
       dispatchFees: Math.round(dispatchFees * 100) / 100,
       averageRatePerMile: averageRatePerMile(group.activities),
-      cancellationRate: total > 0 ? Math.round((cancelled / total) * 1000) / 10 : 0,
+      cancellationRate:
+        total > 0 ? Math.round((cancelled / total) * 1000) / 10 : 0,
       teamRank: 0,
     };
   });
@@ -370,13 +409,28 @@ async function loadReportActivities(
   const parsedPeriod = z.enum(REPORT_PERIODS).parse(period);
   const parsedFilters = reportFiltersSchema.parse(filters);
   await assertFilterAccess(scope, parsedFilters);
+  const preferences = await getOrganizationPreferences(scope.organizationId);
 
-  const range = resolveDateRange(parsedPeriod, parsedFilters);
+  const range = resolveDateRange(
+    parsedPeriod,
+    parsedFilters,
+    preferences.timezone,
+  );
 
-  return db.dailyActivity.findMany({
-    where: buildActivityWhere(scope, range, parsedFilters),
-    orderBy: [{ activityDate: "desc" }, { createdAt: "desc" }],
-  });
+  const query = applyReportActivityFilters(
+    asFilterable(
+      db()
+        .from(T.DailyActivity)
+        .select("*")
+        .order("activityDate", { ascending: false })
+        .order("createdAt", { ascending: false }),
+    ),
+    scope,
+    range,
+    parsedFilters,
+  );
+
+  return (assertDb(await query) ?? []) as DailyActivity[];
 }
 
 export async function getReportBundle(
@@ -388,21 +442,39 @@ export async function getReportBundle(
   const carrierIds = new Set(activities.map((activity) => activity.carrierId));
 
   const teamIds = [...new Set(activities.map((activity) => activity.teamId))];
-  const teams = teamIds.length
-    ? await db.team.findMany({
-        where: { id: { in: teamIds }, organizationId: scope.organizationId },
-        include: { teamLead: { select: { fullName: true } } },
-      })
-    : [];
+  const teams =
+    teamIds.length > 0
+      ? ((assertDb(
+          await db()
+            .from(T.Team)
+            .select("id, teamLead:User!Team_teamLeadUserId_fkey(fullName)")
+            .in("id", teamIds)
+            .eq("organizationId", scope.organizationId),
+        ) ?? []) as Array<{
+          id: string;
+          teamLead: { fullName: string } | Array<{ fullName: string }> | null;
+        }>)
+      : [];
 
   const teamLeadById = new Map<string, string>(
-    teams.map((team) => [team.id, team.teamLead?.fullName ?? "Unassigned"]),
+    teams.map((team) => [
+      team.id,
+      unwrapRelation(team.teamLead)?.fullName ?? "Unassigned",
+    ]),
   );
 
-  const mcNumbers = await db.carrier.findMany({
-    where: { id: { in: [...carrierIds] }, organizationId: scope.organizationId },
-    select: { id: true, mcNumber: true },
-  });
+  const carrierIdList = [...carrierIds];
+  const mcNumbers =
+    carrierIdList.length > 0
+      ? ((assertDb(
+          await db()
+            .from(T.Carrier)
+            .select("id, mcNumber")
+            .in("id", carrierIdList)
+            .eq("organizationId", scope.organizationId),
+        ) ?? []) as Array<{ id: string; mcNumber: string }>)
+      : [];
+
   const mcByCarrierId = new Map<string, string>(
     mcNumbers.map((carrier) => [carrier.id, carrier.mcNumber]),
   );
@@ -453,17 +525,24 @@ export async function exportReportCsv(
   const parsedPeriod = z.enum(REPORT_PERIODS).parse(period);
   const parsedFilters = reportFiltersSchema.parse(filters);
 
-  const settings = await db.organizationSettings.findUnique({
-    where: { organizationId: scope.organizationId },
-  });
+  const settingsResult = await db()
+    .from(T.OrganizationSettings)
+    .select("csvMaxRows, csvIncludeHeaders, csvFileNamePrefix, csvDateFormat")
+    .eq("organizationId", scope.organizationId)
+    .maybeSingle();
+
+  const settings = settingsResult.data;
 
   const bundle = await getReportBundle(scope, parsedPeriod, parsedFilters);
   const maxRows = settings?.csvMaxRows ?? 10000;
   const includeHeaders = settings?.csvIncludeHeaders ?? true;
   const prefix = settings?.csvFileNamePrefix ?? "dpp-report";
+  const csvDateFormat = settings?.csvDateFormat ?? "yyyy-MM-dd";
 
   if (bundle.daily.length > maxRows) {
-    throw new ValidationError(`Export exceeds maximum row limit of ${maxRows}.`);
+    throw new ValidationError(
+      `Export exceeds maximum row limit of ${maxRows}.`,
+    );
   }
 
   const headers = [
@@ -485,10 +564,13 @@ export async function exportReportCsv(
   ];
 
   const dataRows = bundle.daily.map((row) => {
-    const mapped = row as typeof row & { driverName?: string; totalMiles?: number | null };
+    const mapped = row as typeof row & {
+      driverName?: string;
+      totalMiles?: number | null;
+    };
 
     return [
-      mapped.date,
+      formatDate(new Date(`${mapped.date}T12:00:00Z`), csvDateFormat),
       mapped.carrierName,
       mapped.driverName ?? "",
       mapped.dispatcherName,
@@ -509,8 +591,12 @@ export async function exportReportCsv(
   const csv = buildCsv(includeHeaders ? [headers, ...dataRows] : dataRows);
   const fileName = `${prefix}-${parsedPeriod.toLowerCase()}-${new Date().toISOString().slice(0, 10)}.csv`;
 
-  const reportExport = await db.reportExport.create({
-    data: {
+  const exportId = createId();
+  const completedAt = nowIso();
+
+  assertDbVoid(
+    await db().from(T.ReportExport).insert({
+      id: exportId,
       organizationId: scope.organizationId,
       requestedById: actor.id,
       reportType: "daily-activities",
@@ -519,22 +605,24 @@ export async function exportReportCsv(
       status: "COMPLETED",
       fileName,
       rowCount: bundle.daily.length,
-      completedAt: new Date(),
-    },
-  });
+      completedAt,
+      createdAt: nowIso(),
+      errorMessage: null,
+    }),
+  );
 
   await writeAuditLog({
     organizationId: scope.organizationId,
     actorUserId: actor.id,
     action: "REPORT_EXPORTED",
     entityType: "ReportExport",
-    entityId: reportExport.id,
+    entityId: exportId,
     metadata: { period: parsedPeriod, rowCount: bundle.daily.length },
   });
 
   return {
     csv,
-    exportId: reportExport.id,
+    exportId,
     fileName,
   };
 }

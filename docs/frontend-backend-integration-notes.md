@@ -7,6 +7,7 @@ Short reference for replacing mock frontend data with Supabase/backend services.
 **Replace:** `src/lib/auth/mock-session.ts`, `MockSessionProvider`, login/register forms.
 
 **Required session fields:**
+
 - `userId` (Supabase auth user id)
 - `fullName`, `email`
 - `role`: `ADMIN` | `TEAM_LEAD` | `DISPATCHER`
@@ -15,6 +16,7 @@ Short reference for replacing mock frontend data with Supabase/backend services.
 - `dispatcherId` (nullable, for dispatcher profile link)
 
 **Pages:**
+
 - `/admin/login`, `/team-lead/login`, `/dispatcher/login`
 - `/dispatcher/register`
 - `/session-expired` (placeholder until real expiry handling)
@@ -28,6 +30,7 @@ Short reference for replacing mock frontend data with Supabase/backend services.
 **Replace:** `mockPendingUserRequests` in `src/lib/mock-data.ts`, `/admin/users/requests` mock modals.
 
 **Required fields per request:**
+
 - `id`, `fullName`, `email`, `phoneNumber`
 - `requestedRole` (`TEAM_LEAD` | `DISPATCHER`)
 - `preferredTeam`, `notes`, `status`, `submittedAt`
@@ -38,21 +41,21 @@ Short reference for replacing mock frontend data with Supabase/backend services.
 
 ## Pages Needing Backend Data
 
-| Area | Routes | Mock source |
-|------|--------|-------------|
-| Admin dashboard | `/admin/dashboard` | `mockAdminMetrics`, `mockActivities` |
-| Team Lead dashboard | `/team-lead/dashboard` | `mockTeamLeadMetrics`, scoped filters |
-| Dispatcher dashboard | `/dispatcher/dashboard` | `mockDispatcherMetrics`, scoped carriers/activities |
-| Teams | `/admin/teams` | `mockTeams` |
-| Dispatchers | `/admin/*`, `/team-lead/dispatchers` | `mockDispatchers` |
-| Carriers | all role carrier routes | `mockCarriers` |
-| Activities | all role activity routes | `mockActivities` |
-| Rankings | `/admin/rankings`, `/team-lead/rankings` | `mock*Rankings` |
-| Reports | `/admin/reports`, `/team-lead/reports` | `mockDailyReport`, etc. |
-| Settings | `/admin/settings` | `mockAppSettings` |
-| User requests | `/admin/users/requests` | `mockPendingUserRequests` |
-| Performance | `/dispatcher/performance` | `mockDailyReport.dispatchers`, rankings |
-| Account | `/*/account` | mock session + user profile |
+| Area                 | Routes                                   | Mock source                                         |
+| -------------------- | ---------------------------------------- | --------------------------------------------------- |
+| Admin dashboard      | `/admin/dashboard`                       | `mockAdminMetrics`, `mockActivities`                |
+| Team Lead dashboard  | `/team-lead/dashboard`                   | `mockTeamLeadMetrics`, scoped filters               |
+| Dispatcher dashboard | `/dispatcher/dashboard`                  | `mockDispatcherMetrics`, scoped carriers/activities |
+| Teams                | `/admin/teams`                           | `mockTeams`                                         |
+| Dispatchers          | `/admin/*`, `/team-lead/dispatchers`     | `mockDispatchers`                                   |
+| Carriers             | all role carrier routes                  | `mockCarriers`                                      |
+| Activities           | all role activity routes                 | `mockActivities`                                    |
+| Rankings             | `/admin/rankings`, `/team-lead/rankings` | `mock*Rankings`                                     |
+| Reports              | `/admin/reports`, `/team-lead/reports`   | `mockDailyReport`, etc.                             |
+| Settings             | `/admin/settings`                        | `mockAppSettings`                                   |
+| User requests        | `/admin/users/requests`                  | `mockPendingUserRequests`                           |
+| Performance          | `/dispatcher/performance`                | `mockDailyReport.dispatchers`, rankings             |
+| Account              | `/*/account`                             | mock session + user profile                         |
 
 ---
 

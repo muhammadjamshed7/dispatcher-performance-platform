@@ -1,13 +1,14 @@
 import "server-only";
 
 import { z } from "zod";
-import type { TeamStatus } from "@/generated/prisma/client";
+import { T, db } from "@/lib/db/client";
+import type { Team, TeamStatus } from "@/lib/db/types";
+import { assertDb, createId, nowIso } from "@/lib/db/utils";
 import { ForbiddenError } from "@/lib/errors/forbidden-error";
 import { NotFoundError } from "@/lib/errors/not-found-error";
 import { ValidationError } from "@/lib/errors/validation-error";
 import { ADMIN, TEAM_LEAD } from "@/lib/constants/roles";
 import { TEAM_STATUSES } from "@/lib/constants/team-statuses";
-import { db } from "@/lib/db/prisma";
 import type { Team as TeamDto } from "@/lib/types";
 import type { AccessScope, AuthContextUser } from "@/server/auth/types";
 import { mapTeam } from "@/server/mappers";
@@ -25,45 +26,139 @@ const updateTeamInputSchema = createTeamInputSchema.partial();
 type CreateTeamInput = z.infer<typeof createTeamInputSchema>;
 type UpdateTeamInput = z.infer<typeof updateTeamInputSchema>;
 
+import { TEAM_WITH_LEAD } from "@/lib/db/embeds";
+
+type TeamRow = Team & { teamLead?: { fullName: string } | null };
+
 function requireAdmin(scope: AccessScope): void {
   if (!scope.isCompanyWide) {
     throw new ForbiddenError("Admin access is required.");
   }
 }
 
-const teamInclude = {
-  teamLead: { select: { fullName: true } },
-  _count: { select: { dispatchers: true, carriers: true } },
-} as const;
+function applyTeamScopeQuery<
+  T extends {
+    eq: (col: string, val: string) => T;
+    is: (col: string, val: null) => T;
+  },
+>(query: T, scope: AccessScope): T {
+  const filter = teamScopeFilter(scope);
+  let scopedQuery = query
+    .eq("organizationId", scope.organizationId)
+    .is("deletedAt", null);
 
-export async function listTeams(scope: AccessScope): Promise<TeamDto[]> {
-  const teams = await db.team.findMany({
-    where: {
-      organizationId: scope.organizationId,
-      ...teamScopeFilter(scope),
-    },
-    include: teamInclude,
-    orderBy: { name: "asc" },
-  });
+  if ("id" in filter && filter.id) {
+    scopedQuery = scopedQuery.eq("id", filter.id);
+  }
 
-  return teams.map(mapTeam);
+  return scopedQuery;
 }
 
-export async function getTeam(scope: AccessScope, id: string): Promise<TeamDto> {
-  const team = await db.team.findFirst({
-    where: {
-      id,
-      organizationId: scope.organizationId,
-      ...teamScopeFilter(scope),
-    },
-    include: teamInclude,
-  });
+async function fetchTeamCounts(
+  organizationId: string,
+  teamIds: string[],
+): Promise<Map<string, { dispatchers: number; carriers: number }>> {
+  const counts = new Map<string, { dispatchers: number; carriers: number }>();
 
-  if (!team) {
+  for (const teamId of teamIds) {
+    counts.set(teamId, { dispatchers: 0, carriers: 0 });
+  }
+
+  if (teamIds.length === 0) {
+    return counts;
+  }
+
+  const [dispatchersResult, carriersResult] = await Promise.all([
+    db()
+      .from(T.Dispatcher)
+      .select("teamId")
+      .eq("organizationId", organizationId)
+      .is("deletedAt", null)
+      .in("teamId", teamIds),
+    db()
+      .from(T.Carrier)
+      .select("teamId")
+      .eq("organizationId", organizationId)
+      .is("deletedAt", null)
+      .in("teamId", teamIds),
+  ]);
+
+  for (const row of assertDb(dispatchersResult) ?? []) {
+    if (!row.teamId) {
+      continue;
+    }
+
+    const entry = counts.get(row.teamId);
+    if (entry) {
+      entry.dispatchers += 1;
+    }
+  }
+
+  for (const row of assertDb(carriersResult) ?? []) {
+    if (!row.teamId) {
+      continue;
+    }
+
+    const entry = counts.get(row.teamId);
+    if (entry) {
+      entry.carriers += 1;
+    }
+  }
+
+  return counts;
+}
+
+async function enrichTeamsWithCounts(
+  organizationId: string,
+  teams: TeamRow[],
+): Promise<
+  Array<TeamRow & { _count: { dispatchers: number; carriers: number } }>
+> {
+  const counts = await fetchTeamCounts(
+    organizationId,
+    teams.map((team) => team.id),
+  );
+
+  return teams.map((team) => ({
+    ...team,
+    _count: counts.get(team.id) ?? { dispatchers: 0, carriers: 0 },
+  }));
+}
+
+export async function listTeams(scope: AccessScope): Promise<TeamDto[]> {
+  const result = await applyTeamScopeQuery(
+    db().from(T.Team).select(TEAM_WITH_LEAD).order("name", { ascending: true }),
+    scope,
+  );
+
+  const teams = assertDb(result) as TeamRow[];
+  const enriched = await enrichTeamsWithCounts(scope.organizationId, teams);
+
+  return enriched.map(mapTeam);
+}
+
+export async function getTeam(
+  scope: AccessScope,
+  id: string,
+): Promise<TeamDto> {
+  const result = await applyTeamScopeQuery(
+    db().from(T.Team).select(TEAM_WITH_LEAD).eq("id", id),
+    scope,
+  ).maybeSingle();
+
+  if (result.error) {
+    throw new Error(result.error.message);
+  }
+
+  if (!result.data) {
     throw new NotFoundError("Team not found.");
   }
 
-  return mapTeam(team);
+  const [enriched] = await enrichTeamsWithCounts(scope.organizationId, [
+    result.data as TeamRow,
+  ]);
+
+  return mapTeam(enriched);
 }
 
 async function validateTeamLead(
@@ -74,17 +169,25 @@ async function validateTeamLead(
     return;
   }
 
-  const lead = await db.user.findFirst({
-    where: {
-      id: teamLeadUserId,
-      organizationId,
-      deletedAt: null,
-      status: "ACTIVE",
-    },
-  });
+  const result = await db()
+    .from(T.User)
+    .select("id, role")
+    .eq("id", teamLeadUserId)
+    .eq("organizationId", organizationId)
+    .is("deletedAt", null)
+    .eq("status", "ACTIVE")
+    .maybeSingle();
+
+  if (result.error) {
+    throw new Error(result.error.message);
+  }
+
+  const lead = result.data;
 
   if (!lead || (lead.role !== TEAM_LEAD && lead.role !== ADMIN)) {
-    throw new ValidationError("Team lead must be an active team lead or admin user.");
+    throw new ValidationError(
+      "Team lead must be an active team lead or admin user.",
+    );
   }
 }
 
@@ -98,27 +201,34 @@ export async function createTeam(
 
   await validateTeamLead(scope.organizationId, parsed.teamLeadUserId);
 
-  const existing = await db.team.findFirst({
-    where: {
-      organizationId: scope.organizationId,
-      name: parsed.name,
-      deletedAt: null,
-    },
-  });
+  const existingResult = await db()
+    .from(T.Team)
+    .select("id")
+    .eq("organizationId", scope.organizationId)
+    .eq("name", parsed.name)
+    .is("deletedAt", null)
+    .maybeSingle();
 
-  if (existing) {
+  if (existingResult.data) {
     throw new ValidationError("A team with this name already exists.");
   }
 
-  const team = await db.team.create({
-    data: {
+  const insertResult = await db()
+    .from(T.Team)
+    .insert({
+      id: createId(),
       organizationId: scope.organizationId,
       name: parsed.name,
       teamLeadUserId: parsed.teamLeadUserId ?? null,
       status: parsed.status as TeamStatus,
-    },
-    include: teamInclude,
-  });
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    })
+    .select(TEAM_WITH_LEAD)
+    .single();
+
+  const team = assertDb(insertResult) as TeamRow;
+  const [enriched] = await enrichTeamsWithCounts(scope.organizationId, [team]);
 
   await writeAuditLog({
     organizationId: scope.organizationId,
@@ -129,7 +239,7 @@ export async function createTeam(
     metadata: { name: team.name },
   });
 
-  return mapTeam(team);
+  return mapTeam(enriched);
 }
 
 export async function updateTeam(
@@ -141,16 +251,56 @@ export async function updateTeam(
   requireAdmin(scope);
   const parsed = updateTeamInputSchema.parse(input);
 
-  const existing = await db.team.findFirst({
-    where: {
-      id,
-      organizationId: scope.organizationId,
-      deletedAt: null,
-    },
-  });
+  const existingResult = await db()
+    .from(T.Team)
+    .select("id, name")
+    .eq("id", id)
+    .eq("organizationId", scope.organizationId)
+    .is("deletedAt", null)
+    .maybeSingle();
+
+  const existing = existingResult.data;
 
   if (!existing) {
     throw new NotFoundError("Team not found.");
+  }
+
+  if (parsed.status === "INACTIVE") {
+    const [dispatcherResult, carrierResult] = await Promise.all([
+      db()
+        .from(T.Dispatcher)
+        .select("id")
+        .eq("organizationId", scope.organizationId)
+        .eq("teamId", id)
+        .eq("status", "ACTIVE")
+        .is("deletedAt", null)
+        .limit(1),
+      db()
+        .from(T.Carrier)
+        .select("id")
+        .eq("organizationId", scope.organizationId)
+        .eq("teamId", id)
+        .eq("status", "ACTIVE")
+        .is("deletedAt", null)
+        .limit(1),
+    ]);
+
+    if (dispatcherResult.error) {
+      throw new Error(dispatcherResult.error.message);
+    }
+
+    if (carrierResult.error) {
+      throw new Error(carrierResult.error.message);
+    }
+
+    if (
+      (dispatcherResult.data ?? []).length > 0 ||
+      (carrierResult.data ?? []).length > 0
+    ) {
+      throw new ValidationError(
+        "Deactivate or reassign this team's active dispatchers and carriers first.",
+      );
+    }
   }
 
   if (parsed.teamLeadUserId !== undefined) {
@@ -158,31 +308,38 @@ export async function updateTeam(
   }
 
   if (parsed.name && parsed.name !== existing.name) {
-    const duplicate = await db.team.findFirst({
-      where: {
-        organizationId: scope.organizationId,
-        name: parsed.name,
-        deletedAt: null,
-        NOT: { id },
-      },
-    });
+    const duplicateResult = await db()
+      .from(T.Team)
+      .select("id")
+      .eq("organizationId", scope.organizationId)
+      .eq("name", parsed.name)
+      .is("deletedAt", null)
+      .neq("id", id)
+      .maybeSingle();
 
-    if (duplicate) {
+    if (duplicateResult.data) {
       throw new ValidationError("A team with this name already exists.");
     }
   }
 
-  const team = await db.team.update({
-    where: { id },
-    data: {
+  const updateResult = await db()
+    .from(T.Team)
+    .update({
       ...(parsed.name !== undefined ? { name: parsed.name } : {}),
       ...(parsed.teamLeadUserId !== undefined
         ? { teamLeadUserId: parsed.teamLeadUserId || null }
         : {}),
-      ...(parsed.status !== undefined ? { status: parsed.status as TeamStatus } : {}),
-    },
-    include: teamInclude,
-  });
+      ...(parsed.status !== undefined
+        ? { status: parsed.status as TeamStatus }
+        : {}),
+      updatedAt: nowIso(),
+    })
+    .eq("id", id)
+    .select(TEAM_WITH_LEAD)
+    .single();
+
+  const team = assertDb(updateResult) as TeamRow;
+  const [enriched] = await enrichTeamsWithCounts(scope.organizationId, [team]);
 
   await writeAuditLog({
     organizationId: scope.organizationId,
@@ -193,7 +350,7 @@ export async function updateTeam(
     metadata: parsed,
   });
 
-  return mapTeam(team);
+  return mapTeam(enriched);
 }
 
 export async function deactivateTeam(
@@ -203,26 +360,31 @@ export async function deactivateTeam(
 ): Promise<TeamDto> {
   requireAdmin(scope);
 
-  const existing = await db.team.findFirst({
-    where: {
-      id,
-      organizationId: scope.organizationId,
-      deletedAt: null,
-    },
-  });
+  const existingResult = await db()
+    .from(T.Team)
+    .select("id")
+    .eq("id", id)
+    .eq("organizationId", scope.organizationId)
+    .is("deletedAt", null)
+    .maybeSingle();
 
-  if (!existing) {
+  if (!existingResult.data) {
     throw new NotFoundError("Team not found.");
   }
 
-  const team = await db.team.update({
-    where: { id },
-    data: {
+  const updateResult = await db()
+    .from(T.Team)
+    .update({
       status: "INACTIVE",
-      deletedAt: new Date(),
-    },
-    include: teamInclude,
-  });
+      deletedAt: null,
+      updatedAt: nowIso(),
+    })
+    .eq("id", id)
+    .select(TEAM_WITH_LEAD)
+    .single();
+
+  const team = assertDb(updateResult) as TeamRow;
+  const [enriched] = await enrichTeamsWithCounts(scope.organizationId, [team]);
 
   await writeAuditLog({
     organizationId: scope.organizationId,
@@ -232,5 +394,5 @@ export async function deactivateTeam(
     entityId: team.id,
   });
 
-  return mapTeam(team);
+  return mapTeam(enriched);
 }

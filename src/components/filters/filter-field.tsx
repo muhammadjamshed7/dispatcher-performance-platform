@@ -9,7 +9,7 @@ type FilterFieldProps = {
 export function FilterField({ label, children, className }: FilterFieldProps) {
   return (
     <div className={className ?? "min-w-[140px] flex-1 space-y-1"}>
-      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-muted-foreground text-xs">{label}</p>
       {children}
     </div>
   );

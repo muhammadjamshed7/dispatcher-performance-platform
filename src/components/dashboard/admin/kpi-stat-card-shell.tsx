@@ -52,12 +52,14 @@ export function KpiStatCardShell({
           </div>
           <div className="min-w-0">
             <p className="text-sm font-medium text-[#64748B]">{label}</p>
-            <p className="mt-1 text-[28px] font-semibold leading-none tracking-tight text-[#0F172A]">
+            <p className="mt-1 text-[28px] leading-none font-semibold tracking-tight text-[#0F172A]">
               {value}
             </p>
             <p className="mt-2 text-xs text-[#64748B]">{helper}</p>
             {growth ? (
-              <p className="mt-2 text-xs font-medium text-[#22C55E]">{growth}</p>
+              <p className="mt-2 text-xs font-medium text-[#22C55E]">
+                {growth}
+              </p>
             ) : null}
           </div>
         </div>
@@ -106,7 +108,11 @@ export function KpiChartLegend({
   );
 }
 
-export function KpiChartEmptyState({ message = "No data available" }: { message?: string }) {
+export function KpiChartEmptyState({
+  message = "No data available",
+}: {
+  message?: string;
+}) {
   return (
     <div className="flex min-h-[240px] flex-1 items-center justify-center rounded-xl border border-dashed border-[#E2E8F0] bg-[#F8FAFC] text-sm text-[#64748B]">
       {message}

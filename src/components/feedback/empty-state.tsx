@@ -22,10 +22,12 @@ export function EmptyState({
   return (
     <Card>
       <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center">
-        {icon ?? <Inbox className="size-10 text-muted-foreground" />}
+        {icon ?? <Inbox className="text-muted-foreground size-10" />}
         <div className="space-y-1">
           <h3 className="text-base font-medium">{title}</h3>
-          <p className="max-w-md text-sm text-muted-foreground">{description}</p>
+          <p className="text-muted-foreground max-w-md text-sm">
+            {description}
+          </p>
         </div>
         {actionLabel ? (
           <Button

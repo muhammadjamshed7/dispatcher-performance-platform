@@ -24,11 +24,7 @@ export function TruckTypeFilter({
 }: TruckTypeFilterProps) {
   return (
     <FilterField label="Truck Type">
-      <Select
-        value={value}
-        onValueChange={onValueChange}
-        disabled={disabled}
-      >
+      <Select value={value} onValueChange={onValueChange} disabled={disabled}>
         <SelectTrigger className="w-full" size="sm">
           <SelectValue placeholder="Truck type" />
         </SelectTrigger>

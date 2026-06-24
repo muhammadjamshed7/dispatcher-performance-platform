@@ -1,31 +1,39 @@
 import "server-only";
 
 import { z } from "zod";
-import type { OrganizationSettings, StatusReason, TruckType } from "@/generated/prisma/client";
+import { T, db } from "@/lib/db/client";
+import type {
+  OrganizationSettings,
+  StatusReason,
+  TruckType,
+} from "@/lib/db/types";
+import {
+  assertDb,
+  assertDbVoid,
+  createId,
+  decimalToNumber,
+  nowIso,
+} from "@/lib/db/utils";
 import { ForbiddenError } from "@/lib/errors/forbidden-error";
 import { ValidationError } from "@/lib/errors/validation-error";
-import { db } from "@/lib/db/prisma";
-import type { AppSettings } from "@/lib/types";
+import { TRUCK_TYPES } from "@/lib/constants/truck-types";
+import type { AppSettings, DispatchFeeRules } from "@/lib/types";
 import type { AccessScope, AuthContextUser } from "@/server/auth/types";
 import { writeAuditLog } from "@/server/services/audit.service";
 
-const PRISMA_TRUCK_TYPES = [
-  "DRY_VAN",
-  "REEFER",
-  "FLATBED",
-  "BOX_TRUCK",
-  "HOTSHOT",
-  "POWER_ONLY",
-  "CARGO_VAN",
-] as const satisfies readonly TruckType[];
-
 const updateSettingsInputSchema = z.object({
-  dispatchFeeMethod: z.string().trim().min(1).optional(),
+  dispatchFeeMethod: z.literal("percentage").optional(),
   defaultDispatchFeePercent: z.number().min(0).max(100).optional(),
   minimumDispatchFee: z.number().min(0).optional(),
   roundToNearestDollar: z.boolean().optional(),
-  allowedTruckTypes: z.array(z.enum(PRISMA_TRUCK_TYPES)).optional(),
+  allowedTruckTypes: z.array(z.enum(TRUCK_TYPES)).optional(),
   timezone: z.string().trim().min(1).optional(),
+  currency: z
+    .string()
+    .trim()
+    .length(3)
+    .transform((value) => value.toUpperCase())
+    .optional(),
   csvIncludeHeaders: z.boolean().optional(),
   csvDateFormat: z.string().trim().min(1).optional(),
   csvMaxRows: z.number().int().positive().optional(),
@@ -41,27 +49,27 @@ function requireAdmin(scope: AccessScope): void {
   }
 }
 
-function decimalToNumber(value: { toNumber(): number }): number {
-  return value.toNumber();
-}
-
 function mapSettings(
   settings: OrganizationSettings,
   statusReasons: StatusReason[],
+  currency: string,
 ): AppSettings {
   return {
     dispatchFeeCalculation: {
       method: settings.dispatchFeeMethod,
-      defaultPercentage: decimalToNumber(settings.defaultDispatchFeePercent),
-      minimumFee: decimalToNumber(settings.minimumDispatchFee),
+      defaultPercentage:
+        decimalToNumber(settings.defaultDispatchFeePercent) ?? 0,
+      minimumFee: decimalToNumber(settings.minimumDispatchFee) ?? 0,
       roundToNearestDollar: settings.roundToNearestDollar,
     },
-    allowedTruckTypes: settings.allowedTruckTypes as AppSettings["allowedTruckTypes"],
+    allowedTruckTypes:
+      settings.allowedTruckTypes as AppSettings["allowedTruckTypes"],
     allowedStatusReasons: statusReasons
       .filter((reason) => reason.isActive)
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((reason) => reason.label),
     timezone: settings.timezone,
+    currency,
     csvExport: {
       includeHeaders: settings.csvIncludeHeaders,
       dateFormat: settings.csvDateFormat,
@@ -71,36 +79,92 @@ function mapSettings(
   };
 }
 
-async function getOrCreateSettings(organizationId: string): Promise<OrganizationSettings> {
-  const existing = await db.organizationSettings.findUnique({
-    where: { organizationId },
-  });
+async function getOrCreateSettings(
+  organizationId: string,
+): Promise<OrganizationSettings> {
+  const existingResult = await db()
+    .from(T.OrganizationSettings)
+    .select("*")
+    .eq("organizationId", organizationId)
+    .maybeSingle();
 
-  if (existing) {
-    return existing;
+  if (existingResult.error) {
+    throw new Error(existingResult.error.message);
   }
 
-  const organization = await db.organization.findUnique({
-    where: { id: organizationId },
-  });
+  if (existingResult.data) {
+    return existingResult.data;
+  }
 
-  if (!organization) {
+  const organizationResult = await db()
+    .from(T.Organization)
+    .select("id, timezone")
+    .eq("id", organizationId)
+    .maybeSingle();
+
+  if (organizationResult.error) {
+    throw new Error(organizationResult.error.message);
+  }
+
+  if (!organizationResult.data) {
     throw new ValidationError("Organization not found.");
   }
 
-  return db.organizationSettings.create({
-    data: {
+  const organization = organizationResult.data;
+
+  const createdResult = await db()
+    .from(T.OrganizationSettings)
+    .insert({
+      id: createId(),
       organizationId,
       timezone: organization.timezone,
-    },
-  });
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    })
+    .select("*")
+    .single();
+
+  return assertDb(createdResult);
 }
 
-async function loadStatusReasons(organizationId: string): Promise<StatusReason[]> {
-  return db.statusReason.findMany({
-    where: { organizationId },
-    orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
-  });
+export async function getOrganizationPreferences(
+  organizationId: string,
+): Promise<{ timezone: string; currency: string }> {
+  const [settings, organizationResult] = await Promise.all([
+    getOrCreateSettings(organizationId),
+    db()
+      .from(T.Organization)
+      .select("timezone, currency")
+      .eq("id", organizationId)
+      .is("deletedAt", null)
+      .maybeSingle(),
+  ]);
+
+  if (organizationResult.error) {
+    throw new Error(organizationResult.error.message);
+  }
+
+  if (!organizationResult.data) {
+    throw new ValidationError("Organization not found.");
+  }
+
+  return {
+    timezone: settings.timezone || organizationResult.data.timezone,
+    currency: organizationResult.data.currency || "USD",
+  };
+}
+
+async function loadStatusReasons(
+  organizationId: string,
+): Promise<StatusReason[]> {
+  const result = await db()
+    .from(T.StatusReason)
+    .select("*")
+    .eq("organizationId", organizationId)
+    .order("sortOrder", { ascending: true })
+    .order("label", { ascending: true });
+
+  return assertDb(result) ?? [];
 }
 
 export async function getSettings(scope: AccessScope): Promise<AppSettings> {
@@ -108,8 +172,36 @@ export async function getSettings(scope: AccessScope): Promise<AppSettings> {
 
   const settings = await getOrCreateSettings(scope.organizationId);
   const statusReasons = await loadStatusReasons(scope.organizationId);
+  const preferences = await getOrganizationPreferences(scope.organizationId);
 
-  return mapSettings(settings, statusReasons);
+  return mapSettings(settings, statusReasons, preferences.currency);
+}
+
+export async function getDispatchFeeRules(
+  organizationId: string,
+): Promise<DispatchFeeRules> {
+  const settings = await getOrCreateSettings(organizationId);
+
+  if (settings.dispatchFeeMethod !== "percentage") {
+    throw new ValidationError("Unsupported dispatch fee calculation method.");
+  }
+
+  return {
+    method: "percentage",
+    defaultPercentage: decimalToNumber(settings.defaultDispatchFeePercent) ?? 0,
+    minimumFee: decimalToNumber(settings.minimumDispatchFee) ?? 0,
+    roundToNearestDollar: settings.roundToNearestDollar,
+  };
+}
+
+export async function getAllowedStatusReasons(
+  scope: AccessScope,
+): Promise<string[]> {
+  const statusReasons = await loadStatusReasons(scope.organizationId);
+
+  return statusReasons
+    .filter((entry) => entry.isActive)
+    .map((entry) => entry.label);
 }
 
 export async function assertAllowedTruckType(
@@ -119,7 +211,9 @@ export async function assertAllowedTruckType(
   const settings = await getOrCreateSettings(organizationId);
 
   if (!settings.allowedTruckTypes.includes(truckType)) {
-    throw new ValidationError("This truck type is not allowed by organization settings.");
+    throw new ValidationError(
+      "This truck type is not allowed by organization settings.",
+    );
   }
 }
 
@@ -133,7 +227,65 @@ export async function assertAllowedStatusReason(
     .map((entry) => entry.label.toLowerCase());
 
   if (!allowed.includes(reason.trim().toLowerCase())) {
-    throw new ValidationError("This status reason is not allowed by organization settings.");
+    throw new ValidationError(
+      "This status reason is not allowed by organization settings.",
+    );
+  }
+}
+
+async function syncStatusReasons(
+  organizationId: string,
+  allowedStatusReasons: string[],
+): Promise<void> {
+  const existingReasons = await loadStatusReasons(organizationId);
+  const existingByLabel = new Map(
+    existingReasons.map((reason) => [reason.label.toLowerCase(), reason]),
+  );
+  const incomingLabels = new Set(
+    allowedStatusReasons.map((label) => label.toLowerCase()),
+  );
+
+  for (const reason of existingReasons) {
+    const updateResult = await db()
+      .from(T.StatusReason)
+      .update({
+        isActive: incomingLabels.has(reason.label.toLowerCase()),
+        updatedAt: nowIso(),
+      })
+      .eq("id", reason.id);
+
+    assertDbVoid(updateResult);
+  }
+
+  for (const [index, label] of allowedStatusReasons.entries()) {
+    const existing = existingByLabel.get(label.toLowerCase());
+
+    if (existing) {
+      const updateResult = await db()
+        .from(T.StatusReason)
+        .update({
+          label,
+          isActive: true,
+          sortOrder: index,
+          updatedAt: nowIso(),
+        })
+        .eq("id", existing.id);
+
+      assertDbVoid(updateResult);
+      continue;
+    }
+
+    const createResult = await db().from(T.StatusReason).insert({
+      id: createId(),
+      organizationId,
+      label,
+      isActive: true,
+      sortOrder: index,
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    });
+
+    assertDbVoid(createResult);
   }
 }
 
@@ -145,85 +297,103 @@ export async function updateSettings(
   requireAdmin(scope);
   const parsed = updateSettingsInputSchema.parse(input);
 
+  if (parsed.timezone !== undefined) {
+    try {
+      new Intl.DateTimeFormat("en-US", {
+        timeZone: parsed.timezone,
+      }).format(new Date());
+    } catch {
+      throw new ValidationError("Enter a valid IANA timezone.");
+    }
+  }
+
+  if (parsed.currency !== undefined) {
+    try {
+      new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: parsed.currency,
+      }).format(0);
+    } catch {
+      throw new ValidationError("Enter a valid ISO 4217 currency code.");
+    }
+  }
+
   await getOrCreateSettings(scope.organizationId);
 
-  const settings = await db.$transaction(async (tx) => {
-    const updated = await tx.organizationSettings.update({
-      where: { organizationId: scope.organizationId },
-      data: {
-        ...(parsed.dispatchFeeMethod !== undefined
-          ? { dispatchFeeMethod: parsed.dispatchFeeMethod }
-          : {}),
-        ...(parsed.defaultDispatchFeePercent !== undefined
-          ? { defaultDispatchFeePercent: parsed.defaultDispatchFeePercent }
-          : {}),
-        ...(parsed.minimumDispatchFee !== undefined
-          ? { minimumDispatchFee: parsed.minimumDispatchFee }
-          : {}),
-        ...(parsed.roundToNearestDollar !== undefined
-          ? { roundToNearestDollar: parsed.roundToNearestDollar }
-          : {}),
-        ...(parsed.allowedTruckTypes !== undefined
-          ? { allowedTruckTypes: parsed.allowedTruckTypes as TruckType[] }
-          : {}),
+  const updatePayload: Record<string, unknown> = {
+    updatedAt: nowIso(),
+  };
+
+  if (parsed.dispatchFeeMethod !== undefined) {
+    updatePayload.dispatchFeeMethod = parsed.dispatchFeeMethod;
+  }
+
+  if (parsed.defaultDispatchFeePercent !== undefined) {
+    updatePayload.defaultDispatchFeePercent = String(
+      parsed.defaultDispatchFeePercent,
+    );
+  }
+
+  if (parsed.minimumDispatchFee !== undefined) {
+    updatePayload.minimumDispatchFee = String(parsed.minimumDispatchFee);
+  }
+
+  if (parsed.roundToNearestDollar !== undefined) {
+    updatePayload.roundToNearestDollar = parsed.roundToNearestDollar;
+  }
+
+  if (parsed.allowedTruckTypes !== undefined) {
+    updatePayload.allowedTruckTypes = parsed.allowedTruckTypes;
+  }
+
+  if (parsed.timezone !== undefined) {
+    updatePayload.timezone = parsed.timezone;
+  }
+
+  if (parsed.csvIncludeHeaders !== undefined) {
+    updatePayload.csvIncludeHeaders = parsed.csvIncludeHeaders;
+  }
+
+  if (parsed.csvDateFormat !== undefined) {
+    updatePayload.csvDateFormat = parsed.csvDateFormat;
+  }
+
+  if (parsed.csvMaxRows !== undefined) {
+    updatePayload.csvMaxRows = parsed.csvMaxRows;
+  }
+
+  if (parsed.csvFileNamePrefix !== undefined) {
+    updatePayload.csvFileNamePrefix = parsed.csvFileNamePrefix;
+  }
+
+  const settingsResult = await db()
+    .from(T.OrganizationSettings)
+    .update(updatePayload)
+    .eq("organizationId", scope.organizationId)
+    .select("*")
+    .single();
+
+  const settings = assertDb(settingsResult);
+
+  if (parsed.timezone !== undefined || parsed.currency !== undefined) {
+    const organizationUpdateResult = await db()
+      .from(T.Organization)
+      .update({
         ...(parsed.timezone !== undefined ? { timezone: parsed.timezone } : {}),
-        ...(parsed.csvIncludeHeaders !== undefined
-          ? { csvIncludeHeaders: parsed.csvIncludeHeaders }
-          : {}),
-        ...(parsed.csvDateFormat !== undefined
-          ? { csvDateFormat: parsed.csvDateFormat }
-          : {}),
-        ...(parsed.csvMaxRows !== undefined ? { csvMaxRows: parsed.csvMaxRows } : {}),
-        ...(parsed.csvFileNamePrefix !== undefined
-          ? { csvFileNamePrefix: parsed.csvFileNamePrefix }
-          : {}),
-      },
-    });
+        ...(parsed.currency !== undefined ? { currency: parsed.currency } : {}),
+        updatedAt: nowIso(),
+      })
+      .eq("id", scope.organizationId);
 
-    if (parsed.allowedStatusReasons !== undefined) {
-      const existingReasons = await tx.statusReason.findMany({
-        where: { organizationId: scope.organizationId },
-      });
-      const existingByLabel = new Map(
-        existingReasons.map((reason) => [reason.label.toLowerCase(), reason]),
-      );
-      const incomingLabels = new Set(
-        parsed.allowedStatusReasons.map((label) => label.toLowerCase()),
-      );
+    assertDbVoid(organizationUpdateResult);
+  }
 
-      for (const reason of existingReasons) {
-        await tx.statusReason.update({
-          where: { id: reason.id },
-          data: { isActive: incomingLabels.has(reason.label.toLowerCase()) },
-        });
-      }
-
-      for (const [index, label] of parsed.allowedStatusReasons.entries()) {
-        const existing = existingByLabel.get(label.toLowerCase());
-
-        if (existing) {
-          await tx.statusReason.update({
-            where: { id: existing.id },
-            data: { label, isActive: true, sortOrder: index },
-          });
-          continue;
-        }
-
-        await tx.statusReason.create({
-          data: {
-            organizationId: scope.organizationId,
-            label,
-            isActive: true,
-            sortOrder: index,
-          },
-        });
-      }
-    }
-
-    return updated;
-  });
+  if (parsed.allowedStatusReasons !== undefined) {
+    await syncStatusReasons(scope.organizationId, parsed.allowedStatusReasons);
+  }
 
   const statusReasons = await loadStatusReasons(scope.organizationId);
+  const preferences = await getOrganizationPreferences(scope.organizationId);
 
   await writeAuditLog({
     organizationId: scope.organizationId,
@@ -234,5 +404,5 @@ export async function updateSettings(
     metadata: parsed,
   });
 
-  return mapSettings(settings, statusReasons);
+  return mapSettings(settings, statusReasons, preferences.currency);
 }

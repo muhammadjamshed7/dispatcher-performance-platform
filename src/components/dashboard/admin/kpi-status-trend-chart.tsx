@@ -32,7 +32,7 @@ const STATUS_LINES = [
 type StatusLineKey = (typeof STATUS_LINES)[number]["key"];
 
 function makePointLabel(color: string, yOffset: number) {
-  return (props: LabelProps) => {
+  function PointLabel(props: LabelProps) {
     const { x, y, value } = props;
     const count = Number(value);
 
@@ -52,7 +52,10 @@ function makePointLabel(color: string, yOffset: number) {
         {count}
       </text>
     );
-  };
+  }
+
+  PointLabel.displayName = "KpiStatusPointLabel";
+  return PointLabel;
 }
 
 type KpiStatusTrendChartProps = {
@@ -71,13 +74,17 @@ export function KpiStatusTrendChart({ data }: KpiStatusTrendChartProps) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="min-h-[260px] flex-1 w-full">
+      <div className="min-h-[260px] w-full flex-1">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={data}
             margin={{ top: 36, right: 12, left: 0, bottom: 4 }}
           >
-            <CartesianGrid stroke="#E2E8F0" strokeDasharray="4 4" vertical={false} />
+            <CartesianGrid
+              stroke="#E2E8F0"
+              strokeDasharray="4 4"
+              vertical={false}
+            />
             <XAxis
               dataKey="date"
               tick={{ fill: "#64748B", fontSize: 11 }}
@@ -122,7 +129,12 @@ export function KpiStatusTrendChart({ data }: KpiStatusTrendChartProps) {
                 name={line.label}
                 stroke={line.color}
                 strokeWidth={2.25}
-                dot={{ r: 3, fill: line.color, stroke: "#FFFFFF", strokeWidth: 2 }}
+                dot={{
+                  r: 3,
+                  fill: line.color,
+                  stroke: "#FFFFFF",
+                  strokeWidth: 2,
+                }}
                 activeDot={{ r: 4 }}
                 label={makePointLabel(line.color, line.labelOffset)}
                 isAnimationActive={false}

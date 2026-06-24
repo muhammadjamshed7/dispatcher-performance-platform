@@ -62,7 +62,7 @@ export function CarriersTable({
               <TableRow>
                 <TableCell
                   colSpan={10}
-                  className="py-8 text-center text-muted-foreground"
+                  className="text-muted-foreground py-8 text-center"
                 >
                   No carriers found.
                 </TableCell>
@@ -75,7 +75,9 @@ export function CarriersTable({
                   </TableCell>
                   <TableCell>{carrier.driverName}</TableCell>
                   <TableCell>{carrier.mcNumber}</TableCell>
-                  <TableCell>{carrier.truckType.replaceAll("_", " ")}</TableCell>
+                  <TableCell>
+                    {carrier.truckType.replaceAll("_", " ")}
+                  </TableCell>
                   <TableCell>{carrier.assignedTeamName}</TableCell>
                   <TableCell>{carrier.assignedDispatcherName}</TableCell>
                   <TableCell>{carrier.dispatchFeePercentage}%</TableCell>
@@ -106,12 +108,16 @@ export function CarriersTable({
                         <MoreHorizontal className="size-4" />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => onAction(carrier, "view")}>
+                        <DropdownMenuItem
+                          onClick={() => onAction(carrier, "view")}
+                        >
                           View
                         </DropdownMenuItem>
                         {!readOnly ? (
                           <>
-                            <DropdownMenuItem onClick={() => onAction(carrier, "edit")}>
+                            <DropdownMenuItem
+                              onClick={() => onAction(carrier, "edit")}
+                            >
                               Edit
                             </DropdownMenuItem>
                             <DropdownMenuItem

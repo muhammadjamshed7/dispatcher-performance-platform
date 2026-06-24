@@ -26,15 +26,25 @@ import {
 } from "@/lib/dashboard/report-filter-params";
 import { cn } from "@/lib/utils";
 import { formatCurrencyCompact } from "@/lib/utils/format-currency";
+import { resolveDateRangePreset } from "@/lib/utils/resolve-date-range-preset";
 
-type ReportTab = "daily" | "weekly" | "monthly" | "historical";
+type ReportTab = "daily" | "weekly" | "monthly" | "historical" | "custom";
 
 const REPORT_TABS: { id: ReportTab; label: string; period: ReportPeriod }[] = [
   { id: "daily", label: "Daily Report", period: "DAILY" },
   { id: "weekly", label: "Weekly Report", period: "WEEKLY" },
   { id: "monthly", label: "Monthly Report", period: "MONTHLY" },
   { id: "historical", label: "Historical Report", period: "HISTORICAL" },
+  { id: "custom", label: "Custom Range", period: "CUSTOM" },
 ];
+
+const REPORT_TAB_DATE_RANGES: Record<ReportTab, string> = {
+  daily: "today",
+  weekly: "last-7-days",
+  monthly: "this-month",
+  historical: "this-month",
+  custom: "this-month",
+};
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof ApiClientError ? error.message : fallback;
@@ -56,22 +66,25 @@ function isReportEmpty(report: {
 
 export function ReportsPageContent() {
   const [activeTab, setActiveTab] = useState<ReportTab>("daily");
-  const [filters, setFilters] = useState<ReportFilterValues>(DEFAULT_REPORT_FILTERS);
+  const [filters, setFilters] = useState<ReportFilterValues>(
+    DEFAULT_REPORT_FILTERS,
+  );
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const activeConfig =
     REPORT_TABS.find((tab) => tab.id === activeTab) ?? REPORT_TABS[0];
 
   const loadReport = useCallback(
-    () =>
-      fetchReports(reportFiltersToParams(activeConfig.period, filters)),
+    () => fetchReports(reportFiltersToParams(activeConfig.period, filters)),
     [activeConfig.period, filters],
   );
 
-  const { data: activeReport, error, isLoading, reload } = useApiData(
-    loadReport,
-    [activeTab, filters],
-  );
+  const {
+    data: activeReport,
+    error,
+    isLoading,
+    reload,
+  } = useApiData(loadReport, [activeTab, filters]);
 
   const isEmpty =
     !isLoading && !error && activeReport ? isReportEmpty(activeReport) : false;
@@ -87,6 +100,22 @@ export function ReportsPageContent() {
   const showToast = useCallback((message: string) => {
     setToastMessage(message);
   }, []);
+
+  function handleTabChange(tab: ReportTab) {
+    const customRange = resolveDateRangePreset("this-month");
+
+    setActiveTab(tab);
+    setFilters((current) => ({
+      ...current,
+      dateRange: REPORT_TAB_DATE_RANGES[tab],
+      ...(tab === "custom"
+        ? {
+            dateFrom: current.dateFrom || customRange.dateFrom,
+            dateTo: current.dateTo || customRange.dateTo,
+          }
+        : {}),
+    }));
+  }
 
   async function handleExport() {
     try {
@@ -137,14 +166,19 @@ export function ReportsPageContent() {
                 variant={activeTab === tab.id ? "default" : "outline"}
                 size="sm"
                 className={cn(activeTab === tab.id && "shadow-sm")}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabChange(tab.id)}
               >
                 {tab.label}
               </Button>
             ))}
           </div>
 
-          <Button type="button" variant="outline" onClick={handleExport}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleExport}
+            disabled={isLoading || Boolean(error)}
+          >
             <Download className="size-4" />
             Export CSV
           </Button>
@@ -158,7 +192,8 @@ export function ReportsPageContent() {
           emptyDescription="There is no report data for the selected period and filters."
           errorTitle="Unable to load report"
           errorDescription={
-            error ?? "The report preview could not be loaded. Try again or switch tabs."
+            error ??
+            "The report preview could not be loaded. Try again or switch tabs."
           }
         >
           <>
@@ -189,6 +224,7 @@ export function ReportsPageContent() {
               values={filters}
               onChange={setFilters}
               onApply={() => void reload()}
+              showCustomDates={activeTab === "custom"}
             />
 
             <DailyReportTable
@@ -202,7 +238,10 @@ export function ReportsPageContent() {
         </PageContentGate>
       </PageShell>
 
-      <AppToast message={toastMessage} onDismiss={() => setToastMessage(null)} />
+      <AppToast
+        message={toastMessage}
+        onDismiss={() => setToastMessage(null)}
+      />
     </>
   );
 }

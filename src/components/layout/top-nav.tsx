@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, ChevronDown, Menu, Search } from "lucide-react";
+import { Bell, ChevronDown, Menu } from "lucide-react";
 
 import { LogoutButton } from "@/components/auth/logout-button";
+import { GlobalSearch } from "@/components/layout/global-search";
 import { useSession } from "@/components/auth/session-provider";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import {
   getAccountPathForRole,
   getLoginPathForRole,
@@ -33,6 +33,7 @@ export function TopNav({ onMenuClick }: TopNavProps) {
   const navItems = session ? getNavItemsForRole(session.role) : [];
   const accountPath = session ? getAccountPathForRole(session.role) : null;
   const initials = session ? getInitials(session.fullName) : "AA";
+  const showAccountSummary = session?.role === "TEAM_LEAD";
 
   return (
     <header className="sticky top-0 z-30 border-b border-[#E5E7EB] bg-white">
@@ -49,13 +50,7 @@ export function TopNav({ onMenuClick }: TopNavProps) {
         </div>
 
         <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3">
-          <div className="relative hidden max-w-sm flex-1 md:block">
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-[#94A3B8]" />
-            <Input
-              placeholder="Search anything..."
-              className="h-10 rounded-[10px] border-[#E2E8F0] bg-white pl-9 text-sm text-[#334155] placeholder:text-[#94A3B8]"
-            />
-          </div>
+          <GlobalSearch />
 
           <button
             type="button"
@@ -66,13 +61,13 @@ export function TopNav({ onMenuClick }: TopNavProps) {
             <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-[#2563EB]" />
           </button>
 
-          {session ? (
+          {session && showAccountSummary ? (
             <Badge className="hidden rounded-full bg-[#DBEAFE] px-3 py-1 text-xs font-medium text-[#1D4ED8] hover:bg-[#DBEAFE] md:inline-flex">
               {roleLabel(session.role)}
             </Badge>
           ) : null}
 
-          {session && accountPath ? (
+          {session && accountPath && showAccountSummary ? (
             <Link
               href={accountPath}
               className="hidden items-center gap-3 rounded-xl border border-[#E2E8F0] px-3 py-2 hover:bg-[#F8FAFC] sm:flex"

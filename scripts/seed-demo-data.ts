@@ -47,14 +47,54 @@ const DISPATCHERS: {
   phone: string;
   team: (typeof TEAMS)[number];
 }[] = [
-  { fullName: "Jamshed Ali", emailLocal: "jamshed.ali", phone: "+92-300-1112233", team: "Lahore Team" },
-  { fullName: "Ahmad Hassan", emailLocal: "ahmad.hassan", phone: "+92-321-4455667", team: "Lahore Team" },
-  { fullName: "Mansha Khan", emailLocal: "mansha.khan", phone: "+92-333-7788990", team: "Lahore Team" },
-  { fullName: "Rehan Malik", emailLocal: "rehan.malik", phone: "+92-300-5544332", team: "Karachi Team" },
-  { fullName: "Usman Raza", emailLocal: "usman.raza", phone: "+92-345-6677889", team: "Karachi Team" },
-  { fullName: "Bilal Sheikh", emailLocal: "bilal.sheikh", phone: "+92-312-9900112", team: "Karachi Team" },
-  { fullName: "Hassan Iqbal", emailLocal: "hassan.iqbal", phone: "+92-301-2233445", team: "Islamabad Team" },
-  { fullName: "Faisal Mahmood", emailLocal: "faisal.mahmood", phone: "+92-322-5566778", team: "Islamabad Team" },
+  {
+    fullName: "Jamshed Ali",
+    emailLocal: "jamshed.ali",
+    phone: "+92-300-1112233",
+    team: "Lahore Team",
+  },
+  {
+    fullName: "Ahmad Hassan",
+    emailLocal: "ahmad.hassan",
+    phone: "+92-321-4455667",
+    team: "Lahore Team",
+  },
+  {
+    fullName: "Mansha Khan",
+    emailLocal: "mansha.khan",
+    phone: "+92-333-7788990",
+    team: "Lahore Team",
+  },
+  {
+    fullName: "Rehan Malik",
+    emailLocal: "rehan.malik",
+    phone: "+92-300-5544332",
+    team: "Karachi Team",
+  },
+  {
+    fullName: "Usman Raza",
+    emailLocal: "usman.raza",
+    phone: "+92-345-6677889",
+    team: "Karachi Team",
+  },
+  {
+    fullName: "Bilal Sheikh",
+    emailLocal: "bilal.sheikh",
+    phone: "+92-312-9900112",
+    team: "Karachi Team",
+  },
+  {
+    fullName: "Hassan Iqbal",
+    emailLocal: "hassan.iqbal",
+    phone: "+92-301-2233445",
+    team: "Islamabad Team",
+  },
+  {
+    fullName: "Faisal Mahmood",
+    emailLocal: "faisal.mahmood",
+    phone: "+92-322-5566778",
+    team: "Islamabad Team",
+  },
 ];
 
 const CARRIER_TEMPLATES: {
@@ -64,41 +104,220 @@ const CARRIER_TEMPLATES: {
   truckType: TruckType;
   fee: number;
 }[] = [
-  { carrierName: "Al-Hamd Logistics", driverName: "Muhammad Asif", mcNumber: "MC-PK-1001", truckType: "DRY_VAN", fee: 10 },
-  { carrierName: "Karachi Express Carriers", driverName: "Ali Raza", mcNumber: "MC-PK-1002", truckType: "REEFER", fee: 12 },
-  { carrierName: "Lahore Freight Lines", driverName: "Imran Siddiqui", mcNumber: "MC-PK-1003", truckType: "FLATBED", fee: 11 },
-  { carrierName: "Punjab Road Transport", driverName: "Nadeem Akhtar", mcNumber: "MC-PK-1004", truckType: "BOX_TRUCK", fee: 9 },
-  { carrierName: "Sindh Cargo Movers", driverName: "Shahid Mehmood", mcNumber: "MC-PK-1005", truckType: "DRY_VAN", fee: 10.5 },
-  { carrierName: "Green Line Haulers", driverName: "Tariq Jamil", mcNumber: "MC-PK-1006", truckType: "HOTSHOT", fee: 13 },
-  { carrierName: "Capital Freight PK", driverName: "Waqas Butt", mcNumber: "MC-PK-1007", truckType: "CARGO_VAN", fee: 8.5 },
-  { carrierName: "Indus Valley Transport", driverName: "Saeed Anwar", mcNumber: "MC-PK-1008", truckType: "POWER_ONLY", fee: 11.5 },
-  { carrierName: "Metro Dispatch Carriers", driverName: "Kamran Aftab", mcNumber: "MC-PK-1009", truckType: "DRY_VAN", fee: 10 },
-  { carrierName: "North Star Logistics", driverName: "Arslan Tariq", mcNumber: "MC-PK-1010", truckType: "REEFER", fee: 12.5 },
-  { carrierName: "Falcon Freight Services", driverName: "Hamza Saleem", mcNumber: "MC-PK-1011", truckType: "FLATBED", fee: 11 },
-  { carrierName: "Royal Cargo PK", driverName: "Zeeshan Ali", mcNumber: "MC-PK-1012", truckType: "BOX_TRUCK", fee: 9.5 },
-  { carrierName: "Swift Wheels Transport", driverName: "Adnan Qureshi", mcNumber: "MC-PK-1013", truckType: "DRY_VAN", fee: 10 },
-  { carrierName: "Pak Star Haulage", driverName: "Babar Azam", mcNumber: "MC-PK-1014", truckType: "HOTSHOT", fee: 14 },
-  { carrierName: "City Link Carriers", driverName: "Danish Kaneria", mcNumber: "MC-PK-1015", truckType: "CARGO_VAN", fee: 8 },
-  { carrierName: "Highway Masters PK", driverName: "Salman Butt", mcNumber: "MC-PK-1016", truckType: "DRY_VAN", fee: 10.5 },
-  { carrierName: "Prime Movers Lahore", driverName: "Umar Akmal", mcNumber: "MC-PK-1017", truckType: "REEFER", fee: 12 },
-  { carrierName: "Desert Road Logistics", driverName: "Shoaib Akhtar", mcNumber: "MC-PK-1018", truckType: "FLATBED", fee: 11.5 },
-  { carrierName: "Port City Freight", driverName: "Wasim Akram", mcNumber: "MC-PK-1019", truckType: "BOX_TRUCK", fee: 9 },
-  { carrierName: "Mountain Pass Transport", driverName: "Yasir Shah", mcNumber: "MC-PK-1020", truckType: "DRY_VAN", fee: 10 },
-  { carrierName: "River Side Carriers", driverName: "Fakhar Zaman", mcNumber: "MC-PK-1021", truckType: "POWER_ONLY", fee: 11 },
-  { carrierName: "Golden Gate Logistics", driverName: "Haris Rauf", mcNumber: "MC-PK-1022", truckType: "HOTSHOT", fee: 13.5 },
-  { carrierName: "National Express PK", driverName: "Shaheen Afridi", mcNumber: "MC-PK-1023", truckType: "CARGO_VAN", fee: 8.5 },
-  { carrierName: "Unity Cargo Lines", driverName: "Mohammad Rizwan", mcNumber: "MC-PK-1024", truckType: "DRY_VAN", fee: 10 },
+  {
+    carrierName: "Al-Hamd Logistics",
+    driverName: "Muhammad Asif",
+    mcNumber: "MC-PK-1001",
+    truckType: "DRY_VAN",
+    fee: 10,
+  },
+  {
+    carrierName: "Karachi Express Carriers",
+    driverName: "Ali Raza",
+    mcNumber: "MC-PK-1002",
+    truckType: "REEFER",
+    fee: 12,
+  },
+  {
+    carrierName: "Lahore Freight Lines",
+    driverName: "Imran Siddiqui",
+    mcNumber: "MC-PK-1003",
+    truckType: "FLATBED",
+    fee: 11,
+  },
+  {
+    carrierName: "Punjab Road Transport",
+    driverName: "Nadeem Akhtar",
+    mcNumber: "MC-PK-1004",
+    truckType: "BOX_TRUCK",
+    fee: 9,
+  },
+  {
+    carrierName: "Sindh Cargo Movers",
+    driverName: "Shahid Mehmood",
+    mcNumber: "MC-PK-1005",
+    truckType: "DRY_VAN",
+    fee: 10.5,
+  },
+  {
+    carrierName: "Green Line Haulers",
+    driverName: "Tariq Jamil",
+    mcNumber: "MC-PK-1006",
+    truckType: "HOTSHOT",
+    fee: 13,
+  },
+  {
+    carrierName: "Capital Freight PK",
+    driverName: "Waqas Butt",
+    mcNumber: "MC-PK-1007",
+    truckType: "CARGO_VAN",
+    fee: 8.5,
+  },
+  {
+    carrierName: "Indus Valley Transport",
+    driverName: "Saeed Anwar",
+    mcNumber: "MC-PK-1008",
+    truckType: "POWER_ONLY",
+    fee: 11.5,
+  },
+  {
+    carrierName: "Metro Dispatch Carriers",
+    driverName: "Kamran Aftab",
+    mcNumber: "MC-PK-1009",
+    truckType: "DRY_VAN",
+    fee: 10,
+  },
+  {
+    carrierName: "North Star Logistics",
+    driverName: "Arslan Tariq",
+    mcNumber: "MC-PK-1010",
+    truckType: "REEFER",
+    fee: 12.5,
+  },
+  {
+    carrierName: "Falcon Freight Services",
+    driverName: "Hamza Saleem",
+    mcNumber: "MC-PK-1011",
+    truckType: "FLATBED",
+    fee: 11,
+  },
+  {
+    carrierName: "Royal Cargo PK",
+    driverName: "Zeeshan Ali",
+    mcNumber: "MC-PK-1012",
+    truckType: "BOX_TRUCK",
+    fee: 9.5,
+  },
+  {
+    carrierName: "Swift Wheels Transport",
+    driverName: "Adnan Qureshi",
+    mcNumber: "MC-PK-1013",
+    truckType: "DRY_VAN",
+    fee: 10,
+  },
+  {
+    carrierName: "Pak Star Haulage",
+    driverName: "Babar Azam",
+    mcNumber: "MC-PK-1014",
+    truckType: "HOTSHOT",
+    fee: 14,
+  },
+  {
+    carrierName: "City Link Carriers",
+    driverName: "Danish Kaneria",
+    mcNumber: "MC-PK-1015",
+    truckType: "CARGO_VAN",
+    fee: 8,
+  },
+  {
+    carrierName: "Highway Masters PK",
+    driverName: "Salman Butt",
+    mcNumber: "MC-PK-1016",
+    truckType: "DRY_VAN",
+    fee: 10.5,
+  },
+  {
+    carrierName: "Prime Movers Lahore",
+    driverName: "Umar Akmal",
+    mcNumber: "MC-PK-1017",
+    truckType: "REEFER",
+    fee: 12,
+  },
+  {
+    carrierName: "Desert Road Logistics",
+    driverName: "Shoaib Akhtar",
+    mcNumber: "MC-PK-1018",
+    truckType: "FLATBED",
+    fee: 11.5,
+  },
+  {
+    carrierName: "Port City Freight",
+    driverName: "Wasim Akram",
+    mcNumber: "MC-PK-1019",
+    truckType: "BOX_TRUCK",
+    fee: 9,
+  },
+  {
+    carrierName: "Mountain Pass Transport",
+    driverName: "Yasir Shah",
+    mcNumber: "MC-PK-1020",
+    truckType: "DRY_VAN",
+    fee: 10,
+  },
+  {
+    carrierName: "River Side Carriers",
+    driverName: "Fakhar Zaman",
+    mcNumber: "MC-PK-1021",
+    truckType: "POWER_ONLY",
+    fee: 11,
+  },
+  {
+    carrierName: "Golden Gate Logistics",
+    driverName: "Haris Rauf",
+    mcNumber: "MC-PK-1022",
+    truckType: "HOTSHOT",
+    fee: 13.5,
+  },
+  {
+    carrierName: "National Express PK",
+    driverName: "Shaheen Afridi",
+    mcNumber: "MC-PK-1023",
+    truckType: "CARGO_VAN",
+    fee: 8.5,
+  },
+  {
+    carrierName: "Unity Cargo Lines",
+    driverName: "Mohammad Rizwan",
+    mcNumber: "MC-PK-1024",
+    truckType: "DRY_VAN",
+    fee: 10,
+  },
 ];
 
 const ROUTES = [
-  { origin: "Karachi, PK", destination: "Lahore, PK", miles: 760, amount: 2850 },
-  { origin: "Islamabad, PK", destination: "Multan, PK", miles: 420, amount: 1680 },
-  { origin: "Lahore, PK", destination: "Faisalabad, PK", miles: 120, amount: 620 },
-  { origin: "Karachi, PK", destination: "Hyderabad, PK", miles: 165, amount: 740 },
-  { origin: "Rawalpindi, PK", destination: "Peshawar, PK", miles: 185, amount: 810 },
-  { origin: "Quetta, PK", destination: "Karachi, PK", miles: 690, amount: 3100 },
+  {
+    origin: "Karachi, PK",
+    destination: "Lahore, PK",
+    miles: 760,
+    amount: 2850,
+  },
+  {
+    origin: "Islamabad, PK",
+    destination: "Multan, PK",
+    miles: 420,
+    amount: 1680,
+  },
+  {
+    origin: "Lahore, PK",
+    destination: "Faisalabad, PK",
+    miles: 120,
+    amount: 620,
+  },
+  {
+    origin: "Karachi, PK",
+    destination: "Hyderabad, PK",
+    miles: 165,
+    amount: 740,
+  },
+  {
+    origin: "Rawalpindi, PK",
+    destination: "Peshawar, PK",
+    miles: 185,
+    amount: 810,
+  },
+  {
+    origin: "Quetta, PK",
+    destination: "Karachi, PK",
+    miles: 690,
+    amount: 3100,
+  },
   { origin: "Sialkot, PK", destination: "Lahore, PK", miles: 130, amount: 580 },
-  { origin: "Gujranwala, PK", destination: "Islamabad, PK", miles: 210, amount: 920 },
+  {
+    origin: "Gujranwala, PK",
+    destination: "Islamabad, PK",
+    miles: 210,
+    amount: 920,
+  },
 ];
 
 function createDb() {
@@ -125,7 +344,11 @@ function demoEmail(local: string) {
 function utcDateOnly(daysAgo = 0): Date {
   const now = new Date();
   return new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysAgo),
+    Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate() - daysAgo,
+    ),
   );
 }
 
@@ -168,7 +391,8 @@ async function ensureAuthUser(
   email: string,
   fullName: string,
 ) {
-  const { data: listData, error: listError } = await supabase.auth.admin.listUsers();
+  const { data: listData, error: listError } =
+    await supabase.auth.admin.listUsers();
   if (listError) throw new Error(listError.message);
 
   const existing = listData.users.find(
@@ -223,7 +447,10 @@ async function removeDemoData(db: PrismaClient) {
     where: {
       OR: [
         { dispatcherId: { in: dispatcherIds } },
-        { organizationId: org.id, carrier: { mcNumber: { startsWith: "MC-PK-" } } },
+        {
+          organizationId: org.id,
+          carrier: { mcNumber: { startsWith: "MC-PK-" } },
+        },
       ],
     },
   });
@@ -233,7 +460,9 @@ async function removeDemoData(db: PrismaClient) {
   });
 
   await db.carrierAssignmentHistory.deleteMany({
-    where: { carrier: { organizationId: org.id, mcNumber: { startsWith: "MC-PK-" } } },
+    where: {
+      carrier: { organizationId: org.id, mcNumber: { startsWith: "MC-PK-" } },
+    },
   });
 
   await db.carrier.deleteMany({
@@ -242,7 +471,9 @@ async function removeDemoData(db: PrismaClient) {
 
   for (const user of demoUsers) {
     if (user.dispatcher) {
-      await db.dispatcher.delete({ where: { id: user.dispatcher.id } }).catch(() => undefined);
+      await db.dispatcher
+        .delete({ where: { id: user.dispatcher.id } })
+        .catch(() => undefined);
     }
     await db.user.delete({ where: { id: user.id } });
   }
@@ -250,11 +481,15 @@ async function removeDemoData(db: PrismaClient) {
   const supabase = await ensureSupabase();
   for (const user of demoUsers) {
     if (user.supabaseUserId) {
-      await supabase.auth.admin.deleteUser(user.supabaseUserId).catch(() => undefined);
+      await supabase.auth.admin
+        .deleteUser(user.supabaseUserId)
+        .catch(() => undefined);
     }
   }
 
-  console.log(`Removed ${demoUsers.length} demo users and related carriers/activities.`);
+  console.log(
+    `Removed ${demoUsers.length} demo users and related carriers/activities.`,
+  );
 }
 
 async function seedDemoData(db: PrismaClient) {
@@ -299,9 +534,16 @@ async function seedDemoData(db: PrismaClient) {
   for (const teamName of TEAMS) {
     const team = await db.team.upsert({
       where: {
-        organizationId_name: { organizationId: organization.id, name: teamName },
+        organizationId_name: {
+          organizationId: organization.id,
+          name: teamName,
+        },
       },
-      create: { organizationId: organization.id, name: teamName, status: "ACTIVE" },
+      create: {
+        organizationId: organization.id,
+        name: teamName,
+        status: "ACTIVE",
+      },
       update: { status: "ACTIVE", deletedAt: null },
     });
     teamIds.set(teamName, team.id);
@@ -321,7 +563,11 @@ async function seedDemoData(db: PrismaClient) {
   for (const profile of DISPATCHERS) {
     const email = demoEmail(profile.emailLocal);
     const teamId = teamIds.get(profile.team)!;
-    const supabaseUserId = await ensureAuthUser(supabase, email, profile.fullName);
+    const supabaseUserId = await ensureAuthUser(
+      supabase,
+      email,
+      profile.fullName,
+    );
 
     const user = await db.user.upsert({
       where: {
@@ -375,7 +621,8 @@ async function seedDemoData(db: PrismaClient) {
   for (const dispatcher of dispatchers) {
     const assigned: string[] = [];
     for (let slot = 0; slot < 3; slot += 1) {
-      const template = CARRIER_TEMPLATES[carrierIndex % CARRIER_TEMPLATES.length]!;
+      const template =
+        CARRIER_TEMPLATES[carrierIndex % CARRIER_TEMPLATES.length]!;
       carrierIndex += 1;
       const mcNumber = `MC-PK-${dispatcher.emailLocal.toUpperCase().replaceAll(".", "-")}-${slot + 1}`;
 
@@ -466,7 +713,8 @@ async function seedDemoData(db: PrismaClient) {
         ratePerMile = calculateRatePerMile(loadAmount, totalMiles);
         dispatchFee = calculateDispatchFee(loadAmount, feePct);
       } else {
-        reason = STATUS_REASONS[(activityCount + daysAgo) % STATUS_REASONS.length]!;
+        reason =
+          STATUS_REASONS[(activityCount + daysAgo) % STATUS_REASONS.length]!;
       }
 
       await db.dailyActivity.upsert({
@@ -493,7 +741,8 @@ async function seedDemoData(db: PrismaClient) {
           ratePerMile,
           dispatchFee,
           reason,
-          notes: status === "DELIVERED" ? "Demo delivered load" : "Demo test entry",
+          notes:
+            status === "DELIVERED" ? "Demo delivered load" : "Demo test entry",
         },
         update: {
           status,
@@ -504,7 +753,8 @@ async function seedDemoData(db: PrismaClient) {
           ratePerMile,
           dispatchFee,
           reason,
-          notes: status === "DELIVERED" ? "Demo delivered load" : "Demo test entry",
+          notes:
+            status === "DELIVERED" ? "Demo delivered load" : "Demo test entry",
         },
       });
 
@@ -548,12 +798,16 @@ async function seedDemoData(db: PrismaClient) {
   console.log(`Teams: ${TEAMS.join(", ")}`);
   console.log(`Dispatchers: ${DISPATCHERS.length} (Pakistani names)`);
   console.log(`Carriers: ~${dispatchers.length * 3} with MC-PK-* numbers`);
-  console.log(`Activities: ${activityCount}+ entries (today + last 7 days, mixed statuses)`);
+  console.log(
+    `Activities: ${activityCount}+ entries (today + last 7 days, mixed statuses)`,
+  );
   console.log("");
   console.log("Demo dispatcher login (all use the same password):");
   console.log(`  Password: ${DEMO_PASSWORD}`);
   for (const profile of DISPATCHERS) {
-    console.log(`  ${profile.fullName.padEnd(18)} → ${demoEmail(profile.emailLocal)}`);
+    console.log(
+      `  ${profile.fullName.padEnd(18)} → ${demoEmail(profile.emailLocal)}`,
+    );
   }
   console.log("");
   console.log("Remove later: npm run seed:demo -- --remove");

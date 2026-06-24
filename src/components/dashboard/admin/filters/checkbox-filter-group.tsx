@@ -89,7 +89,9 @@ export function CheckboxFilterGroup({
 
       <div className="max-h-40 space-y-1 overflow-y-auto pr-1">
         {visibleOptions.length === 0 ? (
-          <p className="py-3 text-center text-xs text-[#94A3B8]">No matches found</p>
+          <p className="py-3 text-center text-xs text-[#94A3B8]">
+            No matches found
+          </p>
         ) : (
           visibleOptions.map((option) => {
             const checked = selectedValues.includes(option.value);
@@ -105,7 +107,9 @@ export function CheckboxFilterGroup({
                   onChange={() => toggleValue(option.value)}
                   className="size-4 rounded border-[#CBD5E1] text-[#2563EB] focus:ring-[#2563EB]/30"
                 />
-                <span className="truncate text-sm text-[#334155]">{option.label}</span>
+                <span className="truncate text-sm text-[#334155]">
+                  {option.label}
+                </span>
               </label>
             );
           })

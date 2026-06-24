@@ -27,9 +27,7 @@ function formatDetailCell(row: DispatcherRecentActivityRow): {
     amount: isDelivered
       ? formatCurrency(row.loadAmount, { nullLabel: "—" })
       : "—",
-    rate: isDelivered
-      ? formatRatePerMile(row.ratePerMile, "—")
-      : "—",
+    rate: isDelivered ? formatRatePerMile(row.ratePerMile, "—") : "—",
     reason: isDelivered ? "—" : (row.reason ?? "—"),
   };
 }
@@ -56,7 +54,7 @@ export function DispatcherRecentActivitiesTable({
         </Link>
       </div>
       <div className="overflow-x-auto">
-        <table className="min-w-[1100px] w-full text-left text-sm">
+        <table className="w-full min-w-[1100px] text-left text-sm">
           <thead className="bg-[#F8FAFC] text-xs font-medium text-[#475569]">
             <tr>
               {[
@@ -99,10 +97,16 @@ export function DispatcherRecentActivitiesTable({
                       {row.carrierName}
                     </td>
                     <td className="h-14 px-5">
-                      <StatusBadge status={row.status as ActivityDisplayStatus} />
+                      <StatusBadge
+                        status={row.status as ActivityDisplayStatus}
+                      />
                     </td>
-                    <td className="h-14 px-5 text-[#475569]">{detail.origin}</td>
-                    <td className="h-14 px-5 text-[#475569]">{detail.destination}</td>
+                    <td className="h-14 px-5 text-[#475569]">
+                      {detail.origin}
+                    </td>
+                    <td className="h-14 px-5 text-[#475569]">
+                      {detail.destination}
+                    </td>
                     <td className="h-14 px-5 text-[#475569]">{detail.miles}</td>
                     <td className="h-14 px-5 font-medium text-[#0F172A]">
                       {detail.amount}

@@ -55,7 +55,9 @@ export function DispatcherDashboardPage() {
   };
 
   const totalFilteredLoads = useMemo(() => {
-    return dashboard?.statusBreakdown.reduce((sum, item) => sum + item.value, 0) ?? 0;
+    return (
+      dashboard?.statusBreakdown.reduce((sum, item) => sum + item.value, 0) ?? 0
+    );
   }, [dashboard?.statusBreakdown]);
 
   const metricCards = useMemo(
@@ -107,7 +109,6 @@ export function DispatcherDashboardPage() {
   return (
     <div className="space-y-6">
       <DispatcherDashboardHeader
-        dispatcherName={dashboard?.dispatcherName ?? "Dispatcher"}
         onRefresh={reload}
         isRefreshing={isLoading}
       />
@@ -134,7 +135,9 @@ export function DispatcherDashboardPage() {
             ))}
           </div>
 
-          <PendingCarrierEntriesCard carriers={dashboard?.pendingCarriers ?? []} />
+          <PendingCarrierEntriesCard
+            carriers={dashboard?.pendingCarriers ?? []}
+          />
 
           <DispatcherFilterBar
             values={filters}

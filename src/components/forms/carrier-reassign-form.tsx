@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 
 import { Label } from "@/components/ui/label";
 import {
@@ -34,21 +34,22 @@ export function CarrierReassignForm({
     handleSubmit,
     reset,
     setValue,
-    watch,
+    control,
     formState: { errors },
   } = useForm<CarrierReassignValues>({
     resolver: zodResolver(carrierReassignSchema),
-    defaultValues: defaultValues ?? { assignedTeam: "", assignedDispatcher: "" },
+    defaultValues: defaultValues ?? {
+      assignedTeam: "",
+      assignedDispatcher: "",
+    },
   });
 
-  const assignedTeam = watch("assignedTeam");
-  const assignedDispatcher = watch("assignedDispatcher");
+  const assignedTeam = useWatch({ control, name: "assignedTeam" });
+  const assignedDispatcher = useWatch({ control, name: "assignedDispatcher" });
 
   const teamDispatchers = useMemo(
     () =>
-      dispatchers.filter(
-        (dispatcher) => dispatcher.teamName === assignedTeam,
-      ),
+      dispatchers.filter((dispatcher) => dispatcher.teamName === assignedTeam),
     [assignedTeam, dispatchers],
   );
 
@@ -107,12 +108,16 @@ export function CarrierReassignForm({
           </SelectContent>
         </Select>
         {errors.assignedTeam ? (
-          <p className="text-sm text-destructive">{errors.assignedTeam.message}</p>
+          <p className="text-destructive text-sm">
+            {errors.assignedTeam.message}
+          </p>
         ) : null}
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor={`${formId}-assigned-dispatcher`}>Assigned Dispatcher</Label>
+        <Label htmlFor={`${formId}-assigned-dispatcher`}>
+          Assigned Dispatcher
+        </Label>
         <Select
           value={assignedDispatcher}
           onValueChange={(value) => {
@@ -122,10 +127,17 @@ export function CarrierReassignForm({
           }}
           disabled={!assignedTeam || isLoading}
         >
-          <SelectTrigger id={`${formId}-assigned-dispatcher`} className="w-full">
+          <SelectTrigger
+            id={`${formId}-assigned-dispatcher`}
+            className="w-full"
+          >
             <SelectValue placeholder={dispatcherPlaceholder} />
           </SelectTrigger>
-          <SelectContent alignItemWithTrigger={false} side="bottom" className="max-h-60">
+          <SelectContent
+            alignItemWithTrigger={false}
+            side="bottom"
+            className="max-h-60"
+          >
             {teamDispatchers.map((dispatcher) => (
               <SelectItem key={dispatcher.id} value={dispatcher.fullName}>
                 {dispatcher.fullName}
@@ -134,7 +146,7 @@ export function CarrierReassignForm({
           </SelectContent>
         </Select>
         {errors.assignedDispatcher ? (
-          <p className="text-sm text-destructive">
+          <p className="text-destructive text-sm">
             {errors.assignedDispatcher.message}
           </p>
         ) : null}

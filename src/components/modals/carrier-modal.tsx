@@ -1,9 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useMemo, useState } from "react";
 import { Truck } from "lucide-react";
-import { useForm } from "react-hook-form";
 
 import { CarrierDetailView } from "@/components/details/carrier-detail-view";
 import { CarrierForm } from "@/components/forms/carrier-form";
@@ -52,6 +50,9 @@ const REASSIGN_FORM_ID = "carrier-reassign-form";
 
 const PREMIUM_DIALOG_CLASS =
   "flex max-h-[calc(100vh-32px)] w-full max-w-[min(820px,calc(100vw-32px))] flex-col gap-0 overflow-hidden rounded-[24px] border border-[#E5E7EB] bg-white p-0 text-[#0F172A] shadow-[0_24px_80px_rgba(15,23,42,0.18)] ring-0 sm:max-w-[min(820px,calc(100vw-32px))]";
+
+const CARRIER_VIEW_DIALOG_CLASS =
+  "flex max-h-[calc(100vh-32px)] w-full max-w-[min(1180px,calc(100vw-32px))] flex-col gap-0 overflow-hidden rounded-[24px] border border-[#E5E7EB] bg-white p-0 text-[#0F172A] shadow-[0_24px_80px_rgba(15,23,42,0.18)] ring-0 sm:max-w-[min(1180px,calc(100vw-32px))]";
 
 const PREMIUM_OVERLAY_CLASS =
   "bg-[#0F172A]/40 backdrop-blur-[2px] supports-backdrop-filter:backdrop-blur-sm";
@@ -113,17 +114,19 @@ export function CarrierModal({
   const descriptions: Record<CarrierModalMode, string> = {
     create: "Add a new carrier and assign it to a team and dispatcher.",
     edit: "Update carrier profile details.",
-    view: "Carrier profile and recent activity.",
+    view: "Carrier profile, performance summary, and daily activity history.",
     reassign: "Change team and dispatcher assignment.",
     activate: "Mark this carrier as active.",
     deactivate: "Mark this carrier as inactive.",
   };
 
-  useEffect(() => {
-    if (!open) {
+  function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen) {
       setIsSubmitting(false);
     }
-  }, [open]);
+
+    onOpenChange(nextOpen);
+  }
 
   async function handleSubmit(values: CarrierFormValues) {
     if (mode === "create") {
@@ -170,11 +173,66 @@ export function CarrierModal({
 
   const isStatusModal = mode === "activate" || mode === "deactivate";
   const isPremiumCreate = mode === "create";
+  const isCarrierView = mode === "view" && carrier;
 
   const formDefaults = useMemo(
     () => getDefaultValues(mode === "create" ? null : carrier),
     [carrier, mode],
   );
+
+  if (isCarrierView) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent
+          showCloseButton={false}
+          overlayClassName={PREMIUM_OVERLAY_CLASS}
+          className={CARRIER_VIEW_DIALOG_CLASS}
+        >
+          <header className="shrink-0 px-6 pt-8 pb-5 sm:px-10">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex min-w-0 items-start gap-4">
+                <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-[#DBEAFE] text-[#2563EB]">
+                  <Truck className="size-6" />
+                </div>
+                <div className="min-w-0 pt-0.5">
+                  <h2 className="text-xl font-semibold tracking-tight text-[#0F172A]">
+                    {carrier.carrierName}
+                  </h2>
+                  <p className="mt-1 text-sm leading-relaxed text-[#64748B]">
+                    {descriptions.view}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="rounded-lg p-2 text-[#64748B] transition-colors hover:bg-[#F8FAFC] hover:text-[#0F172A]"
+                onClick={() => onOpenChange(false)}
+                aria-label="Close"
+              >
+                <span className="text-2xl leading-none">&times;</span>
+              </button>
+            </div>
+          </header>
+
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 sm:px-10">
+            <CarrierDetailView carrier={carrier} />
+          </div>
+
+          <footer className="shrink-0 border-t border-[#E5E7EB] px-6 py-6 sm:px-10">
+            <div className="flex justify-end">
+              <button
+                type="button"
+                className="inline-flex h-11 items-center justify-center rounded-xl border border-[#E5E7EB] bg-white px-6 text-sm font-medium text-[#334155] transition-colors hover:bg-[#F8FAFC]"
+                onClick={() => onOpenChange(false)}
+              >
+                Close
+              </button>
+            </div>
+          </footer>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   if (isPremiumCreate) {
     return (
@@ -252,19 +310,17 @@ export function CarrierModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{titles[mode]}</DialogTitle>
           <DialogDescription>{descriptions[mode]}</DialogDescription>
         </DialogHeader>
 
-        {mode === "view" && carrier ? (
-          <CarrierDetailView carrier={carrier} />
-        ) : isStatusModal ? (
-          <p className="text-sm text-muted-foreground">
+        {isStatusModal ? (
+          <p className="text-muted-foreground text-sm">
             {mode === "activate" ? "Activate" : "Deactivate"}{" "}
-            <span className="font-medium text-foreground">
+            <span className="text-foreground font-medium">
               {carrier?.carrierName}
             </span>
             ? This will set the status to{" "}
@@ -290,7 +346,11 @@ export function CarrierModal({
         ) : null}
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
             Cancel
           </Button>
 

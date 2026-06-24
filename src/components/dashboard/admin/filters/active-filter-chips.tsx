@@ -4,7 +4,6 @@ import { X } from "lucide-react";
 
 import type { AdminDashboardBundle } from "@/lib/types";
 import {
-  DASHBOARD_STATUS_FILTER_OPTIONS,
   DASHBOARD_TRUCK_TYPE_OPTIONS,
   DEFAULT_ADMIN_DASHBOARD_FILTERS,
   getDateFilterChipLabel,
@@ -67,8 +66,8 @@ export function ActiveFilterChips({
       label:
         filters.teamIds.length === 1
           ? `Team: ${
-              filterOptions.teams.find((team) => team.id === filters.teamIds[0])?.name ??
-              "Selected"
+              filterOptions.teams.find((team) => team.id === filters.teamIds[0])
+                ?.name ?? "Selected"
             }`
           : `Teams: ${filters.teamIds.length} selected`,
       onRemove: () => onChange({ ...filters, teamIds: [] }),
@@ -96,8 +95,9 @@ export function ActiveFilterChips({
       label:
         filters.carrierIds.length === 1
           ? `Carrier: ${
-              filterOptions.carriers.find((carrier) => carrier.id === filters.carrierIds[0])
-                ?.name ?? "Selected"
+              filterOptions.carriers.find(
+                (carrier) => carrier.id === filters.carrierIds[0],
+              )?.name ?? "Selected"
             }`
           : `Carriers: ${filters.carrierIds.length} selected`,
       onRemove: () => onChange({ ...filters, carrierIds: [] }),
@@ -107,7 +107,8 @@ export function ActiveFilterChips({
   if (filters.truckTypes.length > 0) {
     const labels = filters.truckTypes.map(
       (type) =>
-        DASHBOARD_TRUCK_TYPE_OPTIONS.find((option) => option.value === type)?.label ?? type,
+        DASHBOARD_TRUCK_TYPE_OPTIONS.find((option) => option.value === type)
+          ?.label ?? type,
     );
     chips.push({
       key: "trucks",
@@ -134,7 +135,11 @@ export function ActiveFilterChips({
   return (
     <div className="flex flex-wrap items-center gap-2">
       {chips.map((chip) => (
-        <FilterChip key={chip.key} label={chip.label} onRemove={chip.onRemove} />
+        <FilterChip
+          key={chip.key}
+          label={chip.label}
+          onRemove={chip.onRemove}
+        />
       ))}
       <button
         type="button"

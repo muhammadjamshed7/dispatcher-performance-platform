@@ -41,10 +41,12 @@ export function KpiDispatchersPanel({
   return (
     <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-2">
       <div className="flex min-h-[240px] min-w-0 flex-col rounded-xl border border-[#E5E7EB] bg-[#FCFCFD] p-3">
-        <p className="mb-2 text-center text-xs font-semibold text-[#475569]">By Team</p>
+        <p className="mb-2 text-center text-xs font-semibold text-[#475569]">
+          By Team
+        </p>
         {hasTeamData ? (
           <>
-            <div className="min-h-[170px] flex-1 w-full">
+            <div className="min-h-[170px] w-full flex-1">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={byTeam}
@@ -74,9 +76,17 @@ export function KpiDispatchersPanel({
                       borderRadius: 10,
                       fontSize: 12,
                     }}
-                    formatter={(value) => [Number(value).toLocaleString(), "Dispatchers"]}
+                    formatter={(value) => [
+                      Number(value).toLocaleString(),
+                      "Dispatchers",
+                    ]}
                   />
-                  <Bar dataKey="count" fill="#F97316" radius={[0, 6, 6, 0]} maxBarSize={16} />
+                  <Bar
+                    dataKey="count"
+                    fill="#F97316"
+                    radius={[0, 6, 6, 0]}
+                    maxBarSize={16}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -87,7 +97,9 @@ export function KpiDispatchersPanel({
                   className="flex items-center justify-between text-[11px] text-[#64748B]"
                 >
                   <span className="truncate">{item.team}</span>
-                  <span className="font-semibold text-[#0F172A]">{item.count}</span>
+                  <span className="font-semibold text-[#0F172A]">
+                    {item.count}
+                  </span>
                 </div>
               ))}
             </div>

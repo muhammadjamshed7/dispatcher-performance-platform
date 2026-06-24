@@ -30,7 +30,7 @@ export function AuthStateScreen({
   return (
     <main
       className={cn(
-        "flex min-h-screen items-center justify-center bg-muted/30 p-6",
+        "bg-muted/30 flex min-h-screen items-center justify-center p-6",
         className,
       )}
     >
@@ -38,7 +38,7 @@ export function AuthStateScreen({
         <CardHeader className="text-center">
           <div
             className={cn(
-              "mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-muted",
+              "bg-muted mx-auto mb-3 flex size-12 items-center justify-center rounded-full",
               iconClassName,
             )}
           >
@@ -47,7 +47,9 @@ export function AuthStateScreen({
           <CardTitle>{title}</CardTitle>
           <CardDescription>{description}</CardDescription>
         </CardHeader>
-        {children ? <CardContent className="flex flex-col gap-2">{children}</CardContent> : null}
+        {children ? (
+          <CardContent className="flex flex-col gap-2">{children}</CardContent>
+        ) : null}
       </Card>
     </main>
   );

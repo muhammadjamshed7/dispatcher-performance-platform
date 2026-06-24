@@ -11,7 +11,7 @@ import {
 export const dailyActivityFormSchema = z
   .object({
     date: z.string().min(1, "Date is required"),
-    carrier: z.string().trim().min(1, "Carrier is required"),
+    carrierId: z.string().trim().min(1, "Carrier is required"),
     status: z.enum(STATUSES, { message: "Status is required" }),
     notes: z.string().trim().optional(),
     origin: z.string().trim().optional(),
@@ -76,7 +76,7 @@ export type DailyActivityFormValues = z.infer<typeof dailyActivityFormSchema>;
 
 export const defaultDailyActivityFormValues: DailyActivityFormValues = {
   date: new Date().toISOString().slice(0, 10),
-  carrier: "",
+  carrierId: "",
   status: DELIVERED,
   notes: "",
   origin: "",
@@ -86,10 +86,5 @@ export const defaultDailyActivityFormValues: DailyActivityFormValues = {
   reason: "",
 };
 
-export {
-  calculateRatePerMile,
-} from "@/lib/utils/calculate-rate-per-mile";
-export {
-  calculateDispatchFee,
-  calculateDispatchFeeEarned,
-} from "@/lib/utils/calculate-dispatch-fee";
+export { calculateRatePerMile } from "@/lib/utils/calculate-rate-per-mile";
+export { calculateDispatchFee } from "@/lib/utils/calculate-dispatch-fee";

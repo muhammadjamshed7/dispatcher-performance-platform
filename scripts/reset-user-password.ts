@@ -2,7 +2,9 @@ import "dotenv/config";
 
 import { createClient } from "@supabase/supabase-js";
 
-const email = (process.argv[2] ?? process.env.RESET_USER_EMAIL ?? "").trim().toLowerCase();
+const email = (process.argv[2] ?? process.env.RESET_USER_EMAIL ?? "")
+  .trim()
+  .toLowerCase();
 const newPassword = process.argv[3] ?? process.env.RESET_USER_PASSWORD ?? "";
 
 async function main() {
@@ -29,7 +31,8 @@ async function main() {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  const { data: listData, error: listError } = await supabase.auth.admin.listUsers();
+  const { data: listData, error: listError } =
+    await supabase.auth.admin.listUsers();
 
   if (listError) {
     throw new Error(listError.message);
@@ -54,7 +57,9 @@ async function main() {
 
   console.log(`Password updated for ${email}`);
   console.log(`User ID: ${user.id}`);
-  console.log("Sign in at /dispatcher/login (or the portal matching their role).");
+  console.log(
+    "Sign in at /dispatcher/login (or the portal matching their role).",
+  );
 }
 
 main().catch((error) => {

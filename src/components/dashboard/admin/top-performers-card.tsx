@@ -41,7 +41,10 @@ export function TopPerformersCard({ performers }: TopPerformersCardProps) {
         {hasPerformers ? (
           <div className="space-y-4">
             {performers.map((performer) => (
-              <div key={performer.name} className="flex min-w-0 items-center gap-3">
+              <div
+                key={performer.name}
+                className="flex min-w-0 items-center gap-3"
+              >
                 <span className="w-6 shrink-0 text-center text-lg">
                   {MEDALS[performer.rank - 1] ?? performer.rank}
                 </span>
@@ -52,7 +55,9 @@ export function TopPerformersCard({ performers }: TopPerformersCardProps) {
                   <p className="truncate text-sm font-medium text-[#0F172A]">
                     {performer.name}
                   </p>
-                  <p className="truncate text-xs text-[#64748B]">{performer.team}</p>
+                  <p className="truncate text-xs text-[#64748B]">
+                    {performer.team}
+                  </p>
                 </div>
                 <div className="shrink-0 text-right">
                   <p className="text-sm font-semibold text-[#0F172A]">

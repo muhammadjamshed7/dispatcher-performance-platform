@@ -30,7 +30,10 @@ export async function GET(request: Request) {
   return handleApi(async () => {
     const { scope } = await requireAccessScope("ADMIN");
     const url = new URL(request.url);
-    const filters = parseSearchParams(url.searchParams, adminDashboardFiltersSchema);
+    const filters = parseSearchParams(
+      url.searchParams,
+      adminDashboardFiltersSchema,
+    );
     return getAdminDashboardBundle(scope, filters);
   });
 }

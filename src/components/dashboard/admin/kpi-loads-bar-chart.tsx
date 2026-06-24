@@ -15,7 +15,10 @@ import {
   KpiChartEmptyState,
   KpiChartLegend,
 } from "@/components/dashboard/admin/kpi-stat-card-shell";
-import { computeYAxisMax, type KpiChartPoint } from "@/lib/dashboard/kpi-chart-utils";
+import {
+  computeYAxisMax,
+  type KpiChartPoint,
+} from "@/lib/dashboard/kpi-chart-utils";
 
 type KpiLoadsBarChartProps = {
   data: KpiChartPoint[];
@@ -34,10 +37,17 @@ export function KpiLoadsBarChart({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="min-h-[240px] flex-1 w-full">
+      <div className="min-h-[240px] w-full flex-1">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid stroke="#E2E8F0" strokeDasharray="4 4" vertical={false} />
+          <BarChart
+            data={data}
+            margin={{ top: 24, right: 8, left: 0, bottom: 0 }}
+          >
+            <CartesianGrid
+              stroke="#E2E8F0"
+              strokeDasharray="4 4"
+              vertical={false}
+            />
             <XAxis
               dataKey="date"
               tick={{ fill: "#64748B", fontSize: 11 }}
@@ -62,7 +72,12 @@ export function KpiLoadsBarChart({
               }}
               formatter={(value) => [Number(value).toLocaleString(), "Loads"]}
             />
-            <Bar dataKey="value" fill={color} radius={[6, 6, 0, 0]} maxBarSize={28}>
+            <Bar
+              dataKey="value"
+              fill={color}
+              radius={[6, 6, 0, 0]}
+              maxBarSize={28}
+            >
               <LabelList
                 dataKey="value"
                 position="top"

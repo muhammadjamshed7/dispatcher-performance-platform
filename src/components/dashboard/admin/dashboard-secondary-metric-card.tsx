@@ -53,7 +53,9 @@ export function DashboardSecondaryMetricCard({
             </p>
             <p className="mt-1 text-xs text-[#64748B]">{helper}</p>
             {growth ? (
-              <p className="mt-2 text-xs font-medium text-[#22C55E]">{growth}</p>
+              <p className="mt-2 text-xs font-medium text-[#22C55E]">
+                {growth}
+              </p>
             ) : null}
           </div>
         </div>

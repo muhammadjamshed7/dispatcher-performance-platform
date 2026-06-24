@@ -1,9 +1,11 @@
-import type { User } from "@/generated/prisma/client";
+import type { User } from "@/lib/db/types";
 import type { Role } from "@/lib/constants/roles";
 
 export type AuthContextUser = User & {
   teamName: string | null;
   dispatcherId: string | null;
+  timezone: string;
+  currency: string;
 };
 
 export type AccessScope = {

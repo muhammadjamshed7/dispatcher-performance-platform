@@ -27,8 +27,13 @@ function formatAxis(value: number) {
   return `$${value}`;
 }
 
-export function PersonalRevenueTrendChart({ data }: PersonalRevenueTrendChartProps) {
-  const maxRevenue = data.reduce((max, point) => Math.max(max, point.revenue), 0);
+export function PersonalRevenueTrendChart({
+  data,
+}: PersonalRevenueTrendChartProps) {
+  const maxRevenue = data.reduce(
+    (max, point) => Math.max(max, point.revenue),
+    0,
+  );
   const yMax = maxRevenue > 0 ? Math.ceil(maxRevenue * 1.1) : 100;
 
   return (
@@ -37,7 +42,9 @@ export function PersonalRevenueTrendChart({ data }: PersonalRevenueTrendChartPro
         <h3 className="text-base font-semibold text-[#0F172A]">
           Personal Revenue Trend
         </h3>
-        <p className="mt-1 text-xs text-[#64748B]">Delivered revenue over selected period</p>
+        <p className="mt-1 text-xs text-[#64748B]">
+          Delivered revenue over selected period
+        </p>
       </div>
       <div className={DASHBOARD_CHART_BODY_CLASS}>
         {data.length === 0 ? (
@@ -46,14 +53,27 @@ export function PersonalRevenueTrendChart({ data }: PersonalRevenueTrendChartPro
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <AreaChart
+              data={data}
+              margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+            >
               <defs>
-                <linearGradient id="dispatcherRevenueFill" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient
+                  id="dispatcherRevenueFill"
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1"
+                >
                   <stop offset="0%" stopColor="rgba(37, 99, 235, 0.22)" />
                   <stop offset="100%" stopColor="rgba(37, 99, 235, 0.02)" />
                 </linearGradient>
               </defs>
-              <CartesianGrid stroke="#E2E8F0" strokeDasharray="3 3" vertical={false} />
+              <CartesianGrid
+                stroke="#E2E8F0"
+                strokeDasharray="3 3"
+                vertical={false}
+              />
               <XAxis
                 dataKey="date"
                 tick={{ fill: "#64748B", fontSize: 12 }}

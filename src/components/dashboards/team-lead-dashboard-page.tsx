@@ -4,8 +4,7 @@ import { useCallback, useMemo } from "react";
 
 import { PageContentGate } from "@/components/feedback/page-content-gate";
 import type { PageContentState } from "@/components/feedback/page-content-gate";
-import { EntityFilterBar } from "@/components/filters/entity-filter-bar";
-import { DataTablePlaceholder } from "@/components/data-table-placeholder";
+import { TeamActivityOverviewTable } from "@/components/dashboard/team-lead/team-activity-overview-table";
 import { RoleScopeBanner } from "@/components/layout/role-scope-banner";
 import { PageShell } from "@/components/layout/page-shell";
 import { MetricCard } from "@/components/metric-card";
@@ -54,8 +53,12 @@ export function TeamLeadDashboardPage() {
   } = useApiData(loadDispatchers, []);
 
   const isLoading =
-    metricsLoading || activitiesLoading || carriersLoading || dispatchersLoading;
-  const error = metricsError ?? activitiesError ?? carriersError ?? dispatchersError;
+    metricsLoading ||
+    activitiesLoading ||
+    carriersLoading ||
+    dispatchersLoading;
+  const error =
+    metricsError ?? activitiesError ?? carriersError ?? dispatchersError;
 
   const teamActivities = useMemo(
     () => filterActivities(activities),
@@ -107,7 +110,9 @@ export function TeamLeadDashboardPage() {
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <MetricCard
               label="Team Revenue"
-              value={formatCurrency(metrics?.totalRevenue ?? null, { nullLabel: "—" })}
+              value={formatCurrency(metrics?.totalRevenue ?? null, {
+                nullLabel: "—",
+              })}
               hint="Team month-to-date total"
             />
             <MetricCard
@@ -127,18 +132,7 @@ export function TeamLeadDashboardPage() {
             />
           </div>
 
-          <EntityFilterBar />
-
-          <DataTablePlaceholder
-            title="Team Activity Overview"
-            columns={["Dispatcher", "Carrier", "Status", "Load Amount"]}
-            rows={teamActivities.slice(0, 5).map((activity) => [
-              activity.dispatcherName,
-              activity.carrierName,
-              activity.status.replaceAll("_", " "),
-              formatCurrency(activity.loadAmount, { nullLabel: "—" }),
-            ])}
-          />
+          <TeamActivityOverviewTable activities={teamActivities} />
         </>
       </PageContentGate>
     </PageShell>

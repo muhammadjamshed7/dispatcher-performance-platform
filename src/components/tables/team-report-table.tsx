@@ -13,7 +13,7 @@ import { formatPercent } from "@/lib/utils/format-percent";
 import { formatRatePerMile } from "@/lib/utils/format-rate-per-mile";
 
 type TeamReportTableProps = {
-  rows : TeamReportRow[];
+  rows: TeamReportRow[];
   title?: string;
 };
 
@@ -54,7 +54,9 @@ export function TeamReportTable({
                 <TableCell>{row.cancelledLoads}</TableCell>
                 <TableCell>{formatCurrencyCompact(row.revenue)}</TableCell>
                 <TableCell>{formatCurrencyCompact(row.dispatchFees)}</TableCell>
-                <TableCell>{formatRatePerMile(row.averageRatePerMile)}</TableCell>
+                <TableCell>
+                  {formatRatePerMile(row.averageRatePerMile)}
+                </TableCell>
                 <TableCell>{formatPercent(row.cancellationRate)}</TableCell>
                 <TableCell>{row.teamRank}</TableCell>
               </TableRow>

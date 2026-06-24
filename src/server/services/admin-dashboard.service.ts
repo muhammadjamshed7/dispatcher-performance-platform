@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { LoadActivityStatus } from "@/generated/prisma/client";
+import type { LoadActivityStatus } from "@/lib/db/types";
 import {
   CANCELLED,
   DELIVERED,
@@ -9,12 +9,14 @@ import {
 } from "@/lib/constants/statuses";
 import { STATUSES } from "@/lib/constants/statuses";
 import { TRUCK_TYPES } from "@/lib/constants/truck-types";
-import { db } from "@/lib/db/prisma";
+import { T, db } from "@/lib/db/client";
+import { applyScopeWhere, asFilterable } from "@/lib/db/query";
+import { assertDb, countRows, decimalToNumber } from "@/lib/db/utils";
 import type { AdminDashboardBundle } from "@/lib/types";
 import type { AccessScope } from "@/server/auth/types";
 import {
+  applyActivityFilters,
   assertFilterAccess,
-  buildActivityWhere,
   buildTrendDateKeys,
   formatActivityDate,
   formatTrendDateLabel,
@@ -25,17 +27,28 @@ import {
   type ActivityFilters,
 } from "@/server/utils/activity-filters";
 import {
+  activityScopeFilter,
   carrierScopeFilter,
   dispatcherScopeFilter,
   teamScopeFilter,
 } from "@/server/utils/scope-filters";
+import { getOrganizationPreferences } from "@/server/services/settings.service";
+import { getDateKeyInTimeZone } from "@/lib/utils/resolve-date-range";
+
+function unwrapRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
 
 type ActivityRecord = {
   id: string;
-  activityDate: Date;
-  createdAt: Date;
+  activityDate: string;
+  createdAt: string;
   status: LoadActivityStatus;
-  loadAmount: { toNumber(): number } | null;
+  loadAmount: string | null;
   teamNameSnapshot: string;
   dispatcherNameSnapshot: string;
   carrierNameSnapshot: string;
@@ -54,12 +67,8 @@ const STATUS_CHART_META: Record<
   CANCELLED: { label: "Canceled", color: "#EF4444" },
 };
 
-function decimalToNumber(value: { toNumber(): number } | null | undefined): number {
-  if (!value) {
-    return 0;
-  }
-
-  return value.toNumber();
+function toAmount(value: string | null | undefined): number {
+  return decimalToNumber(value) ?? 0;
 }
 
 function getInitials(name: string): string {
@@ -82,7 +91,10 @@ function mapStatusToDisplay(status: LoadActivityStatus): string {
   return STATUS_CHART_META[status].label;
 }
 
-function computeGrowthPercent(current: number, previous: number): number | null {
+function computeGrowthPercent(
+  current: number,
+  previous: number,
+): number | null {
   if (previous === 0) {
     return current === 0 ? null : 100;
   }
@@ -120,7 +132,7 @@ function buildStatusTrend(activities: ActivityRecord[], dateKeys: string[]) {
   }
 
   for (const row of activities) {
-    const dateKey = formatActivityDate(row.activityDate);
+    const dateKey = row.activityDate;
     const bucket = countsByDate.get(dateKey);
     if (!bucket) continue;
 
@@ -182,9 +194,10 @@ function buildMonthlyGrowthTrend(activities: ActivityRecord[]) {
       continue;
     }
 
-    const activityYear = row.activityDate.getUTCFullYear();
-    const activityMonth = row.activityDate.getUTCMonth();
-    const amount = decimalToNumber(row.loadAmount);
+    const activityDate = parseActivityDate(row.activityDate);
+    const activityYear = activityDate.getUTCFullYear();
+    const activityMonth = activityDate.getUTCMonth();
+    const amount = toAmount(row.loadAmount);
 
     if (activityYear === year && activityMonth <= currentMonth) {
       revenueByMonth.set(
@@ -202,7 +215,9 @@ function buildMonthlyGrowthTrend(activities: ActivityRecord[]) {
   return Array.from({ length: currentMonth + 1 }, (_, month) => {
     const revenue = revenueByMonth.get(month) ?? 0;
     const previousRevenue =
-      month === 0 ? (revenueByMonth.get(-1) ?? 0) : (revenueByMonth.get(month - 1) ?? 0);
+      month === 0
+        ? (revenueByMonth.get(-1) ?? 0)
+        : (revenueByMonth.get(month - 1) ?? 0);
     const growth =
       revenue === 0 && previousRevenue === 0
         ? 0
@@ -222,7 +237,7 @@ function filterActivitiesByDateRange(
   dateTo: string,
 ): ActivityRecord[] {
   return activities.filter((row) => {
-    const dateKey = formatActivityDate(row.activityDate);
+    const dateKey = row.activityDate;
     return dateKey >= dateFrom && dateKey <= dateTo;
   });
 }
@@ -258,11 +273,11 @@ function summarizeActivities(
     }
 
     deliveredCount += 1;
-    const dateKey = formatActivityDate(row.activityDate);
+    const dateKey = row.activityDate;
     loadsByDate.set(dateKey, (loadsByDate.get(dateKey) ?? 0) + 1);
     deliveredByDate.set(dateKey, (deliveredByDate.get(dateKey) ?? 0) + 1);
 
-    const amount = decimalToNumber(row.loadAmount);
+    const amount = toAmount(row.loadAmount);
     totalRevenue += amount;
     revenueByDate.set(dateKey, (revenueByDate.get(dateKey) ?? 0) + amount);
 
@@ -276,7 +291,7 @@ function summarizeActivities(
   }
 
   return {
-    totalLoads: deliveredCount,
+    totalLoads: activities.length,
     deliveredLoads: deliveredCount,
     totalRevenue: Math.round(totalRevenue * 100) / 100,
     onTimeRate:
@@ -318,7 +333,7 @@ function summarizeActivities(
       })),
     recentActivities: activities.slice(0, 5).map((row) => ({
       id: row.id,
-      dateTime: row.createdAt.toLocaleString("en-US", {
+      dateTime: new Date(row.createdAt).toLocaleString("en-US", {
         month: "short",
         day: "numeric",
         year: "numeric",
@@ -335,7 +350,7 @@ function summarizeActivities(
           : "—",
       truckType: formatTruckTypeLabel(row.truckTypeSnapshot),
       status: mapStatusToDisplay(row.status),
-      amount: decimalToNumber(row.loadAmount),
+      amount: toAmount(row.loadAmount),
     })),
     sparklines: {
       revenue: buildSparkline(revenueByDate, trendDateKeys),
@@ -350,23 +365,21 @@ async function fetchActivities(
   scope: AccessScope,
   filters: ActivityFilters,
 ): Promise<ActivityRecord[]> {
-  return db.dailyActivity.findMany({
-    where: buildActivityWhere(scope, filters),
-    orderBy: [{ activityDate: "desc" }, { createdAt: "desc" }],
-    select: {
-      id: true,
-      activityDate: true,
-      createdAt: true,
-      status: true,
-      loadAmount: true,
-      teamNameSnapshot: true,
-      dispatcherNameSnapshot: true,
-      carrierNameSnapshot: true,
-      truckTypeSnapshot: true,
-      origin: true,
-      destination: true,
-    },
-  });
+  const query = applyActivityFilters(
+    asFilterable(
+      db()
+        .from(T.DailyActivity)
+        .select(
+          "id, activityDate, createdAt, status, loadAmount, teamNameSnapshot, dispatcherNameSnapshot, carrierNameSnapshot, truckTypeSnapshot, origin, destination",
+        )
+        .order("activityDate", { ascending: false })
+        .order("createdAt", { ascending: false }),
+    ),
+    scope,
+    filters,
+  );
+
+  return (assertDb(await query) ?? []) as ActivityRecord[];
 }
 
 async function fetchActiveDispatchers(
@@ -374,73 +387,147 @@ async function fetchActiveDispatchers(
   filters: ActivityFilters,
 ): Promise<number> {
   const normalized = normalizeActivityFilters(filters);
+  const countFilters: Array<{
+    column: string;
+    value: string | null;
+    op?: "eq" | "is";
+  }> = [
+    { column: "organizationId", value: scope.organizationId },
+    { column: "status", value: "ACTIVE" },
+    { column: "deletedAt", value: null, op: "is" },
+  ];
 
-  return db.dispatcher.count({
-    where: {
-      organizationId: scope.organizationId,
-      status: "ACTIVE",
-      deletedAt: null,
-      ...dispatcherScopeFilter(scope),
-      ...(normalized.teamIds.length === 1
-        ? { teamId: normalized.teamIds[0] }
-        : normalized.teamIds.length > 1
-          ? { teamId: { in: normalized.teamIds } }
-          : {}),
-      ...(normalized.dispatcherIds.length === 1
-        ? { id: normalized.dispatcherIds[0] }
-        : normalized.dispatcherIds.length > 1
-          ? { id: { in: normalized.dispatcherIds } }
-          : {}),
-    },
-  });
+  const dispatcherFilter = dispatcherScopeFilter(scope);
+  if ("id" in dispatcherFilter && dispatcherFilter.id) {
+    countFilters.push({ column: "id", value: dispatcherFilter.id });
+  }
+  if ("teamId" in dispatcherFilter && dispatcherFilter.teamId) {
+    countFilters.push({ column: "teamId", value: dispatcherFilter.teamId });
+  }
+
+  if (normalized.teamIds.length === 1) {
+    countFilters.push({ column: "teamId", value: normalized.teamIds[0]! });
+  } else if (normalized.teamIds.length > 1) {
+    return countRowsWithIn(
+      T.Dispatcher,
+      countFilters,
+      "teamId",
+      normalized.teamIds,
+    );
+  }
+
+  if (normalized.dispatcherIds.length === 1) {
+    countFilters.push({ column: "id", value: normalized.dispatcherIds[0]! });
+  } else if (normalized.dispatcherIds.length > 1) {
+    return countRowsWithIn(
+      T.Dispatcher,
+      countFilters,
+      "id",
+      normalized.dispatcherIds,
+    );
+  }
+
+  return countRows(T.Dispatcher, countFilters);
+}
+
+async function countRowsWithIn(
+  table: string,
+  filters: Array<{ column: string; value: string | null; op?: "eq" | "is" }>,
+  inColumn: string,
+  inValues: string[],
+): Promise<number> {
+  let query = db()
+    .from(table)
+    .select("*", { count: "exact", head: true })
+    .in(inColumn, inValues);
+
+  for (const filter of filters) {
+    if (filter.op === "is") {
+      query = query.is(filter.column, filter.value);
+    } else {
+      query = query.eq(filter.column, filter.value as string);
+    }
+  }
+
+  const { count, error } = await query;
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return count ?? 0;
 }
 
 async function fetchFilterOptions(scope: AccessScope) {
-  const [teams, dispatchers, carriers] = await Promise.all([
-    db.team.findMany({
-      where: {
-        organizationId: scope.organizationId,
-        deletedAt: null,
-        status: "ACTIVE",
-        ...teamScopeFilter(scope),
-      },
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    }),
-    db.dispatcher.findMany({
-      where: {
-        organizationId: scope.organizationId,
-        deletedAt: null,
-        status: "ACTIVE",
-        ...dispatcherScopeFilter(scope),
-      },
-      select: {
-        id: true,
-        teamId: true,
-        user: { select: { fullName: true } },
-      },
-      orderBy: { user: { fullName: "asc" } },
-    }),
-    db.carrier.findMany({
-      where: {
-        organizationId: scope.organizationId,
-        deletedAt: null,
-        status: "ACTIVE",
-        ...carrierScopeFilter(scope),
-      },
-      select: { id: true, carrierName: true, teamId: true, dispatcherId: true },
-      orderBy: { carrierName: "asc" },
-    }),
+  const teamQuery = applyScopeWhere(
+    asFilterable(
+      db()
+        .from(T.Team)
+        .select("id, name")
+        .eq("organizationId", scope.organizationId)
+        .eq("status", "ACTIVE")
+        .is("deletedAt", null)
+        .order("name", { ascending: true }),
+    ),
+    teamScopeFilter(scope),
+  );
+
+  const dispatcherQuery = applyScopeWhere(
+    asFilterable(
+      db()
+        .from(T.Dispatcher)
+        .select("id, teamId, user:User!Dispatcher_userId_fkey(fullName)")
+        .eq("organizationId", scope.organizationId)
+        .eq("status", "ACTIVE")
+        .is("deletedAt", null),
+    ),
+    dispatcherScopeFilter(scope),
+  );
+
+  const carrierQuery = applyScopeWhere(
+    asFilterable(
+      db()
+        .from(T.Carrier)
+        .select("id, carrierName, teamId, dispatcherId")
+        .eq("organizationId", scope.organizationId)
+        .eq("status", "ACTIVE")
+        .is("deletedAt", null)
+        .order("carrierName", { ascending: true }),
+    ),
+    carrierScopeFilter(scope),
+  );
+
+  const [teams, dispatchersRaw, carriers] = await Promise.all([
+    assertDb(await teamQuery) ?? [],
+    assertDb(await dispatcherQuery) ?? [],
+    assertDb(await carrierQuery) ?? [],
   ]);
 
-  return {
-    teams,
-    dispatchers: dispatchers.map((dispatcher) => ({
+  const dispatchers = (
+    dispatchersRaw as Array<{
+      id: string;
+      teamId: string;
+      user: { fullName: string } | Array<{ fullName: string }>;
+    }>
+  )
+    .map((dispatcher) => ({
       id: dispatcher.id,
-      name: dispatcher.user.fullName,
+      name: unwrapRelation(dispatcher.user)?.fullName ?? "",
       teamId: dispatcher.teamId,
-    })),
-    carriers: carriers.map((carrier) => ({
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  return {
+    teams: teams as Array<{ id: string; name: string }>,
+    dispatchers,
+    carriers: (
+      carriers as Array<{
+        id: string;
+        carrierName: string;
+        teamId: string;
+        dispatcherId: string | null;
+      }>
+    ).map((carrier) => ({
       id: carrier.id,
       name: carrier.carrierName,
       teamId: carrier.teamId,
@@ -462,24 +549,30 @@ export async function getAdminDashboardBundle(
   rawFilters: ActivityFilters = {},
 ): Promise<AdminDashboardBundle> {
   await assertFilterAccess(scope, rawFilters);
+  const preferences = await getOrganizationPreferences(scope.organizationId);
 
-  const range = resolveDashboardDateRange(rawFilters);
+  const range = resolveDashboardDateRange(rawFilters, preferences.timezone);
 
   const previousRange = previousPeriodRange(range.dateFrom, range.dateTo);
-  const now = new Date();
+  const todayKey = getDateKeyInTimeZone(new Date(), preferences.timezone);
+  const now = new Date(`${todayKey}T00:00:00Z`);
   const year = now.getUTCFullYear();
   const yearTrendFrom = formatActivityDate(new Date(Date.UTC(year - 1, 11, 1)));
-  const yearTrendTo = formatActivityDate(now);
+  const yearTrendTo = todayKey;
 
   const trendDateKeys = buildTrendDateKeys(range.dateFrom, range.dateTo);
   const trendDates = trendDateKeys.map(formatTrendDateLabel);
 
-  const combinedDateFrom = [range.dateFrom, previousRange.dateFrom, yearTrendFrom].reduce(
-    (min, value) => (value < min ? value : min),
-  );
-  const combinedDateTo = [range.dateTo, previousRange.dateTo, yearTrendTo].reduce(
-    (max, value) => (value > max ? value : max),
-  );
+  const combinedDateFrom = [
+    range.dateFrom,
+    previousRange.dateFrom,
+    yearTrendFrom,
+  ].reduce((min, value) => (value < min ? value : min));
+  const combinedDateTo = [
+    range.dateTo,
+    previousRange.dateTo,
+    yearTrendTo,
+  ].reduce((max, value) => (value > max ? value : max));
 
   const [allActivities, activeDispatchers, filterOptions] = await Promise.all([
     fetchActivities(scope, {
@@ -536,14 +629,20 @@ export async function getAdminDashboardBundle(
       onTimeRate: current.onTimeRate,
       monthlyGrowth: monthlyGrowth ?? 0,
       growth: {
-        revenue: computeGrowthPercent(current.totalRevenue, previous.totalRevenue),
+        revenue: computeGrowthPercent(
+          current.totalRevenue,
+          previous.totalRevenue,
+        ),
         loads: computeGrowthPercent(current.totalLoads, previous.totalLoads),
         delivered: computeGrowthPercent(
           current.deliveredLoads,
           previous.deliveredLoads,
         ),
         dispatchers: null,
-        onTimeRate: computeGrowthPercent(current.onTimeRate, previous.onTimeRate),
+        onTimeRate: computeGrowthPercent(
+          current.onTimeRate,
+          previous.onTimeRate,
+        ),
         monthlyGrowth,
       },
       sparklines: current.sparklines,

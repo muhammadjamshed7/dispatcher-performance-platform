@@ -14,10 +14,7 @@ import {
   PENDING_APPROVAL,
 } from "@/lib/auth/user-statuses";
 import { getAccessDeniedMessage } from "@/lib/auth/permissions";
-import {
-  getDashboardPathForRole,
-  getLoginPathForRole,
-} from "@/lib/auth/roles";
+import { getDashboardPathForRole, getLoginPathForRole } from "@/lib/auth/roles";
 import type { Role } from "@/lib/constants/roles";
 
 type RoleGuardProps = {

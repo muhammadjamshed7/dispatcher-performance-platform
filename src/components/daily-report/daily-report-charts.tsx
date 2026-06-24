@@ -27,7 +27,10 @@ export function TeamComparisonChart({ data }: TeamComparisonChartProps) {
     team: point.team,
     loads: point.deliveredLoads,
   }));
-  const maxLoads = chartData.reduce((max, point) => Math.max(max, point.loads), 0);
+  const maxLoads = chartData.reduce(
+    (max, point) => Math.max(max, point.loads),
+    0,
+  );
   const yMax = maxLoads > 0 ? Math.ceil(maxLoads * 1.1) : 10;
 
   return (
@@ -43,8 +46,15 @@ export function TeamComparisonChart({ data }: TeamComparisonChartProps) {
           <div className={DASHBOARD_EMPTY_STATE_CLASS}>No data available</div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid stroke="#E2E8F0" strokeDasharray="3 3" vertical={false} />
+            <BarChart
+              data={chartData}
+              margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+            >
+              <CartesianGrid
+                stroke="#E2E8F0"
+                strokeDasharray="3 3"
+                vertical={false}
+              />
               <XAxis
                 dataKey="team"
                 tick={{ fill: "#64748B", fontSize: 11 }}
@@ -83,7 +93,10 @@ type RevenueByTeamChartProps = {
 };
 
 export function RevenueByTeamChart({ data }: RevenueByTeamChartProps) {
-  const maxRevenue = data.reduce((max, point) => Math.max(max, point.revenue), 0);
+  const maxRevenue = data.reduce(
+    (max, point) => Math.max(max, point.revenue),
+    0,
+  );
   const yMax = maxRevenue > 0 ? Math.ceil(maxRevenue * 1.1) : 1000;
 
   return (
@@ -99,8 +112,15 @@ export function RevenueByTeamChart({ data }: RevenueByTeamChartProps) {
           <div className={DASHBOARD_EMPTY_STATE_CLASS}>No data available</div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid stroke="#E2E8F0" strokeDasharray="3 3" vertical={false} />
+            <BarChart
+              data={data}
+              margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+            >
+              <CartesianGrid
+                stroke="#E2E8F0"
+                strokeDasharray="3 3"
+                vertical={false}
+              />
               <XAxis
                 dataKey="team"
                 tick={{ fill: "#64748B", fontSize: 11 }}

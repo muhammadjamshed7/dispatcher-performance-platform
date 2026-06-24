@@ -16,7 +16,10 @@ export function DashboardShell({ children }: DashboardShellProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const handleMenuClick = useCallback(() => {
-    if (typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches) {
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia("(max-width: 767px)").matches
+    ) {
       setMobileNavOpen((open) => !open);
       return;
     }

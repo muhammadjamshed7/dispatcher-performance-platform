@@ -3,6 +3,7 @@
 This document explains what the **Dispatcher** role does, what they can access, and how the application works from a dispatcher’s day-to-day perspective.
 
 Related docs:
+
 - [Admin guide](./admin.md)
 - [Team Lead guide](./lead.md)
 
@@ -12,13 +13,13 @@ Related docs:
 
 A **Dispatcher** manages assigned **carriers** and logs **daily activities** (loads) for each carrier every working day. Dispatchers see only **their own** data — their carriers, their activities, and their personal performance metrics.
 
-| Aspect | Dispatcher |
-|--------|------------|
-| **Scope** | Personal (`dispatcherId` linked to user) |
-| **Login URL** | `/dispatcher/login` |
-| **Register URL** | `/dispatcher/register` |
-| **Dashboard** | `/dispatcher/dashboard` |
-| **Primary job** | Log daily load status for every assigned carrier |
+| Aspect           | Dispatcher                                       |
+| ---------------- | ------------------------------------------------ |
+| **Scope**        | Personal (`dispatcherId` linked to user)         |
+| **Login URL**    | `/dispatcher/login`                              |
+| **Register URL** | `/dispatcher/register`                           |
+| **Dashboard**    | `/dispatcher/dashboard`                          |
+| **Primary job**  | Log daily load status for every assigned carrier |
 
 The UI shows a **personal view banner** (e.g. “Personal view for [Your Name]”).
 
@@ -26,13 +27,13 @@ The UI shows a **personal view banner** (e.g. “Personal view for [Your Name]�
 
 ## Dispatcher navigation (sidebar)
 
-| Menu item | URL | Purpose |
-|-----------|-----|---------|
-| Dashboard | `/dispatcher/dashboard` | Personal KPIs and daily completion |
-| My Carriers | `/dispatcher/carriers` | View assigned carriers |
-| Daily Activities | `/dispatcher/activities` | Log and edit daily entries |
-| My Performance | `/dispatcher/performance` | Revenue, loads, rankings context |
-| Account | `/dispatcher/account` | Profile and session |
+| Menu item        | URL                       | Purpose                            |
+| ---------------- | ------------------------- | ---------------------------------- |
+| Dashboard        | `/dispatcher/dashboard`   | Personal KPIs and daily completion |
+| My Carriers      | `/dispatcher/carriers`    | View assigned carriers             |
+| Daily Activities | `/dispatcher/activities`  | Log and edit daily entries         |
+| My Performance   | `/dispatcher/performance` | Revenue, loads, rankings context   |
+| Account          | `/dispatcher/account`     | Profile and session                |
 
 ### Pages dispatchers cannot access
 
@@ -81,12 +82,12 @@ Personal performance snapshot for the current period.
 
 ### KPI cards
 
-| Metric | Meaning |
-|--------|---------|
-| **Personal Revenue** | Total delivered load amount (month-to-date) |
-| **Delivered Loads** | Count of `DELIVERED` activities |
-| **Avg Rate / Mile** | Average across delivered loads |
-| **Assigned Carriers** | Number of active carriers assigned to you |
+| Metric                | Meaning                                     |
+| --------------------- | ------------------------------------------- |
+| **Personal Revenue**  | Total delivered load amount (month-to-date) |
+| **Delivered Loads**   | Count of `DELIVERED` activities             |
+| **Avg Rate / Mile**   | Average across delivered loads              |
+| **Assigned Carriers** | Number of active carriers assigned to you   |
 
 ### Daily entry completion
 
@@ -143,12 +144,12 @@ Record what happened with each assigned carrier **once per calendar day**.
 
 ### Status types
 
-| Status | When to use | Required information |
-|--------|-------------|----------------------|
-| **Delivered** | Load completed and paid | Origin, destination, total miles, load amount |
-| **In Transit** | Load moving, not yet delivered | Reason (from org list) |
-| **Pending** | No load booked today | Reason |
-| **Canceled** | Load was canceled | Reason |
+| Status         | When to use                    | Required information                          |
+| -------------- | ------------------------------ | --------------------------------------------- |
+| **Delivered**  | Load completed and paid        | Origin, destination, total miles, load amount |
+| **In Transit** | Load moving, not yet delivered | Reason (from org list)                        |
+| **Pending**    | No load booked today           | Reason                                        |
+| **Canceled**   | Load was canceled              | Reason                                        |
 
 ### Automatic calculations (Delivered only)
 
@@ -159,12 +160,12 @@ When status is **Delivered**, the system calculates:
 
 ### Important rules
 
-| Rule | Detail |
-|------|--------|
-| **One entry per carrier per day** | Cannot duplicate same carrier + date |
-| **Active carriers only** | Inactive carriers cannot receive new activities |
-| **Your carriers only** | Cannot log for another dispatcher’s carriers |
-| **Edit allowed** | Update same-day or past entries via row actions |
+| Rule                              | Detail                                          |
+| --------------------------------- | ----------------------------------------------- |
+| **One entry per carrier per day** | Cannot duplicate same carrier + date            |
+| **Active carriers only**          | Inactive carriers cannot receive new activities |
+| **Your carriers only**            | Cannot log for another dispatcher’s carriers    |
+| **Edit allowed**                  | Update same-day or past entries via row actions |
 
 ### Example daily routine
 
@@ -198,13 +199,13 @@ Password changes: use Supabase password reset flow at `/auth/reset-password` if 
 
 ## Data the Dispatcher sees (scoping)
 
-| Entity | Visibility |
-|--------|------------|
-| Teams | Not directly managed; team name shown on records |
-| Dispatchers | Only yourself (implicit) |
-| Carriers | Where `dispatcherId` = your dispatcher ID |
-| Activities | Where `dispatcherId` = your dispatcher ID |
-| Reports | No UI access (API is scoped if called directly) |
+| Entity        | Visibility                                        |
+| ------------- | ------------------------------------------------- |
+| Teams         | Not directly managed; team name shown on records  |
+| Dispatchers   | Only yourself (implicit)                          |
+| Carriers      | Where `dispatcherId` = your dispatcher ID         |
+| Activities    | Where `dispatcherId` = your dispatcher ID         |
+| Reports       | No UI access (API is scoped if called directly)   |
 | Rankings page | No UI; performance page may show ranking snippets |
 
 You **cannot** filter or view another dispatcher’s data.
@@ -228,16 +229,16 @@ You **cannot** filter or view another dispatcher’s data.
 
 ## API access (Dispatcher)
 
-| Endpoint | Access |
-|----------|--------|
-| `GET /api/dashboard/dispatcher` | Personal metrics |
-| `GET /api/carriers` | Assigned carriers only |
-| `POST /api/carriers` | ❌ Forbidden |
-| `GET /api/activities` | Own activities |
-| `POST /api/activities` | Own carriers only |
-| `PATCH /api/activities/[id]` | Own activities only |
-| `GET /api/rankings` | Scoped (no dedicated nav page) |
-| Reports / Settings / Teams / User requests | ❌ No access |
+| Endpoint                                   | Access                         |
+| ------------------------------------------ | ------------------------------ |
+| `GET /api/dashboard/dispatcher`            | Personal metrics               |
+| `GET /api/carriers`                        | Assigned carriers only         |
+| `POST /api/carriers`                       | ❌ Forbidden                   |
+| `GET /api/activities`                      | Own activities                 |
+| `POST /api/activities`                     | Own carriers only              |
+| `PATCH /api/activities/[id]`               | Own activities only            |
+| `GET /api/rankings`                        | Scoped (no dedicated nav page) |
+| Reports / Settings / Teams / User requests | ❌ No access                   |
 
 Activity filters available: date range, status, carrier, truck type (within your scope).
 
@@ -260,15 +261,15 @@ Exact list depends on organization configuration.
 
 Carriers are assigned a truck type. Common values:
 
-| Code | Label |
-|------|-------|
-| `DRY_VAN` | Dry Van |
-| `REEFER` | Reefer |
-| `FLATBED` | Flatbed |
-| `BOX_TRUCK` | Box Truck |
-| `HOTSHOT` | Hotshot |
+| Code         | Label      |
+| ------------ | ---------- |
+| `DRY_VAN`    | Dry Van    |
+| `REEFER`     | Reefer     |
+| `FLATBED`    | Flatbed    |
+| `BOX_TRUCK`  | Box Truck  |
+| `HOTSHOT`    | Hotshot    |
 | `POWER_ONLY` | Power Only |
-| `CARGO_VAN` | Cargo Van |
+| `CARGO_VAN`  | Cargo Van  |
 
 Truck type appears on activity snapshots and reports.
 
@@ -276,29 +277,29 @@ Truck type appears on activity snapshots and reports.
 
 ## Dispatcher vs Team Lead vs Admin
 
-| Task | Dispatcher | Team Lead | Admin |
-|------|:----------:|:---------:|:-----:|
-| Log daily activities | ✅ Own carriers | ✅ Team | ✅ All |
-| View assigned carriers | ✅ | ✅ Team | ✅ All |
-| Create carriers | ❌ | ✅ | ✅ |
-| Manage dispatchers | ❌ | ✅ Team | ✅ All |
-| View team reports | ❌ | ✅ | ✅ |
-| Approve new users | ❌ | ❌ | ✅ |
-| Change org settings | ❌ | ❌ | ✅ |
+| Task                   |   Dispatcher    | Team Lead | Admin  |
+| ---------------------- | :-------------: | :-------: | :----: |
+| Log daily activities   | ✅ Own carriers |  ✅ Team  | ✅ All |
+| View assigned carriers |       ✅        |  ✅ Team  | ✅ All |
+| Create carriers        |       ❌        |    ✅     |   ✅   |
+| Manage dispatchers     |       ❌        |  ✅ Team  | ✅ All |
+| View team reports      |       ❌        |    ✅     |   ✅   |
+| Approve new users      |       ❌        |    ❌     |   ✅   |
+| Change org settings    |       ❌        |    ❌     |   ✅   |
 
 ---
 
 ## Who to contact
 
-| Issue | Contact |
-|-------|---------|
-| Need new carrier assigned | Team Lead or Admin |
-| Carrier reassigned to you | Team Lead or Admin |
-| Cannot log in / password | Admin |
-| Registration still pending | Admin (User Requests) |
-| Wrong team assignment | Admin |
-| Fee % or status reason changes | Admin (Settings) |
-| Dispute over activity data | Team Lead |
+| Issue                          | Contact               |
+| ------------------------------ | --------------------- |
+| Need new carrier assigned      | Team Lead or Admin    |
+| Carrier reassigned to you      | Team Lead or Admin    |
+| Cannot log in / password       | Admin                 |
+| Registration still pending     | Admin (User Requests) |
+| Wrong team assignment          | Admin                 |
+| Fee % or status reason changes | Admin (Settings)      |
+| Dispute over activity data     | Team Lead             |
 
 ---
 

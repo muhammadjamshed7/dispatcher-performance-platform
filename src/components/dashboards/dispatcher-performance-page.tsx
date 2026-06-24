@@ -35,11 +35,13 @@ import { formatCurrency } from "@/lib/utils/format-currency";
 import { formatRatePerMile } from "@/lib/utils/format-rate-per-mile";
 
 function isDispatcherRanking(row: unknown): row is DispatcherRanking {
-  return typeof row === "object" && row !== null && "name" in row && "team" in row;
+  return (
+    typeof row === "object" && row !== null && "name" in row && "team" in row
+  );
 }
 
 export function DispatcherPerformancePage() {
-  const { filterActivities, filterCarriers, dispatcherName } = useRoleScope();
+  const { filterActivities, filterCarriers, user } = useRoleScope();
 
   const loadMetrics = useCallback(() => fetchDispatcherDashboard(), []);
   const loadRankings = useCallback(() => fetchRankings("dispatcher"), []);
@@ -73,7 +75,8 @@ export function DispatcherPerformancePage() {
 
   const isLoading =
     metricsLoading || rankingsLoading || carriersLoading || activitiesLoading;
-  const error = metricsError ?? rankingsError ?? carriersError ?? activitiesError;
+  const error =
+    metricsError ?? rankingsError ?? carriersError ?? activitiesError;
 
   const assignedCarriers = useMemo(
     () => filterCarriers(carriers),
@@ -89,9 +92,9 @@ export function DispatcherPerformancePage() {
     [rankings],
   );
 
-  const personalRanking = dispatcherRankings.find(
-    (row) => row.name === dispatcherName,
-  );
+  const personalRanking = user.dispatcherId
+    ? dispatcherRankings.find((row) => row.id === user.dispatcherId)
+    : undefined;
 
   const deliveredCount = personalActivities.filter(
     (activity) => activity.status === DELIVERED,
@@ -130,8 +133,8 @@ export function DispatcherPerformancePage() {
     >
       <RoleScopeBanner
         message={
-          dispatcherName
-            ? `Performance view for ${dispatcherName}`
+          user.fullName
+            ? `Performance view for ${user.fullName}`
             : "Dispatcher performance view"
         }
       />
@@ -144,7 +147,8 @@ export function DispatcherPerformancePage() {
         emptyDescription="Performance metrics are not available yet."
         errorTitle="Unable to load performance"
         errorDescription={
-          error ?? "Performance data could not be loaded. Try again in a moment."
+          error ??
+          "Performance data could not be loaded. Try again in a moment."
         }
       >
         <>
@@ -176,9 +180,12 @@ export function DispatcherPerformancePage() {
             />
             <MetricCard
               label="Revenue Generated"
-              value={formatCurrency(dashboard?.metrics.personalRevenue ?? null, {
-                nullLabel: "—",
-              })}
+              value={formatCurrency(
+                dashboard?.metrics.personalRevenue ?? null,
+                {
+                  nullLabel: "—",
+                },
+              )}
               hint="Month-to-date total"
             />
             <MetricCard
@@ -188,7 +195,10 @@ export function DispatcherPerformancePage() {
             />
             <MetricCard
               label="Avg Rate / Mile"
-              value={formatRatePerMile(dashboard?.metrics.avgRatePerMile ?? null, "—")}
+              value={formatRatePerMile(
+                dashboard?.metrics.avgRatePerMile ?? null,
+                "—",
+              )}
               hint="Personal average"
             />
           </div>
@@ -202,25 +212,37 @@ export function DispatcherPerformancePage() {
                 {personalRanking ? (
                   <>
                     <p>
-                      Rank: <span className="font-medium">#{personalRanking.rank}</span>
+                      Rank:{" "}
+                      <span className="font-medium">
+                        #{personalRanking.rank}
+                      </span>
                     </p>
                     <p>
                       Assigned carriers:{" "}
-                      <span className="font-medium">{personalRanking.carriers}</span>
+                      <span className="font-medium">
+                        {personalRanking.carriers}
+                      </span>
                     </p>
                     <p>
-                      Team: <span className="font-medium">{personalRanking.team}</span>
+                      Team:{" "}
+                      <span className="font-medium">
+                        {personalRanking.team}
+                      </span>
                     </p>
                   </>
                 ) : (
-                  <p className="text-muted-foreground">No ranking data for this dispatcher.</p>
+                  <p className="text-muted-foreground">
+                    No ranking data for this dispatcher.
+                  </p>
                 )}
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Assigned Carriers Preview</CardTitle>
+                <CardTitle className="text-base">
+                  Assigned Carriers Preview
+                </CardTitle>
               </CardHeader>
               <CardContent className="overflow-x-auto">
                 <Table>

@@ -79,14 +79,16 @@ export function DispatcherFilterBar({
   const carrierLabel =
     values.carrierId === FILTER_ALL
       ? "All Carriers"
-      : (filterOptions.carriers.find((carrier) => carrier.id === values.carrierId)
-          ?.name ?? "All Carriers");
+      : (filterOptions.carriers.find(
+          (carrier) => carrier.id === values.carrierId,
+        )?.name ?? "All Carriers");
 
   const truckTypeLabel =
     values.truckType === FILTER_ALL
       ? "All Types"
-      : (filterOptions.truckTypes.find((type) => type.value === values.truckType)
-          ?.label ?? "All Types");
+      : (filterOptions.truckTypes.find(
+          (type) => type.value === values.truckType,
+        )?.label ?? "All Types");
 
   const statusLabel =
     values.status === FILTER_ALL

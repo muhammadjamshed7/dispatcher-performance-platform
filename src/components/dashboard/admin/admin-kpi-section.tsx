@@ -58,7 +58,9 @@ export function AdminKpiSection({
   ]);
 
   const dispatchersByTeam = useMemo(() => {
-    const teamNames = new Map(filterOptions.teams.map((team) => [team.id, team.name]));
+    const teamNames = new Map(
+      filterOptions.teams.map((team) => [team.id, team.name]),
+    );
     const counts = new Map<string, number>();
 
     for (const dispatcher of scopedDispatchers) {
@@ -72,7 +74,9 @@ export function AdminKpiSection({
   }, [filterOptions.teams, scopedDispatchers]);
 
   const utilization = useMemo(() => {
-    const assigned = scopedDispatchers.filter((dispatcher) => dispatcher.teamId).length;
+    const assigned = scopedDispatchers.filter(
+      (dispatcher) => dispatcher.teamId,
+    ).length;
     const unassigned = Math.max(scopedDispatchers.length - assigned, 0);
     const total = Math.max(metrics.activeDispatchers, scopedDispatchers.length);
 
@@ -150,7 +154,8 @@ export function AdminKpiSection({
         label="Active Dispatchers"
         value={metrics.activeDispatchers.toLocaleString()}
         helper={
-          appliedFilters.teamIds.length > 0 || appliedFilters.dispatcherIds.length > 0
+          appliedFilters.teamIds.length > 0 ||
+          appliedFilters.dispatcherIds.length > 0
             ? "Matching current filters"
             : "Across all teams"
         }

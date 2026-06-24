@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,14 +38,14 @@ export function TeamForm({
     handleSubmit,
     reset,
     setValue,
-    watch,
+    control,
     formState: { errors },
   } = useForm<TeamFormValues>({
     resolver: zodResolver(teamFormSchema),
     defaultValues,
   });
 
-  const status = watch("status");
+  const status = useWatch({ control, name: "status" });
 
   useEffect(() => {
     reset(defaultValues);
@@ -68,7 +68,7 @@ export function TeamForm({
           {...register("name")}
         />
         {errors.name ? (
-          <p className="text-sm text-destructive">{errors.name.message}</p>
+          <p className="text-destructive text-sm">{errors.name.message}</p>
         ) : null}
       </div>
 
@@ -95,7 +95,7 @@ export function TeamForm({
           </SelectContent>
         </Select>
         {errors.status ? (
-          <p className="text-sm text-destructive">{errors.status.message}</p>
+          <p className="text-destructive text-sm">{errors.status.message}</p>
         ) : null}
       </div>
     </form>

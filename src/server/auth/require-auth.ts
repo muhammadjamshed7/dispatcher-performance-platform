@@ -33,24 +33,31 @@ export async function requireActiveUser(): Promise<AuthContextUser> {
   const user = await requireUser();
 
   if (user.status !== ACTIVE) {
-    throw new ForbiddenError(getAccessDeniedMessage(
-      {
-        userId: user.id,
-        fullName: user.fullName,
-        email: user.email,
-        role: user.role,
-        status: user.status,
-        teamId: user.teamId,
-        dispatcherId: user.dispatcherId,
-      },
-      user.role,
-    ));
+    throw new ForbiddenError(
+      getAccessDeniedMessage(
+        {
+          userId: user.id,
+          fullName: user.fullName,
+          email: user.email,
+          role: user.role,
+          status: user.status,
+          teamId: user.teamId,
+          dispatcherId: user.dispatcherId,
+          lastLoginAt: user.lastLoginAt ?? null,
+          timezone: user.timezone,
+          currency: user.currency,
+        },
+        user.role,
+      ),
+    );
   }
 
   return user;
 }
 
-export async function requireRole(requiredRole: Role): Promise<AuthContextUser> {
+export async function requireRole(
+  requiredRole: Role,
+): Promise<AuthContextUser> {
   const user = await requireActiveUser();
 
   if (user.role !== requiredRole) {
@@ -64,6 +71,9 @@ export async function requireRole(requiredRole: Role): Promise<AuthContextUser> 
           status: user.status,
           teamId: user.teamId,
           dispatcherId: user.dispatcherId,
+          lastLoginAt: user.lastLoginAt ?? null,
+          timezone: user.timezone,
+          currency: user.currency,
         },
         requiredRole,
       ),
@@ -77,7 +87,9 @@ export async function requireAccessScope(requiredRole?: Role): Promise<{
   user: AuthContextUser;
   scope: AccessScope;
 }> {
-  const user = requiredRole ? await requireRole(requiredRole) : await requireActiveUser();
+  const user = requiredRole
+    ? await requireRole(requiredRole)
+    : await requireActiveUser();
 
   return {
     user,
@@ -95,13 +107,18 @@ export function assertTeamAccess(scope: AccessScope, teamId: string): void {
   }
 }
 
-export function assertDispatcherAccess(scope: AccessScope, dispatcherId: string): void {
+export function assertDispatcherAccess(
+  scope: AccessScope,
+  dispatcherId: string,
+): void {
   if (scope.isCompanyWide || scope.role === "TEAM_LEAD") {
     return;
   }
 
   if (scope.dispatcherId !== dispatcherId) {
-    throw new ForbiddenError("You do not have access to this dispatcher record.");
+    throw new ForbiddenError(
+      "You do not have access to this dispatcher record.",
+    );
   }
 }
 

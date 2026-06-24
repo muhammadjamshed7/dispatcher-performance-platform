@@ -14,7 +14,9 @@ type DispatcherDetailViewProps = {
   dispatcher: Dispatcher;
 };
 
-export function DispatcherDetailView({ dispatcher }: DispatcherDetailViewProps) {
+export function DispatcherDetailView({
+  dispatcher,
+}: DispatcherDetailViewProps) {
   const loadCarriers = useCallback(() => fetchCarriers(), []);
   const loadActivities = useCallback(
     () => fetchActivities({ dispatcherId: dispatcher.id }),
@@ -41,13 +43,16 @@ export function DispatcherDetailView({ dispatcher }: DispatcherDetailViewProps) 
         </CardHeader>
         <CardContent className="grid gap-3 text-sm sm:grid-cols-2">
           <p>
-            <span className="text-muted-foreground">Email:</span> {dispatcher.email}
+            <span className="text-muted-foreground">Email:</span>{" "}
+            {dispatcher.email}
           </p>
           <p>
-            <span className="text-muted-foreground">Phone:</span> {dispatcher.phoneNumber}
+            <span className="text-muted-foreground">Phone:</span>{" "}
+            {dispatcher.phoneNumber}
           </p>
           <p>
-            <span className="text-muted-foreground">Team:</span> {dispatcher.teamName}
+            <span className="text-muted-foreground">Team:</span>{" "}
+            {dispatcher.teamName}
           </p>
           <p>
             <span className="text-muted-foreground">Role:</span>{" "}
@@ -57,7 +62,9 @@ export function DispatcherDetailView({ dispatcher }: DispatcherDetailViewProps) 
             <span className="text-muted-foreground">Status:</span>{" "}
             <Badge
               variant={
-                dispatcher.status === TEAM_STATUS_ACTIVE ? "default" : "secondary"
+                dispatcher.status === TEAM_STATUS_ACTIVE
+                  ? "default"
+                  : "secondary"
               }
             >
               {dispatcher.status}

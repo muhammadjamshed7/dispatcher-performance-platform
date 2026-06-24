@@ -2,13 +2,19 @@ import { z } from "zod";
 
 import { DISPATCHER_ROLES } from "@/lib/validation/dispatcher-form";
 import { TEAM_STATUSES } from "@/lib/constants/team-statuses";
-import { parseJsonBody } from "@/server/api/request";
+import { parseJsonBody, parseSearchParams } from "@/server/api/request";
 import { handleApi } from "@/server/api/response";
 import { requireAccessScope } from "@/server/auth/require-auth";
 import {
   createDispatcher,
   listDispatchers,
 } from "@/server/services/dispatchers.service";
+
+const dispatcherFiltersSchema = z.object({
+  q: z.string().trim().min(1).max(100).optional(),
+  teamId: z.string().optional(),
+  dispatcherId: z.string().optional(),
+});
 
 const createDispatcherBodySchema = z.object({
   fullName: z.string().trim().min(1),
@@ -19,10 +25,15 @@ const createDispatcherBodySchema = z.object({
   status: z.enum(TEAM_STATUSES),
 });
 
-export async function GET() {
+export async function GET(request: Request) {
   return handleApi(async () => {
     const { scope } = await requireAccessScope();
-    return listDispatchers(scope);
+    const url = new URL(request.url);
+    const filters = parseSearchParams(
+      url.searchParams,
+      dispatcherFiltersSchema,
+    );
+    return listDispatchers(scope, filters);
   });
 }
 

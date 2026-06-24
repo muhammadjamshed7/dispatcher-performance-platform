@@ -42,16 +42,23 @@ export function KpiRevenueChart({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="min-h-[240px] flex-1 w-full">
+      <div className="min-h-[240px] w-full flex-1">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
+          <AreaChart
+            data={data}
+            margin={{ top: 24, right: 8, left: 0, bottom: 0 }}
+          >
             <defs>
               <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={color} stopOpacity={0.22} />
                 <stop offset="100%" stopColor={color} stopOpacity={0.03} />
               </linearGradient>
             </defs>
-            <CartesianGrid stroke="#E2E8F0" strokeDasharray="4 4" vertical={false} />
+            <CartesianGrid
+              stroke="#E2E8F0"
+              strokeDasharray="4 4"
+              vertical={false}
+            />
             <XAxis
               dataKey="date"
               tick={{ fill: "#64748B", fontSize: 11 }}
@@ -74,7 +81,10 @@ export function KpiRevenueChart({
                 borderRadius: 10,
                 fontSize: 12,
               }}
-              formatter={(value) => [formatKpiCurrencyLabel(Number(value)), "Revenue"]}
+              formatter={(value) => [
+                formatKpiCurrencyLabel(Number(value)),
+                "Revenue",
+              ]}
             />
             <Area
               type="monotone"

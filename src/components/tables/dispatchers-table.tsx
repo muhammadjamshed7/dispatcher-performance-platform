@@ -23,16 +23,18 @@ import { TEAM_STATUS_ACTIVE } from "@/lib/constants/team-statuses";
 import type { Dispatcher } from "@/lib/types";
 import { formatDateShort } from "@/lib/utils/format-date";
 
-export type DispatcherRowAction = "view" | "edit" | "toggle-status";
+export type DispatcherRowAction = "view" | "edit" | "toggle-status" | "finance";
 
 type DispatchersTableProps = {
   dispatchers: Dispatcher[];
-  onAction: (dispatcher : Dispatcher, action: DispatcherRowAction) => void;
+  onAction: (dispatcher: Dispatcher, action: DispatcherRowAction) => void;
+  showFinanceAction?: boolean;
 };
 
 export function DispatchersTable({
   dispatchers,
   onAction,
+  showFinanceAction = false,
 }: DispatchersTableProps) {
   return (
     <Card>
@@ -59,7 +61,7 @@ export function DispatchersTable({
               <TableRow>
                 <TableCell
                   colSpan={9}
-                  className="py-8 text-center text-muted-foreground"
+                  className="text-muted-foreground py-8 text-center"
                 >
                   No dispatchers found.
                 </TableCell>
@@ -107,6 +109,13 @@ export function DispatchersTable({
                         >
                           View
                         </DropdownMenuItem>
+                        {showFinanceAction ? (
+                          <DropdownMenuItem
+                            onClick={() => onAction(dispatcher, "finance")}
+                          >
+                            Finance
+                          </DropdownMenuItem>
+                        ) : null}
                         <DropdownMenuItem
                           onClick={() => onAction(dispatcher, "edit")}
                         >

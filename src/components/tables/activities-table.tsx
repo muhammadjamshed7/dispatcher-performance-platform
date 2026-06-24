@@ -23,7 +23,10 @@ import { DELIVERED } from "@/lib/constants/statuses";
 import type { DailyActivity } from "@/lib/types";
 import { formatActivityDate } from "@/lib/utils/format-date";
 import { formatCurrency } from "@/lib/utils/format-currency";
-import { formatNullableNumber, formatNullableText } from "@/lib/utils/format-display";
+import {
+  formatNullableNumber,
+  formatNullableText,
+} from "@/lib/utils/format-display";
 import { formatRatePerMile } from "@/lib/utils/format-rate-per-mile";
 
 export type ActivityRowAction = "view" | "edit";
@@ -33,7 +36,10 @@ type ActivitiesTableProps = {
   onAction: (activity: DailyActivity, action: ActivityRowAction) => void;
 };
 
-export function ActivitiesTable({ activities, onAction }: ActivitiesTableProps) {
+export function ActivitiesTable({
+  activities,
+  onAction,
+}: ActivitiesTableProps) {
   return (
     <Card>
       <CardHeader>
@@ -65,7 +71,7 @@ export function ActivitiesTable({ activities, onAction }: ActivitiesTableProps) 
               <TableRow>
                 <TableCell
                   colSpan={15}
-                  className="py-8 text-center text-muted-foreground"
+                  className="text-muted-foreground py-8 text-center"
                 >
                   No activities found.
                 </TableCell>
@@ -79,15 +85,21 @@ export function ActivitiesTable({ activities, onAction }: ActivitiesTableProps) 
                   </TableCell>
                   <TableCell>{activity.dispatcherName}</TableCell>
                   <TableCell>{activity.teamName}</TableCell>
-                  <TableCell>{activity.truckType.replaceAll("_", " ")}</TableCell>
+                  <TableCell>
+                    {activity.truckType.replaceAll("_", " ")}
+                  </TableCell>
                   <TableCell>
                     <StatusBadge status={activity.status} />
                   </TableCell>
-                  <TableCell>{formatNullableText(activity.origin, "—")}</TableCell>
+                  <TableCell>
+                    {formatNullableText(activity.origin, "—")}
+                  </TableCell>
                   <TableCell>
                     {formatNullableText(activity.destination, "—")}
                   </TableCell>
-                  <TableCell>{formatNullableNumber(activity.miles, "—")}</TableCell>
+                  <TableCell>
+                    {formatNullableNumber(activity.miles, "—")}
+                  </TableCell>
                   <TableCell>
                     {formatCurrency(activity.loadAmount, { nullLabel: "—" })}
                   </TableCell>
@@ -101,8 +113,12 @@ export function ActivitiesTable({ activities, onAction }: ActivitiesTableProps) 
                       ? formatCurrency(activity.dispatchFee, { nullLabel: "—" })
                       : "—"}
                   </TableCell>
-                  <TableCell>{formatNullableText(activity.reason, "—")}</TableCell>
-                  <TableCell>{formatNullableText(activity.notes, "—")}</TableCell>
+                  <TableCell>
+                    {formatNullableText(activity.reason, "—")}
+                  </TableCell>
+                  <TableCell>
+                    {formatNullableText(activity.notes, "—")}
+                  </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger

@@ -6,6 +6,7 @@ import {
   Activity,
   BarChart3,
   CalendarDays,
+  DollarSign,
   FileText,
   LayoutDashboard,
   Settings,
@@ -19,10 +20,7 @@ import {
 
 import { useSession } from "@/components/auth/session-provider";
 import { Badge } from "@/components/ui/badge";
-import {
-  getAccountPathForRole,
-  getNavItemsForRole,
-} from "@/lib/auth/roles";
+import { getAccountPathForRole, getNavItemsForRole } from "@/lib/auth/roles";
 import { getInitials } from "@/lib/utils/get-initials";
 import { isNavItemActive } from "@/lib/nav-utils";
 import { cn } from "@/lib/utils";
@@ -39,6 +37,7 @@ const NAV_ICONS: Record<string, typeof LayoutDashboard> = {
   settings: Settings,
   users: UserPlus,
   performance: BarChart3,
+  finance: DollarSign,
   account: UserCircle,
 };
 
@@ -108,16 +107,16 @@ export function AppSidebar({
               title={isCollapsed ? item.label : undefined}
               className={cn(
                 "flex items-center rounded-xl text-sm font-medium transition-colors",
-                isCollapsed
-                  ? "size-10 justify-center"
-                  : "gap-3 px-3 py-2.5",
+                isCollapsed ? "size-10 justify-center" : "gap-3 px-3 py-2.5",
                 isActive
                   ? "bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] text-white shadow-sm"
                   : "text-[#475569] hover:bg-[#F1F5F9] hover:text-[#0F172A]",
               )}
             >
               <Icon className="size-4 shrink-0" />
-              {!isCollapsed ? <span className="truncate">{item.label}</span> : null}
+              {!isCollapsed ? (
+                <span className="truncate">{item.label}</span>
+              ) : null}
             </Link>
           );
         })}
@@ -128,7 +127,7 @@ export function AppSidebar({
           <div className="flex flex-wrap items-center gap-1.5">
             <Badge
               variant="outline"
-              className="border-[#E2E8F0] bg-white text-[10px] uppercase tracking-wide text-[#64748B]"
+              className="border-[#E2E8F0] bg-white text-[10px] tracking-wide text-[#64748B] uppercase"
             >
               Session
             </Badge>

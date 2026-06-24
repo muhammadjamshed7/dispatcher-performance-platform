@@ -5,22 +5,24 @@ import { useCallback, useMemo, useState } from "react";
 import { PageContentGate } from "@/components/feedback/page-content-gate";
 import type { PageContentState } from "@/components/feedback/page-content-gate";
 import { EntityFilterBar } from "@/components/filters/entity-filter-bar";
-import { DataTablePlaceholder } from "@/components/data-table-placeholder";
+import { RankingsTable } from "@/components/tables/rankings-table";
 import { RoleScopeBanner } from "@/components/layout/role-scope-banner";
 import { MetricCard } from "@/components/metric-card";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useApiData } from "@/hooks/use-api-data";
-import { fetchDispatchers, fetchRankings } from "@/lib/api/resources";
-import { TEAM_STATUS_ACTIVE } from "@/lib/constants/team-statuses";
+import { fetchRankings } from "@/lib/api/resources";
+import {
+  DEFAULT_ENTITY_FILTERS,
+  entityFiltersToRankingParams,
+  type EntityFilterValues,
+} from "@/lib/filters/entity-filter-params";
 import type {
   CarrierRanking,
   DispatcherRanking,
   TeamRanking,
 } from "@/lib/types";
-import { formatCurrencyCompact } from "@/lib/utils/format-currency";
-
 type RankingTab = "dispatchers" | "carriers" | "teams";
 
 const RANKING_TABS: { id: RankingTab; label: string }[] = [
@@ -30,7 +32,9 @@ const RANKING_TABS: { id: RankingTab; label: string }[] = [
 ];
 
 function isDispatcherRanking(row: unknown): row is DispatcherRanking {
-  return typeof row === "object" && row !== null && "name" in row && "team" in row;
+  return (
+    typeof row === "object" && row !== null && "name" in row && "team" in row
+  );
 }
 
 function isCarrierRanking(row: unknown): row is CarrierRanking {
@@ -48,6 +52,12 @@ function isTeamRanking(row: unknown): row is TeamRanking {
 
 export function RankingsPageContent() {
   const [activeTab, setActiveTab] = useState<RankingTab>("dispatchers");
+  const [draftFilters, setDraftFilters] = useState<EntityFilterValues>(
+    DEFAULT_ENTITY_FILTERS,
+  );
+  const [appliedFilters, setAppliedFilters] = useState<EntityFilterValues>(
+    DEFAULT_ENTITY_FILTERS,
+  );
 
   const rankingType =
     activeTab === "dispatchers"
@@ -57,10 +67,10 @@ export function RankingsPageContent() {
         : "team";
 
   const loadRankings = useCallback(
-    () => fetchRankings(rankingType),
-    [rankingType],
+    () =>
+      fetchRankings(rankingType, entityFiltersToRankingParams(appliedFilters)),
+    [appliedFilters, rankingType],
   );
-  const loadDispatchers = useCallback(() => fetchDispatchers(), []);
 
   const {
     data: rankings = [],
@@ -68,8 +78,7 @@ export function RankingsPageContent() {
     isLoading,
     isEmpty,
     reload,
-  } = useApiData(loadRankings, [activeTab]);
-  const { data: dispatchers = [] } = useApiData(loadDispatchers, []);
+  } = useApiData(loadRankings, [activeTab, appliedFilters]);
 
   const dispatcherRankings = useMemo(
     () => rankings.filter(isDispatcherRanking),
@@ -79,7 +88,10 @@ export function RankingsPageContent() {
     () => rankings.filter(isCarrierRanking),
     [rankings],
   );
-  const teamRankings = useMemo(() => rankings.filter(isTeamRanking), [rankings]);
+  const teamRankings = useMemo(
+    () => rankings.filter(isTeamRanking),
+    [rankings],
+  );
 
   const activeRows =
     activeTab === "dispatchers"
@@ -96,9 +108,7 @@ export function RankingsPageContent() {
         ? "empty"
         : "ready";
 
-  const activeCount = dispatchers.filter(
-    (dispatcher) => dispatcher.status === TEAM_STATUS_ACTIVE,
-  ).length;
+  const activeCount = dispatcherRankings.length;
 
   return (
     <PageShell
@@ -122,7 +132,15 @@ export function RankingsPageContent() {
         ))}
       </div>
 
-      <EntityFilterBar />
+      <EntityFilterBar
+        values={draftFilters}
+        onChange={setDraftFilters}
+        onApply={() => setAppliedFilters(draftFilters)}
+        showDateRange={false}
+        showCarrier={false}
+        showTruckType={false}
+        showStatus={false}
+      />
 
       <PageContentGate
         state={pageState}
@@ -149,47 +167,26 @@ export function RankingsPageContent() {
                     : (teamRankings[0]?.teamName ?? "—")
               }
             />
-            <MetricCard label="Ranked Items" value={activeRows.length.toString()} />
-            <MetricCard label="Active Dispatchers" value={activeCount.toString()} />
+            <MetricCard
+              label="Ranked Items"
+              value={activeRows.length.toString()}
+            />
+            <MetricCard
+              label="Active Dispatchers"
+              value={activeCount.toString()}
+            />
           </div>
 
           {activeTab === "dispatchers" ? (
-            <DataTablePlaceholder
-              title="Dispatcher Rankings"
-              columns={["Rank", "Dispatcher", "Team", "Assigned Carriers"]}
-              rows={dispatcherRankings.map((row) => [
-                row.rank.toString(),
-                row.name,
-                row.team,
-                row.carriers.toString(),
-              ])}
-            />
+            <RankingsTable type="dispatchers" rows={dispatcherRankings} />
           ) : null}
 
           {activeTab === "carriers" ? (
-            <DataTablePlaceholder
-              title="Carrier Rankings"
-              columns={["Rank", "Carrier", "Dispatcher", "Activity Score"]}
-              rows={carrierRankings.map((row) => [
-                row.rank.toString(),
-                row.carrierName,
-                row.dispatcherName,
-                row.activityScore.toString(),
-              ])}
-            />
+            <RankingsTable type="carriers" rows={carrierRankings} />
           ) : null}
 
           {activeTab === "teams" ? (
-            <DataTablePlaceholder
-              title="Team Rankings"
-              columns={["Rank", "Team", "Team Lead", "Revenue"]}
-              rows={teamRankings.map((row) => [
-                row.rank.toString(),
-                row.teamName,
-                row.teamLeadName,
-                formatCurrencyCompact(row.revenue),
-              ])}
-            />
+            <RankingsTable type="teams" rows={teamRankings} />
           ) : null}
         </>
       </PageContentGate>
