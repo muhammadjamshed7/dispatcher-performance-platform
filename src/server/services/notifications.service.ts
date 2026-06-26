@@ -300,9 +300,19 @@ export async function updateEntityNotificationStatuses(input: {
   editRequestId?: string | null;
   notificationStatus: NotificationStatus;
 }): Promise<void> {
-  let query = db().from(T.Notification).update({
-    notificationStatus: input.notificationStatus,
-  });
+  // When an approval-required notification is auto-resolved (e.g. another
+  // authorized approver finalized the item), also mark it read so it no longer
+  // inflates the recipient's unread badge for an action they can no longer take.
+  const updatePayload: { notificationStatus: NotificationStatus; readAt?: string } =
+    {
+      notificationStatus: input.notificationStatus,
+    };
+
+  if (input.notificationStatus === NOTIFICATION_COMPLETED) {
+    updatePayload.readAt = nowIso();
+  }
+
+  let query = db().from(T.Notification).update(updatePayload);
 
   if (input.activityId) {
     query = query.eq("activityId", input.activityId);

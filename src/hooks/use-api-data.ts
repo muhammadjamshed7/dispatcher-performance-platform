@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ApiClientError } from "@/lib/api/client";
 
@@ -18,24 +18,35 @@ export function useApiData<T>(
   const [data, setData] = useState<T | undefined>(initialData);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(enabled);
+  // Monotonic id of the most recent request. Responses from superseded requests
+  // (e.g. a slow fetch from a previous filter) are ignored so they cannot
+  // overwrite fresher data.
+  const requestIdRef = useRef(0);
 
   const reload = useCallback(async () => {
     if (!enabled) {
       return;
     }
 
+    const requestId = ++requestIdRef.current;
     setIsLoading(true);
     setError(null);
 
     try {
       const next = await loader();
-      setData(next);
+      if (requestId === requestIdRef.current) {
+        setData(next);
+      }
     } catch (err) {
-      setError(
-        err instanceof ApiClientError ? err.message : "Failed to load data.",
-      );
+      if (requestId === requestIdRef.current) {
+        setError(
+          err instanceof ApiClientError ? err.message : "Failed to load data.",
+        );
+      }
     } finally {
-      setIsLoading(false);
+      if (requestId === requestIdRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [enabled, loader]);
 

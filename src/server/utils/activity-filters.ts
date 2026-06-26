@@ -111,7 +111,19 @@ export function parseActivityDate(dateStr: string): Date {
     throw new ValidationError("Invalid activity date.");
   }
 
-  return new Date(Date.UTC(year, month - 1, day));
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  // Reject calendar-invalid dates (e.g. 2026-02-31) which Date.UTC would
+  // otherwise silently roll over into the following month.
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    throw new ValidationError("Invalid activity date.");
+  }
+
+  return date;
 }
 
 export function formatActivityDate(date: Date): string {

@@ -20,7 +20,7 @@ import { useSession } from "@/components/auth/session-provider";
 
 export function UpdatePasswordForm() {
   const router = useRouter();
-  const { session, refreshSession } = useSession();
+  const { refreshSession } = useSession();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -39,8 +39,12 @@ export function UpdatePasswordForm() {
 
     try {
       await updatePasswordRequest(password);
-      await refreshSession();
-      router.replace(session ? getDashboardPathForRole(session.role) : "/");
+      // Use the freshly-resolved session for the redirect — reading the
+      // component's `session` closure here would be stale right after refresh.
+      const updatedSession = await refreshSession();
+      router.replace(
+        updatedSession ? getDashboardPathForRole(updatedSession.role) : "/",
+      );
     } catch (err) {
       setError(
         err instanceof ApiClientError

@@ -22,6 +22,7 @@ const updateSettingsBodySchema = z
     csvDateFormat: z.string().trim().min(1),
     csvMaxRows: z.number().int().positive(),
     csvFileNamePrefix: z.string().trim().min(1),
+    directAdminApprovalMode: z.boolean(),
     allowedStatusReasons: z.array(z.string().trim().min(1)),
   })
   .partial();

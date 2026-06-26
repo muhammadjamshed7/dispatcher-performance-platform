@@ -18,6 +18,7 @@ function createActivity(
     date: "2026-06-01",
     carrierId: "carrier-1",
     carrierName: "Jim Transport",
+    driverName: "Driver One",
     dispatcherId: "dispatcher-1",
     dispatcherName: "Alex Dispatcher",
     teamId: "team-1",

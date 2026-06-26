@@ -23,7 +23,7 @@ import { setDefaultCurrency } from "@/lib/utils/format-currency";
 type SessionContextValue = {
   session: SessionUser | null;
   isLoading: boolean;
-  refreshSession: () => Promise<void>;
+  refreshSession: () => Promise<SessionUser | null>;
   signOut: () => Promise<void>;
   setSession: (session: SessionUser | null) => void;
 };
@@ -39,6 +39,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const nextSession = await fetchSession().catch(() => null);
     setDefaultCurrency(nextSession?.currency);
     setSessionState(nextSession);
+    return nextSession;
   }, []);
 
   // Resolve the session once on mount. The session lives in context for the

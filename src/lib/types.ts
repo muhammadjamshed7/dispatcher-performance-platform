@@ -85,6 +85,7 @@ export type DailyActivity = {
   date: string;
   carrierId: string;
   carrierName: string;
+  driverName: string;
   dispatcherId: string;
   dispatcherName: string;
   teamId: string;

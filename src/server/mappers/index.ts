@@ -105,6 +105,7 @@ export function mapDailyActivity(activity: DailyActivity): DailyActivityDto {
     date: toIsoString(activity.activityDate).slice(0, 10),
     carrierId: activity.carrierId,
     carrierName: activity.carrierNameSnapshot,
+    driverName: activity.driverNameSnapshot,
     dispatcherId: activity.dispatcherId,
     dispatcherName: activity.dispatcherNameSnapshot,
     teamId: activity.teamId,

@@ -11,6 +11,7 @@ import {
   NOT_WORKING,
   STATUSES,
 } from "@/lib/constants/statuses";
+import { buildCsv } from "@/lib/utils/csv";
 import { computeAverageRatePerMile } from "@/lib/utils/compute-finance-metrics";
 import { sanitizeFilterId } from "@/lib/constants/filters";
 import { APPROVED } from "@/lib/constants/activity-approval";
@@ -82,7 +83,19 @@ function parseDate(dateStr: string): Date {
     throw new ValidationError("Invalid date format. Use yyyy-MM-dd.");
   }
 
-  return new Date(Date.UTC(year, month - 1, day));
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  // Reject calendar-invalid dates (e.g. 2026-02-31) which Date.UTC would
+  // otherwise silently roll over into the following month.
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    throw new ValidationError("Invalid date format. Use yyyy-MM-dd.");
+  }
+
+  return date;
 }
 
 function resolveDateRange(
@@ -500,24 +513,6 @@ export async function getReportBundle(
   };
 }
 
-function escapeCsvCell(value: string | number | null | undefined): string {
-  if (value === null || value === undefined) {
-    return "";
-  }
-
-  const str = String(value);
-
-  if (str.includes(",") || str.includes('"') || str.includes("\n")) {
-    return `"${str.replace(/"/g, '""')}"`;
-  }
-
-  return str;
-}
-
-function buildCsv(rows: string[][]): string {
-  return rows.map((row) => row.map(escapeCsvCell).join(",")).join("\n");
-}
-
 export async function exportReportCsv(
   scope: AccessScope,
   actor: AuthContextUser,
@@ -567,14 +562,13 @@ export async function exportReportCsv(
 
   const dataRows = bundle.daily.map((row) => {
     const mapped = row as typeof row & {
-      driverName?: string;
       totalMiles?: number | null;
     };
 
     return [
       formatDate(new Date(`${mapped.date}T12:00:00Z`), csvDateFormat),
       mapped.carrierName,
-      mapped.driverName ?? "",
+      mapped.driverName,
       mapped.dispatcherName,
       mapped.teamName,
       mapped.truckType,

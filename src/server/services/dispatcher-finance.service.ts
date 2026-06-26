@@ -34,6 +34,7 @@ import {
   computeAverageRatePerMile,
   computeBookingEfficiency,
 } from "@/lib/utils/compute-finance-metrics";
+import { buildCsv } from "@/lib/utils/csv";
 import { resolveFinanceDateRangeStrict } from "@/lib/utils/resolve-finance-date-range";
 import {
   getDateKeyInTimeZone,
@@ -545,24 +546,6 @@ export async function getDispatcherFinanceBundle(
         "Pending equals earned dispatch fees because no payments are recorded for this period.",
     },
   };
-}
-
-function escapeCsvCell(value: string | number | null | undefined): string {
-  if (value === null || value === undefined) {
-    return "";
-  }
-
-  const str = String(value);
-
-  if (str.includes(",") || str.includes('"') || str.includes("\n")) {
-    return `"${str.replace(/"/g, '""')}"`;
-  }
-
-  return str;
-}
-
-function buildCsv(rows: string[][]): string {
-  return rows.map((row) => row.map(escapeCsvCell).join(",")).join("\n");
 }
 
 export async function exportDispatcherFinanceCsv(

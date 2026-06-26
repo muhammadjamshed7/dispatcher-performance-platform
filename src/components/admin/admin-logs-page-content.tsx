@@ -36,6 +36,7 @@ import {
 } from "@/lib/audit/audit-log-format";
 import { fetchAdminLogs } from "@/lib/api/resources";
 import type { AuditLogEntry } from "@/lib/types";
+import { escapeCsvCell } from "@/lib/utils/csv";
 import { formatDate } from "@/lib/utils/format-date";
 
 const FILTER_ALL = "all";
@@ -118,7 +119,7 @@ function csvCell(value: unknown): string {
   if (value === null || value === undefined) return "";
   const text =
     typeof value === "object" ? JSON.stringify(value) : String(value);
-  return `"${text.replaceAll('"', '""')}"`;
+  return escapeCsvCell(text);
 }
 
 function entriesToCsv(entries: AuditLogEntry[]): string {

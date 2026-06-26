@@ -14,10 +14,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useEntityOptions } from "@/hooks/use-entity-options";
-import { useRoleScope } from "@/hooks/use-role-scope";
-import { ADMIN, DISPATCHER } from "@/lib/constants/roles";
+import { DISPATCHER } from "@/lib/constants/roles";
 import {
-  DISPATCHER_ROLES,
   defaultDispatcherFormValues,
   dispatcherFormSchema,
   type DispatcherFormValues,
@@ -38,9 +36,10 @@ export function DispatcherForm({
   onSubmit,
 }: DispatcherFormProps) {
   const { teams } = useEntityOptions();
-  const { user } = useRoleScope();
-  const assignableRoles =
-    user.role === ADMIN ? DISPATCHER_ROLES : ([DISPATCHER] as const);
+  // Team leads are provisioned through the user-requests approval flow, not this
+  // modal — creating a TEAM_LEAD here would make a user with no Dispatcher row
+  // that then "disappears" from the dispatcher list. Keep this dispatcher-only.
+  const assignableRoles = [DISPATCHER] as const;
   const {
     register,
     handleSubmit,
