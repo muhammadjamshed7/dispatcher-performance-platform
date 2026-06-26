@@ -15,6 +15,7 @@ import {
   getCurrentUserByEmail,
   touchLastLogin,
 } from "@/server/auth/session";
+import { writeAuditLog } from "@/server/services/audit.service";
 
 function toSessionUser(
   user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>,
@@ -98,6 +99,23 @@ export async function signInWithRole(
   }
 
   void touchLastLogin(sessionUser.id);
+
+  // Record the sign-in in the audit log. Fire-and-forget so a logging failure
+  // never blocks or slows down authentication.
+  void writeAuditLog({
+    organizationId: sessionUser.organizationId,
+    actorUserId: sessionUser.id,
+    action: "USER_LOGGED_IN",
+    entityType: "User",
+    entityId: sessionUser.id,
+    metadata: {
+      role: sessionUser.role,
+      email: sessionUser.email,
+      loginAt: nowIso(),
+    },
+  }).catch(() => {
+    // Audit logging is best-effort for login events.
+  });
 
   return toSessionUser(sessionUser);
 }

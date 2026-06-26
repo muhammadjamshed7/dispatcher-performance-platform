@@ -41,6 +41,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setSessionState(nextSession);
   }, []);
 
+  // Resolve the session once on mount. The session lives in context for the
+  // lifetime of the provider (which stays mounted across in-app navigations),
+  // so we deliberately do NOT refetch /api/auth/me on every route change.
+  // Sign-in sets the session directly (setSession), and apiFetch handles
+  // expiry (401 → redirect), so a per-navigation refetch is redundant.
   useEffect(() => {
     let active = true;
 
@@ -71,7 +76,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, [pathname, refreshSession]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const signOut = useCallback(async () => {
     await logoutRequest();

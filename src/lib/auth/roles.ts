@@ -53,7 +53,7 @@ export const ADMIN_NAV_ITEMS: RoleNavItem[] = [
     href: "/admin/activities/pending",
     iconKey: "pendingApprovals",
   },
-  { label: "Logs", href: "/admin/logs", iconKey: "logs" },
+  { label: "Audit Logs", href: "/admin/logs", iconKey: "logs" },
   { label: "Notifications", href: "/admin/notifications", iconKey: "notifications" },
   { label: "Rankings", href: "/admin/rankings", iconKey: "rankings" },
   { label: "Reports", href: "/admin/reports", iconKey: "reports" },

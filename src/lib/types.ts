@@ -189,6 +189,7 @@ export type AuditLogEntry = {
   teamName: string | null;
   dispatcherName: string | null;
   approvalStatus: ActivityApprovalStatus | null;
+  status: string;
   notes: string | null;
   oldData: Record<string, unknown> | null;
   newData: Record<string, unknown> | null;

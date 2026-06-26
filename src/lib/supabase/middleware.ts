@@ -29,7 +29,12 @@ function shouldRefreshSession(request: NextRequest): boolean {
   }
 
   if (pathname.startsWith("/api/")) {
-    return hasSupabaseAuthCookiesFromList(request.cookies.getAll());
+    // API route handlers create their own Supabase server client and call
+    // auth.getUser(), which both validates the JWT and refreshes the session
+    // cookie (route handlers can write cookies). Refreshing here too would
+    // duplicate that auth-server round trip on every API request, so we let the
+    // handler own session validation/refresh for /api/* routes.
+    return false;
   }
 
   if (!getRoleFromPathname(pathname)) {

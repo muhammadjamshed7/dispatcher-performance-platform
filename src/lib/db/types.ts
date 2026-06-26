@@ -39,6 +39,7 @@ export type AuditAction =
   | "USER_REJECTED"
   | "USER_ROLE_ASSIGNED"
   | "USER_TEAM_ASSIGNED"
+  | "USER_LOGGED_IN"
   | "TEAM_CREATED"
   | "TEAM_UPDATED"
   | "TEAM_DEACTIVATED"

@@ -16,11 +16,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useApiData } from "@/hooks/use-api-data";
+import { useEntityOptions } from "@/hooks/use-entity-options";
 import { useRoleScope } from "@/hooks/use-role-scope";
 import { APPROVED } from "@/lib/constants/activity-approval";
 import {
   fetchActivities,
-  fetchCarriers,
   fetchDispatcherDashboard,
   fetchRankings,
 } from "@/lib/api/resources";
@@ -41,11 +41,18 @@ function isDispatcherRanking(row: unknown): row is DispatcherRanking {
 }
 
 export function DispatcherPerformancePage() {
-  const { filterActivities, filterCarriers, user } = useRoleScope();
+  const { filterActivities, user } = useRoleScope();
+  // Reuse the carriers already loaded by EntityOptionsProvider (shared across
+  // the dashboard) instead of issuing a duplicate /api/carriers request here.
+  // These are already scoped via the role filter inside useEntityOptions.
+  const {
+    carriers: assignedCarriers,
+    isLoading: carriersLoading,
+    reload: reloadCarriers,
+  } = useEntityOptions();
 
   const loadMetrics = useCallback(() => fetchDispatcherDashboard(), []);
   const loadRankings = useCallback(() => fetchRankings("dispatcher"), []);
-  const loadCarriers = useCallback(() => fetchCarriers(), []);
   const loadActivities = useCallback(
     () => fetchActivities({ approvalStatus: APPROVED }),
     [],
@@ -64,12 +71,6 @@ export function DispatcherPerformancePage() {
     reload: reloadRankings,
   } = useApiData(loadRankings, []);
   const {
-    data: carriers = [],
-    error: carriersError,
-    isLoading: carriersLoading,
-    reload: reloadCarriers,
-  } = useApiData(loadCarriers, []);
-  const {
     data: activities = [],
     error: activitiesError,
     isLoading: activitiesLoading,
@@ -78,13 +79,8 @@ export function DispatcherPerformancePage() {
 
   const isLoading =
     metricsLoading || rankingsLoading || carriersLoading || activitiesLoading;
-  const error =
-    metricsError ?? rankingsError ?? carriersError ?? activitiesError;
+  const error = metricsError ?? rankingsError ?? activitiesError;
 
-  const assignedCarriers = useMemo(
-    () => filterCarriers(carriers),
-    [carriers, filterCarriers],
-  );
   const personalActivities = useMemo(
     () => filterActivities(activities),
     [activities, filterActivities],

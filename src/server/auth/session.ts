@@ -1,11 +1,15 @@
 import "server-only";
 
+import { cache } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { USER_WITH_TEAM_AND_DISPATCHER } from "@/lib/db/embeds";
 import type { User } from "@/lib/db/types";
 import { isInfrastructureError } from "@/lib/errors/infrastructure-error";
 import { T, db } from "@/lib/db/client";
 import { assertDbVoid, nowIso, unwrapRelation } from "@/lib/db/utils";
 import { createServerClient } from "@/lib/supabase/server";
+import { getCachedJwks } from "@/server/auth/jwks-cache";
 import type { AuthContextUser } from "@/server/auth/types";
 
 type UserWithRelations = User & {
@@ -52,27 +56,63 @@ async function loadDbUser(
   return mapUser(result.data as UserWithRelations);
 }
 
-export async function getCurrentUser(): Promise<AuthContextUser | null> {
-  try {
-    const supabase = await createServerClient();
-    const {
-      data: { user: authUser },
-      error,
-    } = await supabase.auth.getUser();
+type GetClaimsOptions = NonNullable<
+  Parameters<SupabaseClient["auth"]["getClaims"]>[1]
+>;
 
-    if (error || !authUser) {
-      return null;
-    }
+/**
+ * Resolves the authenticated Supabase user id from the current session.
+ *
+ * Uses `getClaims()` which verifies the access token LOCALLY (no auth-server
+ * round trip) when the project uses asymmetric JWT signing keys, passing the
+ * module-cached JWKS so the keys are not re-fetched per request. For legacy
+ * symmetric (HS256) projects, getClaims transparently falls back to a network
+ * `getUser()` call, so behavior is unchanged until signing keys are enabled.
+ *
+ * Token refresh is still handled: getClaims reads the session via getSession(),
+ * which refreshes the access token when it is expired or about to expire.
+ */
+async function resolveSupabaseUserId(
+  supabase: SupabaseClient,
+): Promise<string | null> {
+  const jwks = await getCachedJwks();
 
-    return await loadDbUser(authUser.id);
-  } catch (error) {
-    if (isInfrastructureError(error)) {
+  const options: GetClaimsOptions | undefined =
+    jwks && jwks.length > 0
+      ? ({ jwks: { keys: jwks } } as GetClaimsOptions)
+      : undefined;
+
+  const { data, error } = await supabase.auth.getClaims(undefined, options);
+
+  if (error || !data || typeof data.claims?.sub !== "string") {
+    return null;
+  }
+
+  return data.claims.sub;
+}
+
+// Memoized per request so multiple guards/services that resolve the current
+// user within a single request share one token verification + DB load.
+export const getCurrentUser = cache(
+  async (): Promise<AuthContextUser | null> => {
+    try {
+      const supabase = await createServerClient();
+      const supabaseUserId = await resolveSupabaseUserId(supabase);
+
+      if (!supabaseUserId) {
+        return null;
+      }
+
+      return await loadDbUser(supabaseUserId);
+    } catch (error) {
+      if (isInfrastructureError(error)) {
+        throw error;
+      }
+
       throw error;
     }
-
-    throw error;
-  }
-}
+  },
+);
 
 export async function getCurrentUserByEmail(
   email: string,
