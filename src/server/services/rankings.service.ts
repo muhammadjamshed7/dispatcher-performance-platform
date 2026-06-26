@@ -1,6 +1,7 @@
 import "server-only";
 
 import { DELIVERED } from "@/lib/constants/statuses";
+import { APPROVED } from "@/lib/constants/activity-approval";
 import { sanitizeFilterId } from "@/lib/constants/filters";
 import { T, db } from "@/lib/db/client";
 import { applyScopeWhere, asFilterable } from "@/lib/db/query";
@@ -187,7 +188,8 @@ export async function getCarrierRankings(
           .from(T.DailyActivity)
           .select("carrierId, status")
           .in("carrierId", carrierIds)
-          .eq("organizationId", scope.organizationId),
+          .eq("organizationId", scope.organizationId)
+          .eq("approvalStatus", APPROVED),
       ),
       activityScopeFilter(scope),
     );
@@ -270,7 +272,8 @@ export async function getTeamRankings(
           .from(T.DailyActivity)
           .select("teamId, status, loadAmount")
           .in("teamId", teamIds)
-          .eq("organizationId", scope.organizationId),
+          .eq("organizationId", scope.organizationId)
+          .eq("approvalStatus", APPROVED),
       ),
       activityScopeFilter(scope),
     );

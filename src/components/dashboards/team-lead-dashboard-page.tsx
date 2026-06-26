@@ -10,6 +10,7 @@ import { PageShell } from "@/components/layout/page-shell";
 import { MetricCard } from "@/components/metric-card";
 import { useApiData } from "@/hooks/use-api-data";
 import { useRoleScope } from "@/hooks/use-role-scope";
+import { APPROVED } from "@/lib/constants/activity-approval";
 import {
   fetchActivities,
   fetchCarriers,
@@ -23,7 +24,10 @@ export function TeamLeadDashboardPage() {
     useRoleScope();
 
   const loadMetrics = useCallback(() => fetchTeamLeadDashboard(), []);
-  const loadActivities = useCallback(() => fetchActivities(), []);
+  const loadActivities = useCallback(
+    () => fetchActivities({ approvalStatus: APPROVED }),
+    [],
+  );
   const loadCarriers = useCallback(() => fetchCarriers(), []);
   const loadDispatchers = useCallback(() => fetchDispatchers(), []);
 
@@ -61,7 +65,10 @@ export function TeamLeadDashboardPage() {
     metricsError ?? activitiesError ?? carriersError ?? dispatchersError;
 
   const teamActivities = useMemo(
-    () => filterActivities(activities),
+    () =>
+      filterActivities(activities).filter(
+        (activity) => activity.approvalStatus === APPROVED,
+      ),
     [activities, filterActivities],
   );
   const teamCarriers = useMemo(

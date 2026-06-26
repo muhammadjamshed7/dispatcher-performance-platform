@@ -20,6 +20,7 @@ import {
 import { LoadingState } from "@/components/feedback/loading-state";
 import { useApiData } from "@/hooks/use-api-data";
 import { fetchActivities } from "@/lib/api/resources";
+import { APPROVED } from "@/lib/constants/activity-approval";
 import { FILTER_ALL } from "@/lib/constants/filters";
 import {
   CANCELLED,
@@ -61,6 +62,7 @@ function filtersToActivityParams(
     carrierId,
     dateFrom,
     dateTo,
+    approvalStatus: APPROVED,
   };
 
   if (filters.status !== FILTER_ALL) {

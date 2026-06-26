@@ -13,6 +13,7 @@ import {
 } from "@/lib/constants/statuses";
 import { computeAverageRatePerMile } from "@/lib/utils/compute-finance-metrics";
 import { sanitizeFilterId } from "@/lib/constants/filters";
+import { APPROVED } from "@/lib/constants/activity-approval";
 import { TRUCK_TYPES } from "@/lib/constants/truck-types";
 import {
   CUSTOM,
@@ -144,6 +145,7 @@ function applyReportActivityFilters<T extends FilterableQuery>(
 ): T {
   let q: FilterableQuery = query
     .eq("organizationId", scope.organizationId)
+    .eq("approvalStatus", APPROVED)
     .gte("activityDate", formatActivityDate(range.start))
     .lte("activityDate", formatActivityDate(range.end));
 

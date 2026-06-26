@@ -1,9 +1,11 @@
-import { SessionProvider } from "@/components/auth/session-provider";
+import { AppProviders } from "@/components/providers/app-providers";
+
+export const dynamic = "force-dynamic";
 
 export default function AuthLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return <SessionProvider>{children}</SessionProvider>;
+  return <AppProviders>{children}</AppProviders>;
 }

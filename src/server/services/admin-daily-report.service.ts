@@ -14,6 +14,7 @@ import { assertDb, decimalToNumber } from "@/lib/db/utils";
 import type { AdminDailyReportBundle } from "@/lib/types";
 import type { AccessScope } from "@/server/auth/types";
 import { getOrganizationPreferences } from "@/server/services/settings.service";
+import { APPROVED } from "@/lib/constants/activity-approval";
 import { getDateKeyInTimeZone } from "@/lib/utils/resolve-date-range";
 
 const dailyReportFiltersSchema = z.object({
@@ -119,6 +120,7 @@ export async function getAdminDailyReportBundle(
     )
     .eq("organizationId", scope.organizationId)
     .eq("activityDate", parsed.date)
+    .eq("approvalStatus", APPROVED)
     .order("createdAt", { ascending: false });
 
   if (parsed.teamId) {

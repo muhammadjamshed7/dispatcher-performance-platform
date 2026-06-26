@@ -2,6 +2,7 @@ import "server-only";
 
 import type { LoadActivityStatus } from "@/lib/db/types";
 import { DELIVERED, STATUSES } from "@/lib/constants/statuses";
+import { APPROVED } from "@/lib/constants/activity-approval";
 import { TRUCK_TYPES } from "@/lib/constants/truck-types";
 import { T, db } from "@/lib/db/client";
 import { applyScopeWhere, asFilterable } from "@/lib/db/query";
@@ -12,15 +13,11 @@ import {
   applyActivityFilters,
   assertFilterAccess,
   formatActivityDate,
-  normalizeActivityFilters,
   parseActivityDate,
   resolveDashboardDateRange,
   type ActivityFilters,
 } from "@/server/utils/activity-filters";
-import {
-  activityScopeFilter,
-  carrierScopeFilter,
-} from "@/server/utils/scope-filters";
+import { carrierScopeFilter } from "@/server/utils/scope-filters";
 import { getOrganizationPreferences } from "@/server/services/settings.service";
 import { getDateKeyInTimeZone } from "@/lib/utils/resolve-date-range";
 
@@ -101,7 +98,12 @@ function getTodayDate(timezone: string): string {
 async function fetchScopedActivities(
   scope: AccessScope,
   filters: ActivityFilters,
+  approvedOnly = true,
 ): Promise<ActivityRow[]> {
+  const effectiveFilters = approvedOnly
+    ? { ...filters, approvalStatus: APPROVED }
+    : filters;
+
   const query = applyActivityFilters(
     asFilterable(
       db()
@@ -113,7 +115,7 @@ async function fetchScopedActivities(
         .order("createdAt", { ascending: false }),
     ),
     scope,
-    filters,
+    effectiveFilters,
   );
 
   return (assertDb(await query) ?? []) as ActivityRow[];
@@ -156,6 +158,16 @@ async function fetchDispatcherName(scope: AccessScope): Promise<string> {
   } | null;
 
   return unwrapRelation(dispatcher?.user)?.fullName ?? "Dispatcher";
+}
+
+function filterActivitiesByDate(
+  activities: ActivityRow[],
+  dateFrom: string,
+  dateTo: string,
+): ActivityRow[] {
+  return activities.filter(
+    (row) => row.activityDate >= dateFrom && row.activityDate <= dateTo,
+  );
 }
 
 function buildRevenueTrend(activities: ActivityRow[]) {
@@ -413,23 +425,29 @@ export async function getDispatcherDashboardBundle(
   const mtdRange = getMonthToDateRange(preferences.timezone);
   const today = getTodayDate(preferences.timezone);
 
+  // `allActivities` is the dispatcher's full approved history (no attribute
+  // filters). The month-to-date and today sets only ever differed by date, so
+  // we slice them in memory instead of issuing separate identical queries.
   const [
     dispatcherName,
     assignedCarriers,
     filterOptions,
     filteredActivities,
-    mtdActivities,
-    todayActivities,
     allActivities,
   ] = await Promise.all([
     fetchDispatcherName(scope),
     fetchAssignedActiveCarriers(scope),
     fetchFilterOptions(scope),
     fetchScopedActivities(scope, filters),
-    fetchScopedActivities(scope, mtdRange),
-    fetchScopedActivities(scope, { dateFrom: today, dateTo: today }),
     fetchScopedActivities(scope, {}),
   ]);
+
+  const mtdActivities = filterActivitiesByDate(
+    allActivities,
+    mtdRange.dateFrom,
+    mtdRange.dateTo,
+  );
+  const todayActivities = filterActivitiesByDate(allActivities, today, today);
 
   const mtdMetrics = buildMtdMetrics(mtdActivities);
   const todayCompletion = buildTodayCompletion(

@@ -38,6 +38,7 @@ const updateSettingsInputSchema = z.object({
   csvDateFormat: z.string().trim().min(1).optional(),
   csvMaxRows: z.number().int().positive().optional(),
   csvFileNamePrefix: z.string().trim().min(1).optional(),
+  directAdminApprovalMode: z.boolean().optional(),
   allowedStatusReasons: z.array(z.string().trim().min(1)).optional(),
 });
 
@@ -76,6 +77,7 @@ function mapSettings(
       maxRows: settings.csvMaxRows,
       fileNamePrefix: settings.csvFileNamePrefix,
     },
+    directAdminApprovalMode: settings.directAdminApprovalMode ?? false,
   };
 }
 
@@ -192,6 +194,13 @@ export async function getDispatchFeeRules(
     minimumFee: decimalToNumber(settings.minimumDispatchFee) ?? 0,
     roundToNearestDollar: settings.roundToNearestDollar,
   };
+}
+
+export async function getDirectAdminApprovalMode(
+  organizationId: string,
+): Promise<boolean> {
+  const settings = await getOrCreateSettings(organizationId);
+  return settings.directAdminApprovalMode ?? false;
 }
 
 export async function getAllowedStatusReasons(
@@ -364,6 +373,10 @@ export async function updateSettings(
 
   if (parsed.csvFileNamePrefix !== undefined) {
     updatePayload.csvFileNamePrefix = parsed.csvFileNamePrefix;
+  }
+
+  if (parsed.directAdminApprovalMode !== undefined) {
+    updatePayload.directAdminApprovalMode = parsed.directAdminApprovalMode;
   }
 
   const settingsResult = await db()

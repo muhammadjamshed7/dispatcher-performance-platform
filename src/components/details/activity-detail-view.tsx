@@ -1,4 +1,7 @@
 import { StatusBadge } from "@/components/status-badge";
+import { ActivityApprovalBadge } from "@/components/activities/activity-approval-badge";
+import { APPROVED, REJECTED } from "@/lib/constants/activity-approval";
+import { ADMIN } from "@/lib/constants/roles";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DELIVERED } from "@/lib/constants/statuses";
 import type { DailyActivity } from "@/lib/types";
@@ -27,6 +30,17 @@ export function ActivityDetailView({ activity }: ActivityDetailViewProps) {
             <span className="text-muted-foreground">Status:</span>{" "}
             <StatusBadge status={activity.status} />
           </p>
+          <p>
+            <span className="text-muted-foreground">Approval:</span>{" "}
+            <ActivityApprovalBadge approvalStatus={activity.approvalStatus} />
+          </p>
+          {activity.approvalStatus === APPROVED && activity.approvedByRole ? (
+            <p>
+              <span className="text-muted-foreground">Approved by:</span>{" "}
+              {activity.approvedByRole === ADMIN ? "Admin" : "Team Lead"}
+              {activity.approvedByName ? ` · ${activity.approvedByName}` : ""}
+            </p>
+          ) : null}
           <p>
             <span className="text-muted-foreground">Carrier:</span>{" "}
             {activity.carrierName}
@@ -97,6 +111,17 @@ export function ActivityDetailView({ activity }: ActivityDetailViewProps) {
           </CardContent>
         </Card>
       )}
+
+      {activity.approvalStatus === REJECTED && activity.rejectionReason ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Rejection Feedback</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm">
+            <p>{activity.rejectionReason}</p>
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

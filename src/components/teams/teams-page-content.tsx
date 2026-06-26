@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { PageContentGate } from "@/components/feedback/page-content-gate";
 import type { PageContentState } from "@/components/feedback/page-content-gate";
@@ -47,7 +47,9 @@ export function TeamsPageContent() {
     reload,
   } = useApiData(loadTeams, []);
 
-  useRealtimeRefresh(["Team"], reload);
+  const teamRealtimeTables = useMemo(() => ["Team", "User"] as const, []);
+
+  useRealtimeRefresh(teamRealtimeTables, reload);
 
   const pageState: PageContentState = isLoading
     ? "loading"

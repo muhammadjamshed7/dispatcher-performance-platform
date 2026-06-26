@@ -3,6 +3,8 @@ import { z } from "zod";
 import { parseSearchParams } from "@/server/api/request";
 import { handleApi } from "@/server/api/response";
 import { requireAccessScope } from "@/server/auth/require-auth";
+import { ForbiddenError } from "@/lib/errors/forbidden-error";
+import { ADMIN, TEAM_LEAD } from "@/lib/constants/roles";
 import { assertFilterAccess } from "@/server/utils/activity-filters";
 import {
   getCarrierRankings,
@@ -25,6 +27,15 @@ export async function GET(request: Request) {
       url.searchParams,
       rankingsQuerySchema,
     );
+
+    // Carrier and team rankings remain admin/team-lead only. Dispatcher
+    // rankings are allowed for all roles; the rankings service scopes a
+    // dispatcher's results to their own record via dispatcherScopeFilter.
+    const isPrivileged = scope.role === ADMIN || scope.role === TEAM_LEAD;
+
+    if (type !== "dispatcher" && !isPrivileged) {
+      throw new ForbiddenError("Admin or team lead access is required.");
+    }
     const filters = {
       teamId: sanitizeFilterId(teamId),
       dispatcherId: sanitizeFilterId(dispatcherId),

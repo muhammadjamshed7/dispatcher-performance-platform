@@ -20,6 +20,12 @@ export const ROLE_DASHBOARD_PATH: Record<Role, string> = {
   [DISPATCHER]: "/dispatcher/dashboard",
 };
 
+export const ROLE_NOTIFICATIONS_PATH: Record<Role, string> = {
+  [ADMIN]: "/admin/notifications",
+  [TEAM_LEAD]: "/team-lead/notifications",
+  [DISPATCHER]: "/dispatcher/notifications",
+};
+
 export const ROLE_ACCOUNT_PATH: Record<Role, string> = {
   [ADMIN]: "/admin/account",
   [TEAM_LEAD]: "/team-lead/account",
@@ -42,6 +48,13 @@ export const ADMIN_NAV_ITEMS: RoleNavItem[] = [
   { label: "Dispatchers", href: "/admin/dispatchers", iconKey: "dispatchers" },
   { label: "Carriers", href: "/admin/carriers", iconKey: "carriers" },
   { label: "Activities", href: "/admin/activities", iconKey: "activities" },
+  {
+    label: "Pending Approvals",
+    href: "/admin/activities/pending",
+    iconKey: "pendingApprovals",
+  },
+  { label: "Logs", href: "/admin/logs", iconKey: "logs" },
+  { label: "Notifications", href: "/admin/notifications", iconKey: "notifications" },
   { label: "Rankings", href: "/admin/rankings", iconKey: "rankings" },
   { label: "Reports", href: "/admin/reports", iconKey: "reports" },
   {
@@ -63,6 +76,12 @@ export const TEAM_LEAD_NAV_ITEMS: RoleNavItem[] = [
   },
   { label: "Carriers", href: "/team-lead/carriers", iconKey: "carriers" },
   { label: "Activities", href: "/team-lead/activities", iconKey: "activities" },
+  {
+    label: "Pending Approvals",
+    href: "/team-lead/activities/pending",
+    iconKey: "pendingApprovals",
+  },
+  { label: "Notifications", href: "/team-lead/notifications", iconKey: "notifications" },
   { label: "Rankings", href: "/team-lead/rankings", iconKey: "rankings" },
   { label: "Reports", href: "/team-lead/reports", iconKey: "reports" },
   { label: "Account", href: "/team-lead/account", iconKey: "account" },
@@ -75,6 +94,16 @@ export const DISPATCHER_NAV_ITEMS: RoleNavItem[] = [
     label: "Daily Activities",
     href: "/dispatcher/activities",
     iconKey: "activities",
+  },
+  {
+    label: "My Submissions",
+    href: "/dispatcher/activities/submissions",
+    iconKey: "pendingApprovals",
+  },
+  {
+    label: "Notifications",
+    href: "/dispatcher/notifications",
+    iconKey: "notifications",
   },
   {
     label: "My Performance",
@@ -95,6 +124,10 @@ export function getNavItemsForRole(role: Role): RoleNavItem[] {
   }
 
   return DISPATCHER_NAV_ITEMS;
+}
+
+export function getNotificationsPathForRole(role: Role): string {
+  return ROLE_NOTIFICATIONS_PATH[role];
 }
 
 export function getAccountPathForRole(role: Role): string {

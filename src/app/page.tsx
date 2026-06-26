@@ -30,6 +30,8 @@ const PORTALS = [
   },
 ] as const;
 
+export const dynamic = "force-dynamic";
+
 export default function HomePage() {
   return (
     <main className="bg-muted/30 relative flex min-h-screen flex-col items-center justify-center p-6">

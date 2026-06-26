@@ -1,6 +1,30 @@
 import type { NextConfig } from "next";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const configDir = path.dirname(fileURLToPath(import.meta.url));
+// Windows can expose two casings for the same folder (Projects vs projects).
+// Pin all bundler roots to the canonical on-disk path to avoid duplicate Next.js modules.
+const projectRoot = fs.realpathSync.native(configDir);
 
 const nextConfig: NextConfig = {
+  outputFileTracingRoot: projectRoot,
+  turbopack: {
+    root: projectRoot,
+  },
+  webpack: (config) => {
+    config.context = projectRoot;
+    config.resolve = config.resolve ?? {};
+    config.resolve.symlinks = true;
+    config.snapshot = {
+      ...config.snapshot,
+      immutablePaths: [],
+      managedPaths: [path.join(projectRoot, "node_modules")],
+    };
+
+    return config;
+  },
   // Prisma client is generated into gitignored `src/generated/prisma` during build.
   // Next.js file tracing skips gitignored files unless we include them explicitly.
   outputFileTracingIncludes: {
@@ -26,7 +50,6 @@ const nextConfig: NextConfig = {
         permanent: false,
       },
       { source: "/auth/login", destination: "/", permanent: false },
-      { source: "/auth/reset-password", destination: "/", permanent: false },
       { source: "/teams", destination: "/admin/teams", permanent: false },
       {
         source: "/dispatchers",

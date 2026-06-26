@@ -2,6 +2,7 @@ import "server-only";
 
 import { T, db } from "@/lib/db/client";
 import { DELIVERED } from "@/lib/constants/statuses";
+import { APPROVED } from "@/lib/constants/activity-approval";
 import { computeAverageRatePerMile } from "@/lib/utils/compute-finance-metrics";
 import { assertDb, countRows, decimalToNumber } from "@/lib/db/utils";
 import type { DashboardMetric } from "@/lib/types";
@@ -16,7 +17,8 @@ async function buildMetrics(scope: AccessScope): Promise<DashboardMetric> {
   let activitiesQuery = db()
     .from(T.DailyActivity)
     .select("status, loadAmount, totalMiles")
-    .eq("organizationId", scope.organizationId);
+    .eq("organizationId", scope.organizationId)
+    .eq("approvalStatus", APPROVED);
 
   if ("dispatcherId" in activityFilter && activityFilter.dispatcherId) {
     activitiesQuery = activitiesQuery.eq(

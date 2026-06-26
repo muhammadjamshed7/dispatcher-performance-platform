@@ -144,7 +144,9 @@ function CarriersPageState({
     await Promise.all([reload(), reloadEntityOptions()]);
   }, [reload, reloadEntityOptions]);
 
-  useRealtimeRefresh(["Carrier"], refreshCarriers);
+  const carrierRealtimeTables = useMemo(() => ["Carrier"] as const, []);
+
+  useRealtimeRefresh(carrierRealtimeTables, refreshCarriers);
 
   const visibleCarriers = carriers;
 

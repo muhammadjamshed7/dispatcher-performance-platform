@@ -2,6 +2,10 @@ import "server-only";
 
 import { z } from "zod";
 import { STATUSES } from "@/lib/constants/statuses";
+import {
+  ACTIVITY_APPROVAL_STATUSES,
+  APPROVED,
+} from "@/lib/constants/activity-approval";
 import { TRUCK_TYPES } from "@/lib/constants/truck-types";
 import { isFilterAll, sanitizeFilterId } from "@/lib/constants/filters";
 import { T, db } from "@/lib/db/client";
@@ -29,6 +33,8 @@ export const activityFiltersSchema = z.object({
   truckType: z.enum(TRUCK_TYPES).optional(),
   truckTypes: z.string().optional(),
   statusKeys: z.string().optional(),
+  approvalStatus: z.enum(ACTIVITY_APPROVAL_STATUSES).optional(),
+  approvalStatuses: z.string().optional(),
 });
 
 export type ActivityFilters = z.infer<typeof activityFiltersSchema>;
@@ -91,6 +97,10 @@ export function normalizeActivityFilters(filters: ActivityFilters) {
     truckTypes: [...new Set(truckTypes)],
     statuses: [...new Set(statuses)],
     statusKeys: parseCsvParam(filters.statusKeys),
+    approvalStatuses: [
+      ...parseCsvParam(filters.approvalStatuses),
+      ...(filters.approvalStatus ? [filters.approvalStatus] : []),
+    ] as (typeof ACTIVITY_APPROVAL_STATUSES)[number][],
   };
 }
 
@@ -287,6 +297,18 @@ export function applyActivityFilters<T extends FilterableQuery>(
     );
   }
 
+  if (normalized.approvalStatuses.length === 1) {
+    scopedQuery = scopedQuery.eq(
+      "approvalStatus",
+      normalized.approvalStatuses[0],
+    );
+  } else if (normalized.approvalStatuses.length > 1) {
+    scopedQuery = scopedQuery.in(
+      "approvalStatus",
+      normalized.approvalStatuses,
+    );
+  }
+
   return scopedQuery as T;
 }
 
@@ -328,4 +350,10 @@ export function previousPeriodRange(
     dateFrom: formatActivityDate(prevFrom),
     dateTo: formatActivityDate(prevTo),
   };
+}
+
+export function restrictToApprovedActivities<
+  T extends { eq: (column: string, value: string) => T },
+>(query: T): T {
+  return query.eq("approvalStatus", APPROVED);
 }

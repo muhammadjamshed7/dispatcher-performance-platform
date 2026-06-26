@@ -9,6 +9,8 @@ import type {
   User,
 } from "@/lib/db/types";
 import { decimalToNumber, toIsoString } from "@/lib/db/utils";
+import { ADMIN, TEAM_LEAD } from "@/lib/constants/roles";
+import { APPROVED } from "@/lib/constants/activity-approval";
 import type {
   Carrier as CarrierDto,
   DailyActivity as DailyActivityDto,
@@ -55,6 +57,25 @@ export function mapDispatcher(
   };
 }
 
+export function mapTeamLeadUser(
+  user: Pick<User, "id" | "fullName" | "email" | "phoneNumber" | "createdAt"> & {
+    team: Pick<Team, "name">;
+    status: Team["status"];
+  },
+): DispatcherDto {
+  return {
+    id: user.id,
+    fullName: user.fullName,
+    email: user.email,
+    phoneNumber: user.phoneNumber ?? "",
+    teamName: user.team.name,
+    role: TEAM_LEAD,
+    status: user.status,
+    assignedCarriersCount: 0,
+    createdAt: toIsoString(user.createdAt),
+  };
+}
+
 export function mapCarrier(
   carrier: Carrier & {
     team: Pick<Team, "name">;
@@ -73,6 +94,7 @@ export function mapCarrier(
     assignedDispatcherName: carrier.dispatcher?.user.fullName ?? "Unassigned",
     dispatchFeePercentage: decimalToNumber(carrier.dispatchFeePercentage) ?? 0,
     status: carrier.status,
+    notes: carrier.notes ?? undefined,
     createdAt: toIsoString(carrier.createdAt),
   };
 }
@@ -97,6 +119,35 @@ export function mapDailyActivity(activity: DailyActivity): DailyActivityDto {
     dispatchFee: decimalToNumber(activity.dispatchFee),
     reason: activity.reason,
     notes: activity.notes,
+    approvalStatus: activity.approvalStatus,
+    submittedById: activity.submittedById,
+    teamLeadApprovedById: activity.teamLeadApprovedById,
+    adminApprovedById: activity.adminApprovedById,
+    rejectedById: activity.rejectedById,
+    rejectionReason: activity.rejectionReason,
+    submittedAt: activity.submittedAt
+      ? toIsoString(activity.submittedAt)
+      : null,
+    teamLeadApprovedAt: activity.teamLeadApprovedAt
+      ? toIsoString(activity.teamLeadApprovedAt)
+      : null,
+    adminApprovedAt: activity.adminApprovedAt
+      ? toIsoString(activity.adminApprovedAt)
+      : null,
+    rejectedAt: activity.rejectedAt ? toIsoString(activity.rejectedAt) : null,
+    approvalNotes: activity.approvalNotes ?? null,
+    approvalType: activity.approvalType ?? "NEW_ACTIVITY",
+    hasPendingEdit: false,
+    pendingEditApprovalStatus: null,
+    approvedByName: null,
+    approvedByRole:
+      activity.approvalStatus === APPROVED
+        ? activity.adminApprovedById
+          ? ADMIN
+          : activity.teamLeadApprovedById
+            ? TEAM_LEAD
+            : null
+        : null,
   };
 }
 

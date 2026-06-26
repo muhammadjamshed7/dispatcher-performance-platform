@@ -1,5 +1,8 @@
 import { DISPATCHER } from "@/lib/constants/roles";
 import { RoleProtectedLayout } from "@/components/auth/role-protected-layout";
+import { AppProviders } from "@/components/providers/app-providers";
+
+export const dynamic = "force-dynamic";
 
 export default function DispatcherLayout({
   children,
@@ -7,6 +10,8 @@ export default function DispatcherLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <RoleProtectedLayout role={DISPATCHER}>{children}</RoleProtectedLayout>
+    <AppProviders>
+      <RoleProtectedLayout role={DISPATCHER}>{children}</RoleProtectedLayout>
+    </AppProviders>
   );
 }

@@ -1,3 +1,6 @@
+import type { ActivityApprovalStatus } from "@/lib/constants/activity-approval";
+import type { ActivityApprovalType } from "@/lib/constants/activity-approval";
+import type { NotificationStatus } from "@/lib/constants/notifications";
 import type { Role } from "@/lib/constants/roles";
 import type { DISPATCHER, TEAM_LEAD } from "@/lib/constants/roles";
 import type { Status } from "@/lib/constants/statuses";
@@ -96,6 +99,100 @@ export type DailyActivity = {
   dispatchFee: number | null;
   reason: string | null;
   notes: string | null;
+  approvalStatus: ActivityApprovalStatus;
+  submittedById: string | null;
+  teamLeadApprovedById: string | null;
+  adminApprovedById: string | null;
+  rejectedById: string | null;
+  rejectionReason: string | null;
+  submittedAt: string | null;
+  teamLeadApprovedAt: string | null;
+  adminApprovedAt: string | null;
+  rejectedAt: string | null;
+  approvalNotes: string | null;
+  approvalType: ActivityApprovalType;
+  hasPendingEdit: boolean;
+  pendingEditApprovalStatus: ActivityApprovalStatus | null;
+  approvedByName: string | null;
+  approvedByRole: Role | null;
+};
+
+export type ActivityEditRequestDto = {
+  id: string;
+  originalActivityId: string;
+  teamId: string;
+  dispatcherId: string;
+  approvalStatus: ActivityApprovalStatus;
+  proposedChanges: Record<string, unknown>;
+  previousData: Record<string, unknown>;
+  submittedById: string;
+  editedById: string;
+  editedByName: string | null;
+  teamLeadApprovedById: string | null;
+  adminApprovedById: string | null;
+  rejectedById: string | null;
+  rejectionReason: string | null;
+  approvalNotes: string | null;
+  submittedAt: string;
+  editedAt: string;
+  teamLeadApprovedAt: string | null;
+  adminApprovedAt: string | null;
+  rejectedAt: string | null;
+  carrierName: string | null;
+  activityDate: string | null;
+  dispatcherName: string | null;
+  teamName: string | null;
+  approvedByName: string | null;
+  approvedByRole: Role | null;
+};
+
+export type PendingApprovalItem = {
+  kind: "new_activity" | "edit_request";
+  id: string;
+  approvalStatus: ActivityApprovalStatus;
+  approvalType: ActivityApprovalType;
+  activityDate: string;
+  carrierName: string;
+  dispatcherName: string;
+  teamName: string;
+  status: LoadActivityStatus;
+  submittedAt: string | null;
+  editedAt: string | null;
+  submittedByName: string | null;
+  editedByName: string | null;
+  rejectionReason: string | null;
+  activity?: DailyActivity;
+  editRequest?: ActivityEditRequestDto;
+};
+
+export type AppNotification = {
+  id: string;
+  title: string;
+  message: string;
+  notificationStatus: NotificationStatus;
+  activityId: string | null;
+  editRequestId: string | null;
+  readAt: string | null;
+  createdAt: string;
+  submittedByName: string | null;
+  carrierName: string | null;
+  activityDate: string | null;
+};
+
+export type AuditLogEntry = {
+  id: string;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  actorName: string | null;
+  actorRole: UserRole | null;
+  teamName: string | null;
+  dispatcherName: string | null;
+  approvalStatus: ActivityApprovalStatus | null;
+  notes: string | null;
+  oldData: Record<string, unknown> | null;
+  newData: Record<string, unknown> | null;
+  createdAt: string;
 };
 
 export type StatusReason = string;
@@ -533,6 +630,7 @@ export type AppSettings = {
     maxRows: number;
     fileNamePrefix: string;
   };
+  directAdminApprovalMode: boolean;
 };
 
 export type DispatchFeeRules = {

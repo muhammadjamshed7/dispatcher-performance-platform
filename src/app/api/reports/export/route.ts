@@ -5,7 +5,7 @@ import { TRUCK_TYPES } from "@/lib/constants/truck-types";
 import { REPORT_PERIODS } from "@/lib/constants/report-periods";
 import { parseJsonBody } from "@/server/api/request";
 import { handleApi } from "@/server/api/response";
-import { requireAccessScope } from "@/server/auth/require-auth";
+import { requireAdminOrTeamLeadScope } from "@/server/auth/require-auth";
 import { exportReportCsv } from "@/server/services/reports.service";
 
 const exportReportBodySchema = z.object({
@@ -21,7 +21,7 @@ const exportReportBodySchema = z.object({
 
 export async function POST(request: Request) {
   return handleApi(async () => {
-    const { user, scope } = await requireAccessScope();
+    const { user, scope } = await requireAdminOrTeamLeadScope();
     const body = await parseJsonBody(request, exportReportBodySchema);
     const { period, ...filters } = body;
     return exportReportCsv(scope, user, period, filters);

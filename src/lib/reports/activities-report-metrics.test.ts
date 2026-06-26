@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { DELIVERED, CANCELLED } from "@/lib/constants/statuses";
+import { APPROVED } from "@/lib/constants/activity-approval";
 import type { DailyActivity } from "@/lib/types";
 
 import {
@@ -31,6 +32,22 @@ function createActivity(
     dispatchFee: 50,
     reason: null,
     notes: null,
+    approvalStatus: APPROVED,
+    submittedById: null,
+    teamLeadApprovedById: null,
+    adminApprovedById: null,
+    rejectedById: null,
+    rejectionReason: null,
+    submittedAt: null,
+    teamLeadApprovedAt: null,
+    adminApprovedAt: null,
+    rejectedAt: null,
+    approvalNotes: null,
+    approvalType: "NEW_ACTIVITY",
+    hasPendingEdit: false,
+    pendingEditApprovalStatus: null,
+    approvedByName: null,
+    approvedByRole: null,
     ...overrides,
   };
 }

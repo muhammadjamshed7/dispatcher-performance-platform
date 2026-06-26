@@ -22,6 +22,8 @@ import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
 import { useApiData } from "@/hooks/use-api-data";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
+import { useSession } from "@/components/auth/session-provider";
+import { DISPATCHER } from "@/lib/constants/roles";
 import { ApiClientError } from "@/lib/api/client";
 import { useEntityOptions } from "@/hooks/use-entity-options";
 import {
@@ -137,6 +139,7 @@ function ActivitiesPageState({
   initialExcelFilters: ActivityExcelFilterState;
   compact: boolean;
 }) {
+  const { session } = useSession();
   const [draftFilters, setDraftFilters] = useState<EntityFilterValues>(
     initialEntityFilters,
   );
@@ -176,7 +179,12 @@ function ActivitiesPageState({
     [],
   );
 
-  useRealtimeRefresh(["DailyActivity"], reload);
+  const activityRealtimeTables = useMemo(
+    () => ["DailyActivity", "ActivityEditRequest"] as const,
+    [],
+  );
+
+  useRealtimeRefresh(activityRealtimeTables, reload);
 
   const carrierNameById = useMemo(
     () =>
@@ -221,7 +229,11 @@ function ActivitiesPageState({
 
     try {
       await createActivityRequest(toCreateActivityPayload(values));
-      showToast(`Activity for "${carrierName}" added successfully.`);
+      showToast(
+        session?.role === DISPATCHER
+          ? `Activity for "${carrierName}" submitted for approval.`
+          : `Activity for "${carrierName}" added successfully.`,
+      );
       await reload();
     } catch (err) {
       showToast(getErrorMessage(err, "Failed to create activity."));
@@ -242,7 +254,14 @@ function ActivitiesPageState({
         selectedActivity.id,
         toUpdateActivityPayload(values),
       );
-      showToast(`Activity for "${carrierName}" updated successfully.`);
+      showToast(
+        session?.role === DISPATCHER &&
+          selectedActivity.approvalStatus === "APPROVED"
+          ? `Edit request for "${carrierName}" submitted for approval. The approved activity remains active until review.`
+          : selectedActivity.approvalStatus === "APPROVED"
+            ? `Activity for "${carrierName}" updated successfully.`
+            : `Activity for "${carrierName}" resubmitted for approval.`,
+      );
       await reload();
     } catch (err) {
       showToast(getErrorMessage(err, "Failed to update activity."));

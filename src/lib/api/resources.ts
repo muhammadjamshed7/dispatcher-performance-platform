@@ -163,6 +163,104 @@ export function updateActivityRequest(
   });
 }
 
+export function fetchPendingActivities() {
+  return apiFetch<DailyActivity[]>("/api/activities/pending");
+}
+
+export function approveActivityRequest(
+  id: string,
+  input?: { approvalNotes?: string },
+) {
+  return apiFetch<DailyActivity>(`/api/activities/${id}/approve`, {
+    method: "POST",
+    body: JSON.stringify(input ?? {}),
+  });
+}
+
+export function rejectActivityRequest(
+  id: string,
+  input: {
+    reason: string;
+    requestChanges?: boolean;
+    approvalNotes?: string;
+  },
+) {
+  return apiFetch<DailyActivity>(`/api/activities/${id}/reject`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function fetchPendingApprovals() {
+  return apiFetch<import("@/lib/types").PendingApprovalItem[]>(
+    "/api/activities/pending",
+  );
+}
+
+export function fetchDispatcherSubmissions() {
+  return apiFetch<import("@/lib/types").PendingApprovalItem[]>(
+    "/api/activities/submissions",
+  );
+}
+
+export function approveEditRequestRequest(
+  id: string,
+  input?: { approvalNotes?: string },
+) {
+  return apiFetch<import("@/lib/types").ActivityEditRequestDto>(
+    `/api/activity-edit-requests/${id}/approve`,
+    {
+      method: "POST",
+      body: JSON.stringify(input ?? {}),
+    },
+  );
+}
+
+export function rejectEditRequestRequest(
+  id: string,
+  input: {
+    reason: string;
+    requestChanges?: boolean;
+    approvalNotes?: string;
+  },
+) {
+  return apiFetch<import("@/lib/types").ActivityEditRequestDto>(
+    `/api/activity-edit-requests/${id}/reject`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function fetchNotifications() {
+  return apiFetch<{
+    notifications: import("@/lib/types").AppNotification[];
+    unreadCount: number;
+  }>("/api/notifications");
+}
+
+export function markNotificationReadRequest(id: string) {
+  return apiFetch<{ success: true }>(`/api/notifications/${id}/read`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export function markAllNotificationsReadRequest() {
+  return apiFetch<{ success: true }>("/api/notifications/read-all", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export function fetchAdminLogs(params?: Record<string, string>) {
+  const query = params ? `?${new URLSearchParams(params).toString()}` : "";
+  return apiFetch<import("@/lib/types").AuditLogEntry[]>(
+    `/api/admin/logs${query}`,
+  );
+}
+
 export function fetchAdminDashboard(params?: Record<string, string>) {
   const query = params ? `?${new URLSearchParams(params).toString()}` : "";
   return apiFetch<AdminDashboardBundle>(`/api/dashboard/admin${query}`);

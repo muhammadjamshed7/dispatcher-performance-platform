@@ -30,4 +30,6 @@ export const T = {
   RegistrationRequest: "RegistrationRequest",
   AuditLog: "AuditLog",
   ReportExport: "ReportExport",
+  ActivityEditRequest: "ActivityEditRequest",
+  Notification: "Notification",
 } as const;

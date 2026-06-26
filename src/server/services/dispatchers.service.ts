@@ -12,7 +12,7 @@ import { TEAM_STATUSES } from "@/lib/constants/team-statuses";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Dispatcher as DispatcherDto } from "@/lib/types";
 import type { AccessScope, AuthContextUser } from "@/server/auth/types";
-import { mapDispatcher } from "@/server/mappers";
+import { mapDispatcher, mapTeamLeadUser } from "@/server/mappers";
 import { writeAuditLog } from "@/server/services/audit.service";
 import { sanitizeFilterId } from "@/lib/constants/filters";
 import { assertFilterAccess } from "@/server/utils/activity-filters";
@@ -264,7 +264,7 @@ export async function createDispatcher(
 
   const teamResult = await db()
     .from(T.Team)
-    .select("id")
+    .select("id, name")
     .eq("id", parsed.teamId)
     .eq("organizationId", scope.organizationId)
     .is("deletedAt", null)
@@ -305,15 +305,15 @@ export async function createDispatcher(
     );
   }
 
-  let dispatcher: DispatcherRow;
+  let dispatcher: DispatcherRow | null = null;
+  let teamLeadDto: DispatcherDto | null = null;
   let createdUserId: string | null = null;
   let createdDispatcherId: string | null = null;
+  const isTeamLead = parsed.role === TEAM_LEAD;
 
   try {
     const userId = createId();
-    const dispatcherId = createId();
     createdUserId = userId;
-    createdDispatcherId = dispatcherId;
     const timestamp = nowIso();
 
     const userResult = await db()
@@ -334,27 +334,42 @@ export async function createDispatcher(
 
     assertDbVoid(userResult);
 
-    const dispatcherResult = await db()
-      .from(T.Dispatcher)
-      .insert({
-        id: dispatcherId,
-        organizationId: scope.organizationId,
-        userId,
-        teamId: parsed.teamId,
-        status: parsed.status as TeamStatus,
+    if (isTeamLead) {
+      teamLeadDto = mapTeamLeadUser({
+        id: userId,
+        fullName: parsed.fullName,
+        email: parsed.email.toLowerCase(),
+        phoneNumber: parsed.phoneNumber ?? null,
         createdAt: timestamp,
-        updatedAt: timestamp,
-      })
-      .select(DISPATCHER_WITH_USER_AND_TEAM)
-      .single();
+        team: { name: teamResult.data.name },
+        status: parsed.status as TeamStatus,
+      });
+    } else {
+      const dispatcherId = createId();
+      createdDispatcherId = dispatcherId;
 
-    dispatcher = normalizeDispatcherRow(
-      assertDb(dispatcherResult) as DispatcherRow,
-    );
-    const [enriched] = await enrichDispatchersWithCounts(scope.organizationId, [
-      dispatcher,
-    ]);
-    dispatcher = enriched;
+      const dispatcherResult = await db()
+        .from(T.Dispatcher)
+        .insert({
+          id: dispatcherId,
+          organizationId: scope.organizationId,
+          userId,
+          teamId: parsed.teamId,
+          status: parsed.status as TeamStatus,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        })
+        .select(DISPATCHER_WITH_USER_AND_TEAM)
+        .single();
+
+      dispatcher = normalizeDispatcherRow(
+        assertDb(dispatcherResult) as DispatcherRow,
+      );
+      const [enriched] = await enrichDispatchersWithCounts(scope.organizationId, [
+        dispatcher,
+      ]);
+      dispatcher = enriched;
+    }
   } catch (error) {
     if (createdDispatcherId) {
       await ignoreDbError(
@@ -375,14 +390,18 @@ export async function createDispatcher(
   await writeAuditLog({
     organizationId: scope.organizationId,
     actorUserId: actor.id,
-    action: "DISPATCHER_CREATED",
-    entityType: "Dispatcher",
-    entityId: dispatcher.id,
-    metadata: { email: parsed.email, teamId: parsed.teamId },
+    action: isTeamLead ? "USER_ROLE_ASSIGNED" : "DISPATCHER_CREATED",
+    entityType: isTeamLead ? "User" : "Dispatcher",
+    entityId: isTeamLead ? createdUserId! : dispatcher!.id,
+    metadata: {
+      email: parsed.email,
+      teamId: parsed.teamId,
+      role: parsed.role,
+    },
   });
 
   return {
-    dispatcher: mapDispatcher(dispatcher),
+    dispatcher: isTeamLead ? teamLeadDto! : mapDispatcher(dispatcher!),
     temporaryPassword,
   };
 }

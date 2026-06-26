@@ -5,6 +5,7 @@ import { useCallback, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useApiData } from "@/hooks/use-api-data";
+import { APPROVED } from "@/lib/constants/activity-approval";
 import { fetchActivities, fetchCarriers } from "@/lib/api/resources";
 import type { Dispatcher } from "@/lib/types";
 import { TEAM_STATUS_ACTIVE } from "@/lib/constants/team-statuses";
@@ -19,7 +20,11 @@ export function DispatcherDetailView({
 }: DispatcherDetailViewProps) {
   const loadCarriers = useCallback(() => fetchCarriers(), []);
   const loadActivities = useCallback(
-    () => fetchActivities({ dispatcherId: dispatcher.id }),
+    () =>
+      fetchActivities({
+        dispatcherId: dispatcher.id,
+        approvalStatus: APPROVED,
+      }),
     [dispatcher.id],
   );
 

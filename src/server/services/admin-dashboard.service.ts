@@ -7,6 +7,7 @@ import {
   NOT_BOOKED,
   NOT_WORKING,
 } from "@/lib/constants/statuses";
+import { APPROVED } from "@/lib/constants/activity-approval";
 import { STATUSES } from "@/lib/constants/statuses";
 import { TRUCK_TYPES } from "@/lib/constants/truck-types";
 import { T, db } from "@/lib/db/client";
@@ -27,7 +28,6 @@ import {
   type ActivityFilters,
 } from "@/server/utils/activity-filters";
 import {
-  activityScopeFilter,
   carrierScopeFilter,
   dispatcherScopeFilter,
   teamScopeFilter,
@@ -372,6 +372,7 @@ async function fetchActivities(
         .select(
           "id, activityDate, createdAt, status, loadAmount, teamNameSnapshot, dispatcherNameSnapshot, carrierNameSnapshot, truckTypeSnapshot, origin, destination",
         )
+        .eq("approvalStatus", APPROVED)
         .order("activityDate", { ascending: false })
         .order("createdAt", { ascending: false }),
     ),

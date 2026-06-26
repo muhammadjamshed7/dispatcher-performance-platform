@@ -5,7 +5,7 @@ import { TRUCK_TYPES } from "@/lib/constants/truck-types";
 import { REPORT_PERIODS } from "@/lib/constants/report-periods";
 import { parseSearchParams } from "@/server/api/request";
 import { handleApi } from "@/server/api/response";
-import { requireAccessScope } from "@/server/auth/require-auth";
+import { requireAdminOrTeamLeadScope } from "@/server/auth/require-auth";
 import { getReportBundle } from "@/server/services/reports.service";
 
 const reportQuerySchema = z.object({
@@ -21,7 +21,7 @@ const reportQuerySchema = z.object({
 
 export async function GET(request: Request) {
   return handleApi(async () => {
-    const { scope } = await requireAccessScope();
+    const { scope } = await requireAdminOrTeamLeadScope();
     const url = new URL(request.url);
     const query = parseSearchParams(url.searchParams, reportQuerySchema);
     const { period, ...filters } = query;

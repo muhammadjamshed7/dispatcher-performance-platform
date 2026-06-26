@@ -56,6 +56,9 @@ export function SettingsEditForm({ settings, onSaved }: SettingsEditFormProps) {
   const [csvFileNamePrefix, setCsvFileNamePrefix] = useState(
     settings.csvExport.fileNamePrefix,
   );
+  const [directAdminApprovalMode, setDirectAdminApprovalMode] = useState(
+    settings.directAdminApprovalMode,
+  );
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -96,6 +99,7 @@ export function SettingsEditForm({ settings, onSaved }: SettingsEditFormProps) {
         csvDateFormat,
         csvMaxRows: Number(csvMaxRows),
         csvFileNamePrefix,
+        directAdminApprovalMode,
       });
       setDefaultCurrency(savedSettings.currency);
       setToastMessage("Settings saved.");
@@ -254,6 +258,28 @@ export function SettingsEditForm({ settings, onSaved }: SettingsEditFormProps) {
                 onChange={(event) => setCsvFileNamePrefix(event.target.value)}
               />
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Activity Approval</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={directAdminApprovalMode}
+                onChange={(event) =>
+                  setDirectAdminApprovalMode(event.target.checked)
+                }
+              />
+              <span>
+                Direct admin approval mode — dispatcher submissions skip team
+                lead review and go straight to admin approval.
+              </span>
+            </label>
           </CardContent>
         </Card>
       </div>

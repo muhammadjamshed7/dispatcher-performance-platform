@@ -4,7 +4,6 @@ import { useCallback, useMemo } from "react";
 
 import { PageContentGate } from "@/components/feedback/page-content-gate";
 import type { PageContentState } from "@/components/feedback/page-content-gate";
-import { RoleScopeBanner } from "@/components/layout/role-scope-banner";
 import { PageShell } from "@/components/layout/page-shell";
 import { MetricCard } from "@/components/metric-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +17,7 @@ import {
 } from "@/components/ui/table";
 import { useApiData } from "@/hooks/use-api-data";
 import { useRoleScope } from "@/hooks/use-role-scope";
+import { APPROVED } from "@/lib/constants/activity-approval";
 import {
   fetchActivities,
   fetchCarriers,
@@ -46,7 +46,10 @@ export function DispatcherPerformancePage() {
   const loadMetrics = useCallback(() => fetchDispatcherDashboard(), []);
   const loadRankings = useCallback(() => fetchRankings("dispatcher"), []);
   const loadCarriers = useCallback(() => fetchCarriers(), []);
-  const loadActivities = useCallback(() => fetchActivities(), []);
+  const loadActivities = useCallback(
+    () => fetchActivities({ approvalStatus: APPROVED }),
+    [],
+  );
 
   const {
     data: dashboard,
@@ -131,14 +134,6 @@ export function DispatcherPerformancePage() {
       title="My Performance"
       description="Personal performance metrics and carrier activity."
     >
-      <RoleScopeBanner
-        message={
-          user.fullName
-            ? `Performance view for ${user.fullName}`
-            : "Dispatcher performance view"
-        }
-      />
-
       <PageContentGate
         state={pageState}
         onRetry={reload}

@@ -54,7 +54,7 @@ function roleDispatchersPath(role: AccessScope["role"]): string {
 }
 
 async function searchCarriers(scope: AccessScope, query: string) {
-  let carrierQuery = applyScopeWhere(
+  const carrierQuery = applyScopeWhere(
     asFilterable(
       db()
         .from(T.Carrier)
@@ -75,7 +75,7 @@ async function searchCarriers(scope: AccessScope, query: string) {
 }
 
 async function searchDispatchers(scope: AccessScope, query: string) {
-  let dispatcherQuery = applyScopeWhere(
+  const dispatcherQuery = applyScopeWhere(
     asFilterable(
       db()
         .from(T.Dispatcher)

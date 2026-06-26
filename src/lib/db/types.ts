@@ -10,6 +10,20 @@ export type LoadActivityStatus =
   | "CANCELLED"
   | "NOT_BOOKED"
   | "NOT_WORKING";
+export type ActivityApprovalStatus =
+  | "APPROVED"
+  | "PENDING_TEAM_LEAD_APPROVAL"
+  | "PENDING_ADMIN_APPROVAL"
+  | "REJECTED";
+export type ActivityApprovalType = "NEW_ACTIVITY" | "EDIT_ACTIVITY";
+export type NotificationStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "REJECTED"
+  | "CHANGES_REQUESTED"
+  | "ADMIN_APPROVAL_REQUIRED"
+  | "TEAM_LEAD_APPROVAL_REQUIRED"
+  | "COMPLETED";
 export type TruckType =
   | "DRY_VAN"
   | "REEFER"
@@ -37,6 +51,11 @@ export type AuditAction =
   | "CARRIER_REASSIGNED"
   | "ACTIVITY_CREATED"
   | "ACTIVITY_UPDATED"
+  | "ACTIVITY_SUBMITTED"
+  | "ACTIVITY_APPROVED_BY_TEAM_LEAD"
+  | "ACTIVITY_APPROVED_BY_ADMIN"
+  | "ACTIVITY_REJECTED"
+  | "ACTIVITY_PENDING_UPDATED"
   | "SETTINGS_UPDATED"
   | "REPORT_EXPORTED";
 
@@ -100,6 +119,7 @@ export type Carrier = {
   dispatcherId: string | null;
   dispatchFeePercentage: string;
   status: CarrierStatus;
+  notes: string | null;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -127,6 +147,18 @@ export type DailyActivity = {
   dispatchFee: string | null;
   reason: string | null;
   notes: string | null;
+  approvalStatus: ActivityApprovalStatus;
+  submittedById: string | null;
+  teamLeadApprovedById: string | null;
+  adminApprovedById: string | null;
+  rejectedById: string | null;
+  rejectionReason: string | null;
+  approvalNotes: string | null;
+  approvalType: ActivityApprovalType;
+  submittedAt: string | null;
+  teamLeadApprovedAt: string | null;
+  adminApprovedAt: string | null;
+  rejectedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -163,6 +195,7 @@ export type OrganizationSettings = {
   csvDateFormat: string;
   csvMaxRows: number;
   csvFileNamePrefix: string;
+  directAdminApprovalMode: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -185,6 +218,45 @@ export type AuditLog = {
   entityType: string;
   entityId: string | null;
   metadata: Record<string, unknown> | null;
+  createdAt: string;
+};
+
+export type ActivityEditRequest = {
+  id: string;
+  organizationId: string;
+  originalActivityId: string;
+  teamId: string;
+  dispatcherId: string;
+  approvalStatus: ActivityApprovalStatus;
+  proposedChanges: Record<string, unknown>;
+  previousData: Record<string, unknown>;
+  submittedById: string;
+  editedById: string;
+  teamLeadApprovedById: string | null;
+  adminApprovedById: string | null;
+  rejectedById: string | null;
+  rejectionReason: string | null;
+  approvalNotes: string | null;
+  submittedAt: string;
+  editedAt: string;
+  teamLeadApprovedAt: string | null;
+  adminApprovedAt: string | null;
+  rejectedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type Notification = {
+  id: string;
+  organizationId: string;
+  recipientUserId: string;
+  title: string;
+  message: string;
+  notificationStatus: NotificationStatus;
+  activityId: string | null;
+  editRequestId: string | null;
+  metadata: Record<string, unknown> | null;
+  readAt: string | null;
   createdAt: string;
 };
 

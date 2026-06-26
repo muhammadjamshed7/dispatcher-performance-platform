@@ -5,6 +5,7 @@ import { useCallback, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useApiData } from "@/hooks/use-api-data";
+import { APPROVED } from "@/lib/constants/activity-approval";
 import {
   fetchActivities,
   fetchCarriers,
@@ -22,7 +23,7 @@ export function TeamDetailView({ team }: TeamDetailViewProps) {
   const loadDispatchers = useCallback(() => fetchDispatchers(), []);
   const loadCarriers = useCallback(() => fetchCarriers(), []);
   const loadActivities = useCallback(
-    () => fetchActivities({ teamId: team.id }),
+    () => fetchActivities({ teamId: team.id, approvalStatus: APPROVED }),
     [team.id],
   );
 

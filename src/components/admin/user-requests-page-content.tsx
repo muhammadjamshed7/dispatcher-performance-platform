@@ -113,7 +113,12 @@ export function UserRequestsPageContent() {
   } = useApiData(loadRequests, []);
   const { data: teams = [] } = useApiData(loadTeams, []);
 
-  useRealtimeRefresh(["RegistrationRequest"], reload);
+  const requestRealtimeTables = useMemo(
+    () => ["RegistrationRequest", "User"] as const,
+    [],
+  );
+
+  useRealtimeRefresh(requestRealtimeTables, reload);
 
   const pageState: PageContentState = isLoading
     ? "loading"

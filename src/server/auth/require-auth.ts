@@ -3,6 +3,7 @@ import "server-only";
 import { ForbiddenError } from "@/lib/errors/forbidden-error";
 import { NotFoundError } from "@/lib/errors/not-found-error";
 import type { Role } from "@/lib/constants/roles";
+import { ADMIN, TEAM_LEAD } from "@/lib/constants/roles";
 import { ACTIVE } from "@/lib/auth/user-statuses";
 import { getAccessDeniedMessage } from "@/lib/auth/permissions";
 import {
@@ -95,6 +96,19 @@ export async function requireAccessScope(requiredRole?: Role): Promise<{
     user,
     scope: buildAccessScope(user),
   };
+}
+
+export async function requireAdminOrTeamLeadScope(): Promise<{
+  user: AuthContextUser;
+  scope: AccessScope;
+}> {
+  const result = await requireAccessScope();
+
+  if (result.scope.role !== ADMIN && result.scope.role !== TEAM_LEAD) {
+    throw new ForbiddenError("Admin or team lead access is required.");
+  }
+
+  return result;
 }
 
 export function assertTeamAccess(scope: AccessScope, teamId: string): void {

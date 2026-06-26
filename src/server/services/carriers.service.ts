@@ -408,6 +408,7 @@ export async function createCarrier(
         status: (parsed.status === "ACTIVE"
           ? "ACTIVE"
           : "INACTIVE") as CarrierStatus,
+        notes: parsed.notes ?? null,
         createdAt: timestamp,
         updatedAt: timestamp,
       })
@@ -522,6 +523,7 @@ export async function updateCarrier(
               : "INACTIVE") as CarrierStatus,
           }
         : {}),
+      ...(parsed.notes !== undefined ? { notes: parsed.notes || null } : {}),
       updatedAt: nowIso(),
     })
     .eq("id", id)

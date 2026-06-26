@@ -3,6 +3,9 @@
 import { MoreHorizontal } from "lucide-react";
 
 import { StatusBadge } from "@/components/status-badge";
+import { ActivityApprovalBadge } from "@/components/activities/activity-approval-badge";
+import { APPROVED, REJECTED } from "@/lib/constants/activity-approval";
+import { ADMIN } from "@/lib/constants/roles";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -34,11 +37,13 @@ export type ActivityRowAction = "view" | "edit";
 type ActivitiesTableProps = {
   activities: DailyActivity[];
   onAction: (activity: DailyActivity, action: ActivityRowAction) => void;
+  showApprovalStatus?: boolean;
 };
 
 export function ActivitiesTable({
   activities,
   onAction,
+  showApprovalStatus = true,
 }: ActivitiesTableProps) {
   return (
     <Card>
@@ -55,6 +60,8 @@ export function ActivitiesTable({
               <TableHead>Team</TableHead>
               <TableHead>Truck Type</TableHead>
               <TableHead>Status</TableHead>
+              {showApprovalStatus ? <TableHead>Approval</TableHead> : null}
+              {showApprovalStatus ? <TableHead>Rejection Reason</TableHead> : null}
               <TableHead>Origin</TableHead>
               <TableHead>Destination</TableHead>
               <TableHead>Miles</TableHead>
@@ -70,7 +77,7 @@ export function ActivitiesTable({
             {activities.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={15}
+                  colSpan={showApprovalStatus ? 17 : 15}
                   className="text-muted-foreground py-8 text-center"
                 >
                   No activities found.
@@ -91,6 +98,38 @@ export function ActivitiesTable({
                   <TableCell>
                     <StatusBadge status={activity.status} />
                   </TableCell>
+                  {showApprovalStatus ? (
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        <ActivityApprovalBadge
+                          approvalStatus={
+                            activity.pendingEditApprovalStatus ??
+                            activity.approvalStatus
+                          }
+                        />
+                        {!activity.pendingEditApprovalStatus &&
+                        activity.approvalStatus === APPROVED &&
+                        activity.approvedByRole ? (
+                          <span className="text-muted-foreground text-[11px]">
+                            by{" "}
+                            {activity.approvedByRole === ADMIN
+                              ? "Admin"
+                              : "Team Lead"}
+                            {activity.approvedByName
+                              ? ` · ${activity.approvedByName}`
+                              : ""}
+                          </span>
+                        ) : null}
+                      </div>
+                    </TableCell>
+                  ) : null}
+                  {showApprovalStatus ? (
+                    <TableCell>
+                      {activity.approvalStatus === REJECTED
+                        ? formatNullableText(activity.rejectionReason, "—")
+                        : "—"}
+                    </TableCell>
+                  ) : null}
                   <TableCell>
                     {formatNullableText(activity.origin, "—")}
                   </TableCell>

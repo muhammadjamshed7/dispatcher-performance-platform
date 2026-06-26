@@ -4,6 +4,8 @@ import { FileQuestion } from "lucide-react";
 import { AuthStateScreen } from "@/components/auth/auth-state-screen";
 import { buttonVariants } from "@/components/ui/button";
 
+export const dynamic = "force-dynamic";
+
 export default function NotFoundPage() {
   return (
     <AuthStateScreen

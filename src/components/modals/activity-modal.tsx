@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { ActivityDetailView } from "@/components/details/activity-detail-view";
 import { DailyActivityForm } from "@/components/forms/daily-activity-form";
@@ -60,13 +60,6 @@ export function ActivityModal({
   onEdit,
 }: ActivityModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [createFormKey, setCreateFormKey] = useState(0);
-
-  useEffect(() => {
-    if (open && mode === "create") {
-      setCreateFormKey((current) => current + 1);
-    }
-  }, [mode, open]);
 
   const titles: Record<ActivityModalMode, string> = {
     create: "Add Activity",
@@ -100,7 +93,7 @@ export function ActivityModal({
   }
 
   const formKey =
-    mode === "create" ? `create-${createFormKey}` : `edit-${activity?.id ?? "new"}`;
+    mode === "create" ? `create-${open}` : `edit-${activity?.id ?? "new"}`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

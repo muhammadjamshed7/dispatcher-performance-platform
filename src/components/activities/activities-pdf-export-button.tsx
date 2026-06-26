@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import type { ActivityExcelFilterState } from "@/lib/filters/activity-excel-filter-params";
 import type { EntityFilterValues } from "@/lib/filters/entity-filter-params";
 import { exportDailyActivitiesPdf } from "@/lib/reports/export-daily-activities-pdf";
+import { APPROVED } from "@/lib/constants/activity-approval";
 import type { ActivitiesReportFilterContext } from "@/lib/reports/activities-report-filter-labels";
 import type { Carrier, DailyActivity, Dispatcher, Team } from "@/lib/types";
 
@@ -38,8 +39,12 @@ export function ActivitiesPdfExportButton({
   const [isExporting, setIsExporting] = useState(false);
 
   async function handleExport() {
-    if (activities.length === 0) {
-      onError?.("No activities to export for the current filters.");
+    const approvedActivities = activities.filter(
+      (activity) => activity.approvalStatus === APPROVED,
+    );
+
+    if (approvedActivities.length === 0) {
+      onError?.("No approved activities to export for the current filters.");
       return;
     }
 
@@ -56,7 +61,7 @@ export function ActivitiesPdfExportButton({
 
     try {
       await exportDailyActivitiesPdf({
-        activities,
+        activities: approvedActivities,
         filterContext,
       });
       onSuccess?.();

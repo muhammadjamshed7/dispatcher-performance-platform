@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, ChevronDown, Menu } from "lucide-react";
+import { ChevronDown, Menu } from "lucide-react";
 
 import { LogoutButton } from "@/components/auth/logout-button";
 import { GlobalSearch } from "@/components/layout/global-search";
+import { NotificationsDropdown } from "@/components/notifications/notifications-dropdown";
 import { useSession } from "@/components/auth/session-provider";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -52,14 +53,7 @@ export function TopNav({ onMenuClick }: TopNavProps) {
         <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3">
           <GlobalSearch />
 
-          <button
-            type="button"
-            className="relative shrink-0 rounded-lg p-2 text-[#475569] hover:bg-[#F1F5F9]"
-            aria-label="Notifications"
-          >
-            <Bell className="size-5" />
-            <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-[#2563EB]" />
-          </button>
+          <NotificationsDropdown />
 
           {session && showAccountSummary ? (
             <Badge className="hidden rounded-full bg-[#DBEAFE] px-3 py-1 text-xs font-medium text-[#1D4ED8] hover:bg-[#DBEAFE] md:inline-flex">

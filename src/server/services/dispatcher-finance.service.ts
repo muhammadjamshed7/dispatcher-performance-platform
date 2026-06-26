@@ -17,6 +17,7 @@ import {
   STATUSES,
 } from "@/lib/constants/statuses";
 import { LOAD_ACTIVITY_STATUS_LABELS } from "@/lib/constants/status-labels";
+import { APPROVED } from "@/lib/constants/activity-approval";
 import { T, db } from "@/lib/db/client";
 import { assertDb, decimalToNumber } from "@/lib/db/utils";
 import type {
@@ -316,6 +317,7 @@ async function fetchActivitiesForDispatcher(
     )
     .eq("organizationId", organizationId)
     .eq("dispatcherId", dispatcherId)
+    .eq("approvalStatus", APPROVED)
     .gte("activityDate", dateFrom)
     .lte("activityDate", dateTo)
     .order("activityDate", { ascending: false })

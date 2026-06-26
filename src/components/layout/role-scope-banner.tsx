@@ -3,6 +3,7 @@
 import { Info } from "lucide-react";
 
 import { useRoleScope } from "@/hooks/use-role-scope";
+import { DISPATCHER } from "@/lib/constants/roles";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -12,6 +13,12 @@ type RoleScopeBannerProps = {
 
 export function RoleScopeBanner({ message }: RoleScopeBannerProps) {
   const { scopeLabel, user, role } = useRoleScope();
+
+  // Dispatchers only ever see their own data, so the scope banner just repeats
+  // the role/name already shown in the top nav. Hide it for them.
+  if (role === DISPATCHER) {
+    return null;
+  }
 
   return (
     <Card className="bg-muted/20 border-dashed">
