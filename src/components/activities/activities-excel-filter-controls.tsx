@@ -11,6 +11,7 @@ import { useEntityOptions } from "@/hooks/use-entity-options";
 import type { Status } from "@/lib/constants/statuses";
 import type { TruckType } from "@/lib/constants/truck-types";
 import {
+  ACTIVITY_APPROVAL_STATUS_OPTIONS,
   ACTIVITY_DATE_RANGE_OPTIONS,
   ACTIVITY_STATUS_OPTIONS,
   ACTIVITY_TRUCK_TYPE_OPTIONS,
@@ -18,6 +19,7 @@ import {
   countActiveActivityExcelFilters,
   type ActivityExcelFilterState,
 } from "@/lib/filters/activity-excel-filter-params";
+import type { ActivityApprovalStatus } from "@/lib/constants/activity-approval";
 import { getCarrierDisplayName } from "@/lib/utils/carrier-display";
 import { cn } from "@/lib/utils";
 
@@ -147,8 +149,8 @@ function ActivitiesExcelFilterPopover({
       <div className="border-b border-[#F1F5F9] px-5 py-4">
         <h2 className="text-base font-semibold text-[#0F172A]">Filters</h2>
         <p className="mt-1 text-xs text-[#64748B]">
-          Refine activities by date, team, dispatcher, carrier, truck type, or
-          status.
+          Refine activities by date, team, dispatcher, carrier, truck type,
+          status, or approval status.
         </p>
       </div>
 
@@ -213,6 +215,20 @@ function ActivitiesExcelFilterPopover({
               selectedValues={draftFilters.statuses}
               onChange={(statuses) =>
                 patchDraft({ statuses: statuses as Status[] })
+              }
+            />
+            <Separator className="bg-[#F1F5F9]" />
+
+            <CheckboxFilterGroup
+              title="Approval Status"
+              searchPlaceholder="Search approval statuses..."
+              options={ACTIVITY_APPROVAL_STATUS_OPTIONS}
+              selectedValues={draftFilters.approvalStatuses}
+              onChange={(approvalStatuses) =>
+                patchDraft({
+                  approvalStatuses:
+                    approvalStatuses as ActivityApprovalStatus[],
+                })
               }
             />
           </>

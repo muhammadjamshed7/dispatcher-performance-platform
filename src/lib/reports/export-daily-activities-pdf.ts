@@ -1,3 +1,7 @@
+import {
+  ACTIVITY_APPROVAL_LABELS,
+  REJECTED,
+} from "@/lib/constants/activity-approval";
 import { DELIVERED } from "@/lib/constants/statuses";
 import { getLoadActivityStatusLabel } from "@/lib/constants/status-labels";
 import type { DailyActivity } from "@/lib/types";
@@ -19,6 +23,12 @@ import {
 export type DailyActivitiesPdfExportInput = {
   activities: DailyActivity[];
   filterContext: ActivitiesReportFilterContext;
+  /**
+   * Adds an "Approval" column and folds rejection feedback into the notes cell.
+   * Used for the dispatcher's own activity export where pending/rejected rows
+   * are included.
+   */
+  includeApprovalDetails?: boolean;
 };
 
 type JsPdfDocument = {
@@ -44,7 +54,7 @@ const MARGIN_X = 14;
 const HEADER_COLOR: [number, number, number] = [15, 23, 42];
 const SECTION_COLOR: [number, number, number] = [30, 41, 59];
 
-const ACTIVITY_TABLE_HEAD = [
+const BASE_ACTIVITY_TABLE_HEAD = [
   "Date",
   "Carrier",
   "Dispatcher",
@@ -60,6 +70,19 @@ const ACTIVITY_TABLE_HEAD = [
   "Reason",
   "Notes",
 ];
+
+function buildActivityTableHead(includeApprovalDetails: boolean): string[] {
+  if (!includeApprovalDetails) {
+    return BASE_ACTIVITY_TABLE_HEAD;
+  }
+
+  // Insert the "Approval" column immediately after "Status".
+  return [
+    ...BASE_ACTIVITY_TABLE_HEAD.slice(0, 6),
+    "Approval",
+    ...BASE_ACTIVITY_TABLE_HEAD.slice(6),
+  ];
+}
 
 const SUMMARY_TABLE_HEAD = [
   "Name",
@@ -84,10 +107,24 @@ function formatMiles(value: number): string {
   });
 }
 
-function activityToPdfRow(activity: DailyActivity): string[] {
+function activityToPdfRow(
+  activity: DailyActivity,
+  includeApprovalDetails: boolean,
+): string[] {
   const isDelivered = activity.status === DELIVERED;
 
-  return [
+  let notesCell = activity.notes ?? "";
+  if (
+    includeApprovalDetails &&
+    activity.approvalStatus === REJECTED &&
+    activity.rejectionReason
+  ) {
+    notesCell = `Rejected: ${activity.rejectionReason}${
+      notesCell ? ` | ${notesCell}` : ""
+    }`;
+  }
+
+  const row = [
     formatActivityDate(activity.date),
     activity.carrierName,
     activity.dispatcherName,
@@ -101,12 +138,16 @@ function activityToPdfRow(activity: DailyActivity): string[] {
       ? formatCurrency(activity.loadAmount, { nullLabel: "" })
       : "",
     isDelivered ? formatRatePerMile(activity.ratePerMile, "") : "",
-    isDelivered
-      ? formatCurrency(activity.dispatchFee, { nullLabel: "" })
-      : "",
+    isDelivered ? formatCurrency(activity.dispatchFee, { nullLabel: "" }) : "",
     activity.reason ?? "",
-    activity.notes ?? "",
+    notesCell,
   ];
+
+  if (includeApprovalDetails) {
+    row.splice(6, 0, ACTIVITY_APPROVAL_LABELS[activity.approvalStatus]);
+  }
+
+  return row;
 }
 
 function totalsToSummaryRow(
@@ -157,6 +198,7 @@ function ensureSpace(
 export async function exportDailyActivitiesPdf({
   activities,
   filterContext,
+  includeApprovalDetails = false,
 }: DailyActivitiesPdfExportInput): Promise<void> {
   const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
     import("jspdf"),
@@ -197,10 +239,43 @@ export async function exportDailyActivitiesPdf({
 
   y += 4;
 
+  // With the extra "Approval" column we let autoTable auto-distribute widths to
+  // avoid overflowing the landscape page; the fixed layout is tuned for the
+  // 14-column report.
+  const activityColumnStyles: Record<
+    number,
+    { cellWidth?: number; halign?: "right" }
+  > = includeApprovalDetails
+    ? {
+        8: { halign: "right" as const },
+        9: { halign: "right" as const },
+        10: { halign: "right" as const },
+        11: { halign: "right" as const },
+        12: { halign: "right" as const },
+      }
+    : {
+        0: { cellWidth: 16 },
+        1: { cellWidth: 22 },
+        2: { cellWidth: 22 },
+        3: { cellWidth: 18 },
+        4: { cellWidth: 14 },
+        5: { cellWidth: 16 },
+        6: { cellWidth: 20 },
+        7: { cellWidth: 20 },
+        8: { cellWidth: 12, halign: "right" as const },
+        9: { cellWidth: 16, halign: "right" as const },
+        10: { cellWidth: 14, halign: "right" as const },
+        11: { cellWidth: 16, halign: "right" as const },
+        12: { cellWidth: 24 },
+        13: { cellWidth: 24 },
+      };
+
   autoTable(doc, {
     startY: y,
-    head: [ACTIVITY_TABLE_HEAD],
-    body: activities.map(activityToPdfRow),
+    head: [buildActivityTableHead(includeApprovalDetails)],
+    body: activities.map((activity) =>
+      activityToPdfRow(activity, includeApprovalDetails),
+    ),
     styles: {
       fontSize: 7,
       cellPadding: 1.6,
@@ -215,22 +290,7 @@ export async function exportDailyActivitiesPdf({
     alternateRowStyles: {
       fillColor: [248, 250, 252],
     },
-    columnStyles: {
-      0: { cellWidth: 16 },
-      1: { cellWidth: 22 },
-      2: { cellWidth: 22 },
-      3: { cellWidth: 18 },
-      4: { cellWidth: 14 },
-      5: { cellWidth: 16 },
-      6: { cellWidth: 20 },
-      7: { cellWidth: 20 },
-      8: { cellWidth: 12, halign: "right" },
-      9: { cellWidth: 16, halign: "right" },
-      10: { cellWidth: 14, halign: "right" },
-      11: { cellWidth: 16, halign: "right" },
-      12: { cellWidth: 24 },
-      13: { cellWidth: 24 },
-    },
+    columnStyles: activityColumnStyles,
     margin: { left: MARGIN_X, right: MARGIN_X },
     didDrawPage: (data) => {
       const pageWidth = doc.internal.pageSize.getWidth();

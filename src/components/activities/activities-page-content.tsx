@@ -40,11 +40,12 @@ import {
   createActivityRequest,
   fetchActivities,
   fetchAllowedStatusReasons,
+  fetchDispatcherSubmissions,
   updateActivityRequest,
 } from "@/lib/api/resources";
 import { getCarrierDisplayName } from "@/lib/utils/carrier-display";
 import { DELIVERED } from "@/lib/constants/statuses";
-import type { DailyActivity } from "@/lib/types";
+import type { ActivityEditRequestDto, DailyActivity } from "@/lib/types";
 import type { DailyActivityFormValues } from "@/lib/validation/daily-activity-form";
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -140,6 +141,7 @@ function ActivitiesPageState({
   compact: boolean;
 }) {
   const { session } = useSession();
+  const isDispatcher = session?.role === DISPATCHER;
   const [draftFilters, setDraftFilters] = useState<EntityFilterValues>(
     initialEntityFilters,
   );
@@ -179,12 +181,49 @@ function ActivitiesPageState({
     [],
   );
 
+  const loadSubmissions = useCallback(() => fetchDispatcherSubmissions(), []);
+  const { data: submissions = [], reload: reloadSubmissions } = useApiData(
+    loadSubmissions,
+    [],
+    { enabled: isDispatcher },
+  );
+
+  const editRequestByActivityId = useMemo(() => {
+    const map = new Map<string, ActivityEditRequestDto>();
+
+    for (const item of submissions) {
+      if (item.kind !== "edit_request" || !item.editRequest) {
+        continue;
+      }
+
+      const activityId = item.editRequest.originalActivityId;
+      const existing = map.get(activityId);
+
+      if (
+        !existing ||
+        new Date(item.editRequest.editedAt).getTime() >
+          new Date(existing.editedAt).getTime()
+      ) {
+        map.set(activityId, item.editRequest);
+      }
+    }
+
+    return map;
+  }, [submissions]);
+
+  const refreshAll = useCallback(() => {
+    void reload();
+    if (isDispatcher) {
+      void reloadSubmissions();
+    }
+  }, [isDispatcher, reload, reloadSubmissions]);
+
   const activityRealtimeTables = useMemo(
     () => ["DailyActivity", "ActivityEditRequest"] as const,
     [],
   );
 
-  useRealtimeRefresh(activityRealtimeTables, reload);
+  useRealtimeRefresh(activityRealtimeTables, refreshAll);
 
   const carrierNameById = useMemo(
     () =>
@@ -292,6 +331,8 @@ function ActivitiesPageState({
               teams={teams}
               dispatchers={dispatchers}
               carriers={carriers}
+              includeAllStatuses={isDispatcher}
+              includeApprovalDetails={isDispatcher}
               disabled={isLoading || Boolean(error)}
               onSuccess={() =>
                 showToast("Daily activities PDF exported successfully.")
@@ -340,6 +381,11 @@ function ActivitiesPageState({
         open={modalOpen}
         mode={modalMode}
         activity={selectedActivity}
+        pendingEditRequest={
+          selectedActivity
+            ? (editRequestByActivityId.get(selectedActivity.id) ?? null)
+            : null
+        }
         allowedStatusReasons={allowedStatusReasons}
         onOpenChange={setModalOpen}
         onCreate={handleCreate}

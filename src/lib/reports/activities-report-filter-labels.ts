@@ -1,3 +1,4 @@
+import { ACTIVITY_APPROVAL_LABELS } from "@/lib/constants/activity-approval";
 import { DATE_RANGE_OPTIONS } from "@/lib/constants/date-ranges";
 import { FILTER_ALL } from "@/lib/constants/filters";
 import { getLoadActivityStatusLabel } from "@/lib/constants/status-labels";
@@ -145,6 +146,14 @@ export function buildExcelFilterSummaryLines(
     lines.push(
       `Statuses: ${filters.statuses
         .map((status) => getLoadActivityStatusLabel(status))
+        .join(", ")}`,
+    );
+  }
+
+  if (filters.approvalStatuses.length > 0) {
+    lines.push(
+      `Approval: ${filters.approvalStatuses
+        .map((status) => ACTIVITY_APPROVAL_LABELS[status])
         .join(", ")}`,
     );
   }

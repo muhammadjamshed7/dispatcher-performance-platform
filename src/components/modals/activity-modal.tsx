@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { DailyActivity } from "@/lib/types";
+import type { ActivityEditRequestDto, DailyActivity } from "@/lib/types";
 import type { DailyActivityFormValues } from "@/lib/validation/daily-activity-form";
 
 export type ActivityModalMode = "create" | "edit" | "view";
@@ -22,6 +22,7 @@ type ActivityModalProps = {
   open: boolean;
   mode: ActivityModalMode;
   activity?: DailyActivity | null;
+  pendingEditRequest?: ActivityEditRequestDto | null;
   allowedStatusReasons?: string[];
   onOpenChange: (open: boolean) => void;
   onCreate?: (values: DailyActivityFormValues) => void | Promise<void>;
@@ -54,6 +55,7 @@ export function ActivityModal({
   open,
   mode,
   activity,
+  pendingEditRequest,
   allowedStatusReasons = [],
   onOpenChange,
   onCreate,
@@ -95,28 +97,43 @@ export function ActivityModal({
   const formKey =
     mode === "create" ? `create-${open}` : `edit-${activity?.id ?? "new"}`;
 
+  const isView = mode === "view";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{titles[mode]}</DialogTitle>
+      <DialogContent
+        className={
+          isView
+            ? "flex max-h-[92vh] w-full max-w-5xl flex-col gap-0 overflow-hidden"
+            : "flex max-h-[92vh] w-full max-w-3xl flex-col gap-0 overflow-hidden"
+        }
+      >
+        <DialogHeader className="border-b pb-4 pr-10">
+          <DialogTitle className="text-xl font-semibold">
+            {titles[mode]}
+          </DialogTitle>
           <DialogDescription>{descriptions[mode]}</DialogDescription>
         </DialogHeader>
 
-        {mode === "view" && activity ? (
-          <ActivityDetailView activity={activity} />
-        ) : (
-          <DailyActivityForm
-            key={formKey}
-            formId={FORM_ID}
-            defaultValues={getDefaultValues(
-              mode === "create" ? null : activity,
-            )}
-            carrierLabelFallback={activity?.carrierName}
-            allowedStatusReasons={allowedStatusReasons}
-            onSubmit={handleSubmit}
-          />
-        )}
+        <div className="-mx-1 flex-1 overflow-y-auto px-1 py-4">
+          {mode === "view" && activity ? (
+            <ActivityDetailView
+              activity={activity}
+              editRequest={pendingEditRequest}
+            />
+          ) : (
+            <DailyActivityForm
+              key={formKey}
+              formId={FORM_ID}
+              defaultValues={getDefaultValues(
+                mode === "create" ? null : activity,
+              )}
+              carrierLabelFallback={activity?.carrierName}
+              allowedStatusReasons={allowedStatusReasons}
+              onSubmit={handleSubmit}
+            />
+          )}
+        </div>
 
         <DialogFooter>
           <Button

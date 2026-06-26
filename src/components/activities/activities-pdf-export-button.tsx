@@ -19,6 +19,10 @@ type ActivitiesPdfExportButtonProps = {
   teams: Team[];
   dispatchers: Dispatcher[];
   carriers: Carrier[];
+  /** Export every approval status (not just APPROVED). Used for the dispatcher's own records. */
+  includeAllStatuses?: boolean;
+  /** Render approval status + rejection feedback columns in the PDF. */
+  includeApprovalDetails?: boolean;
   disabled?: boolean;
   onSuccess?: () => void;
   onError?: (message: string) => void;
@@ -32,6 +36,8 @@ export function ActivitiesPdfExportButton({
   teams,
   dispatchers,
   carriers,
+  includeAllStatuses = false,
+  includeApprovalDetails = false,
   disabled = false,
   onSuccess,
   onError,
@@ -39,12 +45,16 @@ export function ActivitiesPdfExportButton({
   const [isExporting, setIsExporting] = useState(false);
 
   async function handleExport() {
-    const approvedActivities = activities.filter(
-      (activity) => activity.approvalStatus === APPROVED,
-    );
+    const exportActivities = includeAllStatuses
+      ? activities
+      : activities.filter((activity) => activity.approvalStatus === APPROVED);
 
-    if (approvedActivities.length === 0) {
-      onError?.("No approved activities to export for the current filters.");
+    if (exportActivities.length === 0) {
+      onError?.(
+        includeAllStatuses
+          ? "No activities to export for the current filters."
+          : "No approved activities to export for the current filters.",
+      );
       return;
     }
 
@@ -61,8 +71,9 @@ export function ActivitiesPdfExportButton({
 
     try {
       await exportDailyActivitiesPdf({
-        activities: approvedActivities,
+        activities: exportActivities,
         filterContext,
+        includeApprovalDetails,
       });
       onSuccess?.();
     } catch (error) {

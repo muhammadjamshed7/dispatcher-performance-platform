@@ -1,3 +1,8 @@
+import {
+  ACTIVITY_APPROVAL_LABELS,
+  ACTIVITY_APPROVAL_STATUSES,
+  type ActivityApprovalStatus,
+} from "@/lib/constants/activity-approval";
 import { FILTER_ALL } from "@/lib/constants/filters";
 import { DATE_RANGE_OPTIONS } from "@/lib/constants/date-ranges";
 import { getLoadActivityStatusLabel } from "@/lib/constants/status-labels";
@@ -13,6 +18,7 @@ export type ActivityExcelFilterState = {
   carrierIds: string[];
   truckTypes: TruckType[];
   statuses: Status[];
+  approvalStatuses: ActivityApprovalStatus[];
 };
 
 export const DEFAULT_ACTIVITY_EXCEL_FILTERS: ActivityExcelFilterState = {
@@ -22,6 +28,7 @@ export const DEFAULT_ACTIVITY_EXCEL_FILTERS: ActivityExcelFilterState = {
   carrierIds: [],
   truckTypes: [],
   statuses: [],
+  approvalStatuses: [],
 };
 
 function parseCsv(value: string | null | undefined): string[] {
@@ -77,6 +84,16 @@ export function parseActivityExcelFiltersFromSearchParams(
     ...(legacyStatus && legacyStatus !== FILTER_ALL ? [legacyStatus] : []),
   ].filter((value): value is Status => STATUSES.includes(value as Status));
 
+  const legacyApprovalStatus = params.get("approvalStatus")?.trim();
+  const approvalStatuses = [
+    ...parseCsv(params.get("approvalStatuses")),
+    ...(legacyApprovalStatus && legacyApprovalStatus !== FILTER_ALL
+      ? [legacyApprovalStatus]
+      : []),
+  ].filter((value): value is ActivityApprovalStatus =>
+    ACTIVITY_APPROVAL_STATUSES.includes(value as ActivityApprovalStatus),
+  );
+
   const dateRange =
     params.get("dateRange")?.trim() || DEFAULT_ACTIVITY_EXCEL_FILTERS.dateRange;
 
@@ -89,6 +106,7 @@ export function parseActivityExcelFiltersFromSearchParams(
     carrierIds: [...new Set(carrierIds)],
     truckTypes: [...new Set(truckTypes)],
     statuses: [...new Set(statuses)],
+    approvalStatuses: [...new Set(approvalStatuses)],
   };
 }
 
@@ -117,6 +135,9 @@ export function activityExcelFiltersToParams(
   if (filters.statuses.length > 0) {
     params.statuses = filters.statuses.join(",");
   }
+  if (filters.approvalStatuses.length > 0) {
+    params.approvalStatuses = filters.approvalStatuses.join(",");
+  }
 
   return params;
 }
@@ -134,6 +155,7 @@ export function countActiveActivityExcelFilters(
   if (filters.carrierIds.length > 0) count += 1;
   if (filters.truckTypes.length > 0) count += 1;
   if (filters.statuses.length > 0) count += 1;
+  if (filters.approvalStatuses.length > 0) count += 1;
 
   return count;
 }
@@ -144,5 +166,12 @@ export const ACTIVITY_STATUS_OPTIONS = STATUSES.map((value) => ({
   value,
   label: getLoadActivityStatusLabel(value),
 }));
+
+export const ACTIVITY_APPROVAL_STATUS_OPTIONS = ACTIVITY_APPROVAL_STATUSES.map(
+  (value) => ({
+    value,
+    label: ACTIVITY_APPROVAL_LABELS[value],
+  }),
+);
 
 export { CARRIER_TRUCK_TYPE_OPTIONS as ACTIVITY_TRUCK_TYPE_OPTIONS };
