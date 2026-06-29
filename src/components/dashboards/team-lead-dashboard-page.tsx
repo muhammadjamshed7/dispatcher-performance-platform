@@ -9,27 +9,33 @@ import { RoleScopeBanner } from "@/components/layout/role-scope-banner";
 import { PageShell } from "@/components/layout/page-shell";
 import { MetricCard } from "@/components/metric-card";
 import { useApiData } from "@/hooks/use-api-data";
+import { useEntityOptions } from "@/hooks/use-entity-options";
 import { useRoleScope } from "@/hooks/use-role-scope";
 import { APPROVED } from "@/lib/constants/activity-approval";
 import {
   fetchActivities,
-  fetchCarriers,
-  fetchDispatchers,
   fetchTeamLeadDashboard,
 } from "@/lib/api/resources";
 import { formatCurrency } from "@/lib/utils/format-currency";
 
 export function TeamLeadDashboardPage() {
-  const { filterActivities, filterCarriers, filterDispatchers, teamName } =
-    useRoleScope();
+  const { filterActivities, teamName } = useRoleScope();
+  // Reuse the carriers/dispatchers already loaded by EntityOptionsProvider
+  // (shared across the dashboard shell) instead of issuing duplicate
+  // /api/carriers and /api/dispatchers requests here. These are already
+  // role-scoped inside useEntityOptions.
+  const {
+    carriers: teamCarriers,
+    dispatchers: teamDispatchers,
+    isLoading: entityLoading,
+    reload: reloadEntities,
+  } = useEntityOptions();
 
   const loadMetrics = useCallback(() => fetchTeamLeadDashboard(), []);
   const loadActivities = useCallback(
     () => fetchActivities({ approvalStatus: APPROVED }),
     [],
   );
-  const loadCarriers = useCallback(() => fetchCarriers(), []);
-  const loadDispatchers = useCallback(() => fetchDispatchers(), []);
 
   const {
     data: metrics,
@@ -43,26 +49,9 @@ export function TeamLeadDashboardPage() {
     isLoading: activitiesLoading,
     reload: reloadActivities,
   } = useApiData(loadActivities, []);
-  const {
-    data: carriers = [],
-    error: carriersError,
-    isLoading: carriersLoading,
-    reload: reloadCarriers,
-  } = useApiData(loadCarriers, []);
-  const {
-    data: dispatchers = [],
-    error: dispatchersError,
-    isLoading: dispatchersLoading,
-    reload: reloadDispatchers,
-  } = useApiData(loadDispatchers, []);
 
-  const isLoading =
-    metricsLoading ||
-    activitiesLoading ||
-    carriersLoading ||
-    dispatchersLoading;
-  const error =
-    metricsError ?? activitiesError ?? carriersError ?? dispatchersError;
+  const isLoading = metricsLoading || activitiesLoading || entityLoading;
+  const error = metricsError ?? activitiesError;
 
   const teamActivities = useMemo(
     () =>
@@ -70,14 +59,6 @@ export function TeamLeadDashboardPage() {
         (activity) => activity.approvalStatus === APPROVED,
       ),
     [activities, filterActivities],
-  );
-  const teamCarriers = useMemo(
-    () => filterCarriers(carriers),
-    [carriers, filterCarriers],
-  );
-  const teamDispatchers = useMemo(
-    () => filterDispatchers(dispatchers),
-    [dispatchers, filterDispatchers],
   );
 
   const pageState: PageContentState = isLoading
@@ -89,9 +70,8 @@ export function TeamLeadDashboardPage() {
   const reload = useCallback(() => {
     void reloadMetrics();
     void reloadActivities();
-    void reloadCarriers();
-    void reloadDispatchers();
-  }, [reloadMetrics, reloadActivities, reloadCarriers, reloadDispatchers]);
+    void reloadEntities();
+  }, [reloadMetrics, reloadActivities, reloadEntities]);
 
   return (
     <PageShell

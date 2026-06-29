@@ -6,7 +6,7 @@ import { APPROVED } from "@/lib/constants/activity-approval";
 import { TRUCK_TYPES } from "@/lib/constants/truck-types";
 import { T, db } from "@/lib/db/client";
 import { applyScopeWhere, asFilterable } from "@/lib/db/query";
-import { assertDb, decimalToNumber } from "@/lib/db/utils";
+import { assertDb, toAmount, unwrapRelation } from "@/lib/db/utils";
 import type { DispatcherDashboardBundle } from "@/lib/types";
 import type { AccessScope } from "@/server/auth/types";
 import {
@@ -20,14 +20,6 @@ import {
 import { carrierScopeFilter } from "@/server/utils/scope-filters";
 import { getOrganizationPreferences } from "@/server/services/settings.service";
 import { getDateKeyInTimeZone } from "@/lib/utils/resolve-date-range";
-
-function unwrapRelation<T>(value: T | T[] | null | undefined): T | null {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  return Array.isArray(value) ? (value[0] ?? null) : value;
-}
 
 const STATUS_CHART_META: Record<
   LoadActivityStatus,
@@ -62,10 +54,6 @@ type CarrierRow = {
   truckType: string;
   status: string;
 };
-
-function toAmount(value: string | null | undefined): number {
-  return decimalToNumber(value) ?? 0;
-}
 
 function formatTruckTypeLabel(value: string): string {
   return value

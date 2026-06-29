@@ -83,29 +83,55 @@ enum NotificationStatus {
 
 enum AuditAction {
   USER_APPROVED
+  USER_MANUALLY_CREATED
+  USER_PASSWORD_RESET
+  USER_PASSWORD_CHANGED
   USER_REJECTED
   USER_ROLE_ASSIGNED
   USER_TEAM_ASSIGNED
+  USER_ACTIVATED
+  USER_DEACTIVATED
   USER_LOGGED_IN
+  USER_LOGGED_OUT
+  USER_LOGIN_FAILED
   TEAM_CREATED
   TEAM_UPDATED
+  TEAM_ACTIVATED
   TEAM_DEACTIVATED
+  TEAM_LEAD_CREATED
+  TEAM_LEAD_ASSIGNED
   DISPATCHER_CREATED
   DISPATCHER_UPDATED
+  DISPATCHER_REACTIVATED
   DISPATCHER_DEACTIVATED
   CARRIER_CREATED
   CARRIER_UPDATED
+  CARRIER_ACTIVATED
   CARRIER_DEACTIVATED
   CARRIER_REASSIGNED
+  CARRIER_EXPORTED
   ACTIVITY_CREATED
   ACTIVITY_UPDATED
   ACTIVITY_SUBMITTED
+  ACTIVITY_EDIT_REQUEST_SUBMITTED
   ACTIVITY_APPROVED_BY_TEAM_LEAD
   ACTIVITY_APPROVED_BY_ADMIN
   ACTIVITY_REJECTED
+  ACTIVITY_CHANGES_REQUESTED
   ACTIVITY_PENDING_UPDATED
+  ACTIVITY_EXPORTED
   SETTINGS_UPDATED
+  SETTINGS_DISPATCH_FEE_RULES_UPDATED
+  SETTINGS_TRUCK_TYPES_UPDATED
+  SETTINGS_STATUS_REASONS_UPDATED
+  SETTINGS_DIRECT_APPROVAL_UPDATED
+  NOTIFICATION_READ
+  NOTIFICATION_MARK_ALL_READ
+  REPORT_VIEWED
   REPORT_EXPORTED
+  FINANCE_VIEWED
+  FINANCE_EXPORTED
+  AUDIT_LOGS_EXPORTED
 }
 
 model Organization {
@@ -161,6 +187,12 @@ model User {
   carrierAssignments CarrierAssignmentHistory[] @relation("AssignmentActor")
   notifications      Notification[]             @relation("NotificationRecipient")
 
+  editRequestsSubmitted        ActivityEditRequest[] @relation("EditRequestSubmittedBy")
+  editRequestsEdited           ActivityEditRequest[] @relation("EditRequestEditedBy")
+  editRequestsTeamLeadApproved ActivityEditRequest[] @relation("EditRequestTeamLeadApprovedBy")
+  editRequestsAdminApproved    ActivityEditRequest[] @relation("EditRequestAdminApprovedBy")
+  editRequestsRejected         ActivityEditRequest[] @relation("EditRequestRejectedBy")
+
   @@unique([organizationId, email])
   @@index([organizationId, role, status])
   @@index([teamId])
@@ -177,14 +209,15 @@ model Team {
   updatedAt      DateTime   @updatedAt
   deletedAt      DateTime?
 
-  organization      Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  teamLead          User?                      @relation("TeamLead", fields: [teamLeadUserId], references: [id], onDelete: SetNull)
-  members           User[]                     @relation("TeamMembers")
-  dispatchers       Dispatcher[]
-  carriers          Carrier[]
-  dailyActivities   DailyActivity[]
-  dailySubmissions  DailySubmission[]
-  assignmentHistory CarrierAssignmentHistory[]
+  organization         Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  teamLead             User?                      @relation("TeamLead", fields: [teamLeadUserId], references: [id], onDelete: SetNull)
+  members              User[]                     @relation("TeamMembers")
+  dispatchers          Dispatcher[]
+  carriers             Carrier[]
+  dailyActivities      DailyActivity[]
+  dailySubmissions     DailySubmission[]
+  assignmentHistory    CarrierAssignmentHistory[]
+  activityEditRequests ActivityEditRequest[]
 
   @@unique([organizationId, name])
   @@index([organizationId, status])
@@ -201,13 +234,14 @@ model Dispatcher {
   updatedAt      DateTime   @updatedAt
   deletedAt      DateTime?
 
-  organization      Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user              User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  team              Team                       @relation(fields: [teamId], references: [id], onDelete: Restrict)
-  carriers          Carrier[]
-  dailyActivities   DailyActivity[]
-  dailySubmissions  DailySubmission[]
-  assignmentHistory CarrierAssignmentHistory[]
+  organization         Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user                 User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team                 Team                       @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  carriers             Carrier[]
+  dailyActivities      DailyActivity[]
+  dailySubmissions     DailySubmission[]
+  assignmentHistory    CarrierAssignmentHistory[]
+  activityEditRequests ActivityEditRequest[]
 
   @@index([organizationId, teamId, status])
   @@index([deletedAt])
@@ -265,9 +299,9 @@ model CarrierAssignmentHistory {
 }
 
 model DailyActivity {
-  id                            String             @id @default(cuid())
+  id                            String                 @id @default(cuid())
   organizationId                String
-  activityDate                  DateTime           @db.Date
+  activityDate                  DateTime               @db.Date
   carrierId                     String
   dispatcherId                  String
   teamId                        String
@@ -277,13 +311,13 @@ model DailyActivity {
   dispatcherNameSnapshot        String
   teamNameSnapshot              String
   truckTypeSnapshot             TruckType
-  dispatchFeePercentageSnapshot Decimal            @db.Decimal(5, 2)
+  dispatchFeePercentageSnapshot Decimal                @db.Decimal(5, 2)
   origin                        String?
   destination                   String?
-  totalMiles                    Decimal?           @db.Decimal(10, 2)
-  loadAmount                    Decimal?           @db.Decimal(12, 2)
-  ratePerMile                   Decimal?           @db.Decimal(10, 4)
-  dispatchFee                   Decimal?           @db.Decimal(12, 2)
+  totalMiles                    Decimal?               @db.Decimal(10, 2)
+  loadAmount                    Decimal?               @db.Decimal(12, 2)
+  ratePerMile                   Decimal?               @db.Decimal(10, 4)
+  dispatchFee                   Decimal?               @db.Decimal(12, 2)
   reason                        String?
   notes                         String?
   approvalStatus                ActivityApprovalStatus @default(APPROVED)
@@ -293,19 +327,19 @@ model DailyActivity {
   rejectedById                  String?
   rejectionReason               String?
   approvalNotes                 String?
-  approvalType                  ActivityApprovalType @default(NEW_ACTIVITY)
+  approvalType                  ActivityApprovalType   @default(NEW_ACTIVITY)
   submittedAt                   DateTime?
   teamLeadApprovedAt            DateTime?
   adminApprovedAt               DateTime?
   rejectedAt                    DateTime?
-  createdAt                     DateTime           @default(now())
-  updatedAt                     DateTime           @updatedAt
+  createdAt                     DateTime               @default(now())
+  updatedAt                     DateTime               @updatedAt
 
-  organization     Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  carrier          Carrier               @relation(fields: [carrierId], references: [id], onDelete: Restrict)
-  dispatcher       Dispatcher            @relation(fields: [dispatcherId], references: [id], onDelete: Restrict)
-  team             Team                  @relation(fields: [teamId], references: [id], onDelete: Restrict)
-  editRequests     ActivityEditRequest[] @relation("OriginalActivity")
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  carrier      Carrier               @relation(fields: [carrierId], references: [id], onDelete: Restrict)
+  dispatcher   Dispatcher            @relation(fields: [dispatcherId], references: [id], onDelete: Restrict)
+  team         Team                  @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  editRequests ActivityEditRequest[] @relation("OriginalActivity")
 
   @@unique([carrierId, activityDate])
   @@index([organizationId, activityDate])
@@ -419,8 +453,15 @@ model ActivityEditRequest {
   createdAt            DateTime               @default(now())
   updatedAt            DateTime               @updatedAt
 
-  organization     Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  originalActivity DailyActivity @relation("OriginalActivity", fields: [originalActivityId], references: [id], onDelete: Cascade)
+  organization       Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  originalActivity   DailyActivity @relation("OriginalActivity", fields: [originalActivityId], references: [id], onDelete: Cascade)
+  team               Team          @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  dispatcher         Dispatcher    @relation(fields: [dispatcherId], references: [id], onDelete: Restrict)
+  submittedBy        User          @relation("EditRequestSubmittedBy", fields: [submittedById], references: [id], onDelete: Restrict)
+  editedBy           User          @relation("EditRequestEditedBy", fields: [editedById], references: [id], onDelete: Restrict)
+  teamLeadApprovedBy User?         @relation("EditRequestTeamLeadApprovedBy", fields: [teamLeadApprovedById], references: [id], onDelete: SetNull)
+  adminApprovedBy    User?         @relation("EditRequestAdminApprovedBy", fields: [adminApprovedById], references: [id], onDelete: SetNull)
+  rejectedBy         User?         @relation("EditRequestRejectedBy", fields: [rejectedById], references: [id], onDelete: SetNull)
 
   @@index([organizationId, approvalStatus])
   @@index([originalActivityId, approvalStatus])

@@ -4,9 +4,7 @@ import type { PostgrestError } from "@supabase/supabase-js";
 
 import { ValidationError } from "@/lib/errors/validation-error";
 
-export function unwrapRelation<T>(
-  value: T | T[] | null | undefined,
-): T | null {
+export function unwrapRelation<T>(value: T | T[] | null | undefined): T | null {
   if (value === null || value === undefined) {
     return null;
   }
@@ -47,6 +45,20 @@ export function decimalToNumber(
   }
 
   return value.toNumber();
+}
+
+export function toAmount(value: string | null | undefined): number {
+  return decimalToNumber(value) ?? 0;
+}
+
+export async function ignoreDbError(
+  promise: PromiseLike<unknown>,
+): Promise<void> {
+  try {
+    await promise;
+  } catch {
+    // best-effort rollback
+  }
 }
 
 export function assertDb<T>(

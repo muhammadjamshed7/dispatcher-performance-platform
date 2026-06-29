@@ -2,8 +2,21 @@ import "server-only";
 
 import { z } from "zod";
 import { T, db } from "@/lib/db/client";
-import type { Dispatcher, TeamStatus, User, UserRole } from "@/lib/db/types";
-import { assertDb, assertDbVoid, createId, nowIso } from "@/lib/db/utils";
+import type {
+  Dispatcher,
+  JsonValue,
+  TeamStatus,
+  User,
+  UserRole,
+} from "@/lib/db/types";
+import {
+  assertDb,
+  assertDbVoid,
+  createId,
+  ignoreDbError,
+  nowIso,
+  unwrapRelation,
+} from "@/lib/db/utils";
 import { ForbiddenError } from "@/lib/errors/forbidden-error";
 import { NotFoundError } from "@/lib/errors/not-found-error";
 import { ValidationError } from "@/lib/errors/validation-error";
@@ -68,22 +81,6 @@ function applyDispatcherScopeQuery<T extends FilterableQuery>(
   }
 
   return scopedQuery as T;
-}
-
-async function ignoreDbError(promise: PromiseLike<unknown>): Promise<void> {
-  try {
-    await promise;
-  } catch {
-    // best-effort rollback
-  }
-}
-
-function unwrapRelation<T>(value: T | T[] | null | undefined): T | null {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  return Array.isArray(value) ? (value[0] ?? null) : value;
 }
 
 function normalizeDispatcherRow(row: DispatcherRow): DispatcherRow {
@@ -365,9 +362,10 @@ export async function createDispatcher(
       dispatcher = normalizeDispatcherRow(
         assertDb(dispatcherResult) as DispatcherRow,
       );
-      const [enriched] = await enrichDispatchersWithCounts(scope.organizationId, [
-        dispatcher,
-      ]);
+      const [enriched] = await enrichDispatchersWithCounts(
+        scope.organizationId,
+        [dispatcher],
+      );
       dispatcher = enriched;
     }
   } catch (error) {
@@ -390,13 +388,17 @@ export async function createDispatcher(
   await writeAuditLog({
     organizationId: scope.organizationId,
     actorUserId: actor.id,
-    action: isTeamLead ? "USER_ROLE_ASSIGNED" : "DISPATCHER_CREATED",
+    action: isTeamLead ? "TEAM_LEAD_CREATED" : "DISPATCHER_CREATED",
     entityType: isTeamLead ? "User" : "Dispatcher",
     entityId: isTeamLead ? createdUserId! : dispatcher!.id,
     metadata: {
+      entityName: parsed.fullName,
+      fullName: parsed.fullName,
       email: parsed.email,
       teamId: parsed.teamId,
+      teamName: teamResult.data.name,
       role: parsed.role,
+      status: parsed.status,
     },
   });
 
@@ -595,8 +597,50 @@ export async function updateDispatcher(
     action: "DISPATCHER_UPDATED",
     entityType: "Dispatcher",
     entityId: dispatcher.id,
-    metadata: parsed,
+    metadata: {
+      entityName: dispatcher.user.fullName,
+      oldData: previousUser,
+      newData: {
+        fullName: dispatcher.user.fullName,
+        email: dispatcher.user.email,
+        phoneNumber: dispatcher.user.phoneNumber,
+        role: dispatcher.user.role,
+        teamId: dispatcher.teamId,
+        status: dispatcher.status,
+      },
+      changedFields: Object.keys(parsed),
+    } as JsonValue,
   });
+
+  if (parsed.role !== undefined && parsed.role !== previousUser.role) {
+    await writeAuditLog({
+      organizationId: scope.organizationId,
+      actorUserId: actor.id,
+      action: "USER_ROLE_ASSIGNED",
+      entityType: "User",
+      entityId: existing.userId,
+      metadata: {
+        entityName: dispatcher.user.fullName,
+        oldData: { role: previousUser.role },
+        newData: { role: parsed.role },
+      } as JsonValue,
+    });
+  }
+
+  if (parsed.teamId !== undefined && parsed.teamId !== previousUser.teamId) {
+    await writeAuditLog({
+      organizationId: scope.organizationId,
+      actorUserId: actor.id,
+      action: "USER_TEAM_ASSIGNED",
+      entityType: "User",
+      entityId: existing.userId,
+      metadata: {
+        entityName: dispatcher.user.fullName,
+        oldData: { teamId: previousUser.teamId },
+        newData: { teamId: parsed.teamId },
+      } as JsonValue,
+    });
+  }
 
   return mapDispatcher(dispatcher);
 }
@@ -694,10 +738,27 @@ export async function activateDispatcher(
   await writeAuditLog({
     organizationId: scope.organizationId,
     actorUserId: actor.id,
-    action: "DISPATCHER_UPDATED",
+    action: "DISPATCHER_REACTIVATED",
     entityType: "Dispatcher",
     entityId: id,
-    metadata: { status: "ACTIVE" },
+    metadata: {
+      entityName: dispatcher.user.fullName,
+      oldData: { status: existing.status },
+      newData: { status: "ACTIVE" },
+    } as JsonValue,
+  });
+
+  await writeAuditLog({
+    organizationId: scope.organizationId,
+    actorUserId: actor.id,
+    action: "USER_ACTIVATED",
+    entityType: "User",
+    entityId: dispatcher.userId,
+    metadata: {
+      entityName: dispatcher.user.fullName,
+      oldData: { status: previousUserStatus?.data?.status ?? null },
+      newData: { status: "ACTIVE" },
+    } as JsonValue,
   });
 
   return mapDispatcher(dispatcher);
@@ -761,6 +822,24 @@ export async function deactivateDispatcher(
     action: "DISPATCHER_DEACTIVATED",
     entityType: "Dispatcher",
     entityId: id,
+    metadata: {
+      entityName: dispatcher.user.fullName,
+      oldData: { status: existing.status },
+      newData: { status: "INACTIVE" },
+    } as JsonValue,
+  });
+
+  await writeAuditLog({
+    organizationId: scope.organizationId,
+    actorUserId: actor.id,
+    action: "USER_DEACTIVATED",
+    entityType: "User",
+    entityId: dispatcher.userId,
+    metadata: {
+      entityName: dispatcher.user.fullName,
+      oldData: { status: existing.user ? "ACTIVE" : null },
+      newData: { status: "INACTIVE" },
+    } as JsonValue,
   });
 
   return mapDispatcher(dispatcher);

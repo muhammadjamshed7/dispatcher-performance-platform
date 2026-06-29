@@ -6,6 +6,9 @@ import {
   deriveAuditModule,
   deriveAuditStatus,
   formatAuditAction,
+  formatAuditData,
+  formatAuditDataLines,
+  humanizeAuditKey,
 } from "@/lib/audit/audit-log-format";
 
 test("deriveAuditStatus", async (t) => {
@@ -52,4 +55,60 @@ test("formatAuditAction renders a readable label", () => {
     "Activity Approved By Admin",
   );
   assert.equal(formatAuditAction("USER_LOGGED_IN"), "User Logged In");
+});
+
+test("humanizeAuditKey converts keys to Title Case labels", () => {
+  assert.equal(humanizeAuditKey("teamName"), "Team Name");
+  assert.equal(humanizeAuditKey("ratePerMile"), "Rate Per Mile");
+  assert.equal(humanizeAuditKey("team_name"), "Team Name");
+  assert.equal(humanizeAuditKey("mcNumber"), "MC Number");
+  assert.equal(humanizeAuditKey("mc_number"), "MC Number");
+  assert.equal(humanizeAuditKey("carrierId"), "Carrier ID");
+});
+
+test("formatAuditData renders readable key-value lines", () => {
+  assert.equal(
+    formatAuditData({ reason: "Deadhead too much", teamName: "Default Team" }),
+    "Reason: Deadhead too much\nTeam Name: Default Team",
+  );
+});
+
+test("formatAuditData returns an em dash for empty/null data", () => {
+  assert.equal(formatAuditData(null), "—");
+  assert.equal(formatAuditData(undefined), "—");
+  assert.equal(formatAuditData({}), "—");
+  assert.equal(formatAuditData(""), "—");
+});
+
+test("formatAuditData flattens nested objects and arrays readably", () => {
+  const result = formatAuditData({
+    truckTypes: ["Dry Van", "Reefer"],
+    location: { city: "Dallas", state: "TX" },
+  });
+  assert.equal(
+    result,
+    "Truck Types: Dry Van; Reefer\nLocation: City: Dallas, State: TX",
+  );
+  assert.ok(!result.includes("{"));
+  assert.ok(!result.includes("}"));
+});
+
+test("formatAuditData formats primitives and booleans", () => {
+  assert.equal(
+    formatAuditData({ active: true, retries: 3 }),
+    "Active: Yes\nRetries: 3",
+  );
+});
+
+test("formatAuditData parses JSON strings", () => {
+  assert.equal(
+    formatAuditData('{"teamName":"Default Team"}'),
+    "Team Name: Default Team",
+  );
+});
+
+test("formatAuditDataLines returns per-line label/value pairs", () => {
+  const lines = formatAuditDataLines({ teamName: "Default Team" });
+  assert.deepEqual(lines, [{ label: "Team Name", value: "Default Team" }]);
+  assert.deepEqual(formatAuditDataLines(null), []);
 });

@@ -10,7 +10,7 @@ import {
   STATUSES,
 } from "@/lib/constants/statuses";
 import { T, db } from "@/lib/db/client";
-import { assertDb, decimalToNumber } from "@/lib/db/utils";
+import { assertDb, toAmount, unwrapRelation } from "@/lib/db/utils";
 import type { AdminDailyReportBundle } from "@/lib/types";
 import type { AccessScope } from "@/server/auth/types";
 import { getOrganizationPreferences } from "@/server/services/settings.service";
@@ -36,24 +36,12 @@ const STATUS_META: Record<
   NOT_WORKING: { label: "Not Working", color: "#3B82F6" },
 };
 
-function toAmount(value: string | null | undefined): number {
-  return decimalToNumber(value) ?? 0;
-}
-
 function formatTime(value: string): string {
   return new Date(value).toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
   });
-}
-
-function unwrapRelation<T>(value: T | T[] | null | undefined): T | null {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  return Array.isArray(value) ? (value[0] ?? null) : value;
 }
 
 async function loadFilterOptions(organizationId: string) {

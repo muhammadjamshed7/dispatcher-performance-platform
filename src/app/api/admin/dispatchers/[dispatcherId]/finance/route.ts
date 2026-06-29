@@ -4,7 +4,7 @@ import { STATUSES } from "@/lib/constants/statuses";
 import { parseSearchParams } from "@/server/api/request";
 import { handleApi } from "@/server/api/response";
 import { requireAccessScope } from "@/server/auth/require-auth";
-import { getDispatcherFinanceBundle } from "@/server/services/dispatcher-finance.service";
+import { viewDispatcherFinanceBundle } from "@/server/services/dispatcher-finance.service";
 
 const financeFiltersSchema = z.object({
   dateRange: z
@@ -22,10 +22,10 @@ type RouteContext = {
 
 export async function GET(request: Request, context: RouteContext) {
   return handleApi(async () => {
-    const { scope } = await requireAccessScope("ADMIN");
+    const { user, scope } = await requireAccessScope("ADMIN");
     const { dispatcherId } = await context.params;
     const url = new URL(request.url);
     const filters = parseSearchParams(url.searchParams, financeFiltersSchema);
-    return getDispatcherFinanceBundle(scope, dispatcherId, filters);
+    return viewDispatcherFinanceBundle(scope, user, dispatcherId, filters);
   });
 }

@@ -19,7 +19,7 @@ import {
 import { LOAD_ACTIVITY_STATUS_LABELS } from "@/lib/constants/status-labels";
 import { APPROVED } from "@/lib/constants/activity-approval";
 import { T, db } from "@/lib/db/client";
-import { assertDb, decimalToNumber } from "@/lib/db/utils";
+import { assertDb, toAmount, unwrapRelation } from "@/lib/db/utils";
 import type {
   DispatcherFinanceBundle,
   FinanceAppliedFilters,
@@ -68,10 +68,6 @@ type ActivityRecord = Pick<
   | "ratePerMile"
   | "dispatchFee"
 >;
-
-function toAmount(value: string | null | undefined): number {
-  return decimalToNumber(value) ?? 0;
-}
 
 function roundCurrency(value: number): number {
   return Math.round(value * 100) / 100;
@@ -335,14 +331,6 @@ async function fetchActivitiesForDispatcher(
   return (assertDb(await query) ?? []) as ActivityRecord[];
 }
 
-function unwrapRelation<T>(value: T | T[] | null | undefined): T | null {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  return Array.isArray(value) ? (value[0] ?? null) : value;
-}
-
 async function loadDispatcherProfile(
   organizationId: string,
   dispatcherId: string,
@@ -548,6 +536,35 @@ export async function getDispatcherFinanceBundle(
   };
 }
 
+export async function viewDispatcherFinanceBundle(
+  scope: AccessScope,
+  actor: AuthContextUser,
+  dispatcherId: string,
+  rawFilters: FinanceFilters = { dateRange: "this-month" },
+): Promise<DispatcherFinanceBundle> {
+  const bundle = await getDispatcherFinanceBundle(
+    scope,
+    dispatcherId,
+    rawFilters,
+  );
+
+  await writeAuditLog({
+    organizationId: scope.organizationId,
+    actorUserId: actor.id,
+    action: "FINANCE_VIEWED",
+    entityType: "Finance",
+    entityId: dispatcherId,
+    metadata: {
+      entityName: `${bundle.profile.fullName} Finance`,
+      dispatcherName: bundle.profile.fullName,
+      filters: bundle.filters,
+      rowCount: bundle.loadHistory.length,
+    },
+  });
+
+  return bundle;
+}
+
 export async function exportDispatcherFinanceCsv(
   scope: AccessScope,
   actor: AuthContextUser,
@@ -646,12 +663,16 @@ export async function exportDispatcherFinanceCsv(
   await writeAuditLog({
     organizationId: scope.organizationId,
     actorUserId: actor.id,
-    action: "REPORT_EXPORTED",
-    entityType: "ReportExport",
+    action: "FINANCE_EXPORTED",
+    entityType: "Finance",
     entityId: dispatcherId,
     metadata: {
+      entityName: `${bundle.profile.fullName} Finance`,
       reportType: "dispatcher-finance",
+      dispatcherName: bundle.profile.fullName,
+      filters: bundle.filters,
       rowCount: bundle.loadHistory.length,
+      fileName,
     },
   });
 

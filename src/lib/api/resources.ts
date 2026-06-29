@@ -12,9 +12,12 @@ import type {
   DispatcherFinanceBundle,
   Dispatcher,
   DispatchFeeRules,
+  CreateManagedUserResult,
+  ManagedUser,
   PendingUserRequest,
   RankingRow,
   ReportBundle,
+  ResetManagedUserPasswordResult,
   SearchResults,
   Team,
 } from "@/lib/types";
@@ -261,6 +264,13 @@ export function fetchAdminLogs(params?: Record<string, string>) {
   );
 }
 
+export function recordAuditExportEvent(input: Record<string, unknown>) {
+  return apiFetch<{ success: true }>("/api/audit/export-events", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 export function fetchAdminDashboard(params?: Record<string, string>) {
   const query = params ? `?${new URLSearchParams(params).toString()}` : "";
   return apiFetch<AdminDashboardBundle>(`/api/dashboard/admin${query}`);
@@ -327,6 +337,27 @@ export function updateSettingsRequest(input: Record<string, unknown>) {
 
 export function fetchUserRequests() {
   return apiFetch<PendingUserRequest[]>("/api/users/requests");
+}
+
+export function fetchManagedUsers() {
+  return apiFetch<ManagedUser[]>("/api/users");
+}
+
+export function createManagedUserRequest(input: Record<string, unknown>) {
+  return apiFetch<CreateManagedUserResult>("/api/users", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function resetManagedUserPasswordRequest(
+  id: string,
+  input: Record<string, unknown>,
+) {
+  return apiFetch<ResetManagedUserPasswordResult>(`/api/users/${id}/password`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 export function approveUserRequest(id: string, input: Record<string, unknown>) {

@@ -37,6 +37,7 @@ import {
   createCarrierRequest,
   fetchActivities,
   fetchCarriers,
+  recordAuditExportEvent,
   reassignCarrierRequest,
   updateCarrierRequest,
 } from "@/lib/api/resources";
@@ -106,12 +107,10 @@ function CarriersPageState({
   const { role } = useRoleScope();
   const canManageCarriers = role !== DISPATCHER;
   const canExportCarrier = role === ADMIN;
-  const [draftFilters, setDraftFilters] = useState<EntityFilterValues>(
-    initialEntityFilters,
-  );
-  const [appliedFilters, setAppliedFilters] = useState<EntityFilterValues>(
-    initialEntityFilters,
-  );
+  const [draftFilters, setDraftFilters] =
+    useState<EntityFilterValues>(initialEntityFilters);
+  const [appliedFilters, setAppliedFilters] =
+    useState<EntityFilterValues>(initialEntityFilters);
   const [excelAppliedFilters, setExcelAppliedFilters] =
     useState<CarrierExcelFilterState>(initialExcelFilters);
   const [modalOpen, setModalOpen] = useState(false);
@@ -188,6 +187,25 @@ function CarriersPageState({
       showToast(`Generating report for "${carrier.carrierName}"...`);
       const activities = await fetchActivities({ carrierId: carrier.id });
       await exportCarrierActivityPdf({ carrier, activities });
+      await recordAuditExportEvent({
+        action: "CARRIER_EXPORTED",
+        entityType: "Carrier",
+        entityId: carrier.id,
+        entityName: carrier.carrierName,
+        format: "pdf",
+        rowCount: activities.length,
+        filters: {
+          carrierId: carrier.id,
+        },
+        metadata: {
+          carrierName: carrier.carrierName,
+          mcNumber: carrier.mcNumber,
+        },
+      }).catch((auditError) => {
+        console.error("Failed to record carrier PDF export audit event", {
+          auditError,
+        });
+      });
       showToast(`Report for "${carrier.carrierName}" downloaded.`);
     } catch (err) {
       showToast(getErrorMessage(err, "Failed to export carrier report."));

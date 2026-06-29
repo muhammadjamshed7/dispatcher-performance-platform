@@ -34,6 +34,7 @@ import {
   decimalToNumber,
   nowIso,
   toDateOnly,
+  unwrapRelation,
 } from "@/lib/db/utils";
 import type { DailyActivity as DailyActivityDto } from "@/lib/types";
 import { calculateDispatchFee } from "@/lib/utils/calculate-dispatch-fee";
@@ -286,14 +287,6 @@ type CarrierWithRelations = {
     | null;
 };
 
-function unwrapRelation<T>(value: T | T[] | null | undefined): T | null {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  return Array.isArray(value) ? (value[0] ?? null) : value;
-}
-
 function toDecimalString(value: number | null | undefined): string | null {
   if (value === null || value === undefined) {
     return null;
@@ -403,8 +396,9 @@ export async function listActivities(
   const approverIds = new Set<string>();
   for (const row of activities) {
     if (row.approvalStatus === APPROVED) {
-      const approverId = (row.adminApprovedById ??
-        row.teamLeadApprovedById) as string | null;
+      const approverId = (row.adminApprovedById ?? row.teamLeadApprovedById) as
+        | string
+        | null;
       if (approverId) {
         approverIdByActivity.set(row.id as string, approverId);
         approverIds.add(approverId);
@@ -597,6 +591,8 @@ export async function createActivity(
     entityType: "DailyActivity",
     entityId: activity.id,
     metadata: {
+      entityName: `${carrierRow.carrierName} - ${parsed.activityDate}`,
+      carrierName: carrierRow.carrierName,
       carrierId: carrierRow.id,
       activityDate: parsed.activityDate,
       status: parsed.status,
@@ -772,14 +768,19 @@ export async function updateActivity(
           ? normalized.destination?.trim() || null
           : null,
       totalMiles:
-        normalized.status === DELIVERED ? normalized.totalMiles ?? null : null,
+        normalized.status === DELIVERED
+          ? (normalized.totalMiles ?? null)
+          : null,
       loadAmount:
-        normalized.status === DELIVERED ? normalized.loadAmount ?? null : null,
+        normalized.status === DELIVERED
+          ? (normalized.loadAmount ?? null)
+          : null,
       reason:
         normalized.status === DELIVERED
           ? null
           : normalized.reason?.trim() || null,
-      notes: parsed.notes !== undefined ? parsed.notes?.trim() || null : undefined,
+      notes:
+        parsed.notes !== undefined ? parsed.notes?.trim() || null : undefined,
     };
 
     await createEditRequest(scope, actor, existing, proposed);
@@ -856,6 +857,9 @@ export async function updateActivity(
     entityType: "DailyActivity",
     entityId: activity.id,
     metadata: {
+      entityName: `${existing.carrierNameSnapshot as string} - ${String(
+        existing.activityDate,
+      ).slice(0, 10)}`,
       previousData: wasApproved ? snapshotActivityFields(existing) : null,
       proposedChanges: parsed,
       approvalStatus: nextApprovalStatus,
@@ -986,6 +990,9 @@ export async function approveActivity(
       entityType: "DailyActivity",
       entityId: id,
       metadata: {
+        entityName: `${existing.carrierNameSnapshot as string} - ${String(
+          existing.activityDate,
+        ).slice(0, 10)}`,
         teamName: existing.teamNameSnapshot as string,
         dispatcherName: existing.dispatcherNameSnapshot as string,
         approvalStatus: APPROVED,
@@ -1060,6 +1067,9 @@ export async function approveActivity(
     entityType: "DailyActivity",
     entityId: id,
     metadata: {
+      entityName: `${existing.carrierNameSnapshot as string} - ${String(
+        existing.activityDate,
+      ).slice(0, 10)}`,
       previousStatus: currentStatus,
       teamName: existing.teamNameSnapshot as string,
       dispatcherName: existing.dispatcherNameSnapshot as string,
@@ -1142,10 +1152,15 @@ export async function rejectActivity(
   await writeAuditLog({
     organizationId: scope.organizationId,
     actorUserId: actor.id,
-    action: "ACTIVITY_REJECTED",
+    action: parsed.requestChanges
+      ? "ACTIVITY_CHANGES_REQUESTED"
+      : "ACTIVITY_REJECTED",
     entityType: "DailyActivity",
     entityId: id,
     metadata: {
+      entityName: `${existing.carrierNameSnapshot as string} - ${String(
+        existing.activityDate,
+      ).slice(0, 10)}`,
       reason: rejectionReason,
       requestChanges: parsed.requestChanges ?? false,
       previousStatus: currentStatus,

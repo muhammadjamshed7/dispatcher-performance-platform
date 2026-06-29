@@ -50,6 +50,41 @@ const registerSchema = z.object({
   notes: z.string().optional(),
 });
 
+async function recordFailedLogin(input: {
+  email: string;
+  expectedRole: Role;
+  reason: string;
+}): Promise<void> {
+  try {
+    const matchedUser = await getCurrentUserByEmail(input.email.toLowerCase());
+
+    if (!matchedUser) {
+      return;
+    }
+
+    await writeAuditLog({
+      organizationId: matchedUser.organizationId,
+      actorUserId: null,
+      action: "USER_LOGIN_FAILED",
+      entityType: "User",
+      entityId: matchedUser.id,
+      metadata: {
+        actorName: matchedUser.fullName,
+        actorEmail: matchedUser.email,
+        actorRole: matchedUser.role,
+        expectedRole: input.expectedRole,
+        actualRole: matchedUser.role,
+        accountStatus: matchedUser.status,
+        reason: input.reason,
+        attemptedAt: nowIso(),
+        entityName: matchedUser.fullName,
+      },
+    });
+  } catch (error) {
+    console.error("Failed to record login failure", { error });
+  }
+}
+
 export async function signInWithRole(
   input: {
     email: string;
@@ -67,6 +102,11 @@ export async function signInWithRole(
   });
 
   if (error || !data.user) {
+    await recordFailedLogin({
+      email: parsed.email,
+      expectedRole: parsed.expectedRole,
+      reason: "INVALID_CREDENTIALS",
+    });
     throw new ValidationError("Invalid email or password for this portal.");
   }
 
@@ -78,16 +118,31 @@ export async function signInWithRole(
     sessionUser.email !== parsed.email.toLowerCase()
   ) {
     await supabase.auth.signOut();
+    await recordFailedLogin({
+      email: parsed.email,
+      expectedRole: parsed.expectedRole,
+      reason: "AUTH_USER_NOT_LINKED",
+    });
     throw new ValidationError("Invalid email or password for this portal.");
   }
 
   if (sessionUser.role !== parsed.expectedRole) {
     await supabase.auth.signOut();
+    await recordFailedLogin({
+      email: parsed.email,
+      expectedRole: parsed.expectedRole,
+      reason: "WRONG_PORTAL",
+    });
     throw new ValidationError("Invalid email or password for this portal.");
   }
 
   if (sessionUser.status !== ACTIVE) {
     await supabase.auth.signOut();
+    await recordFailedLogin({
+      email: parsed.email,
+      expectedRole: parsed.expectedRole,
+      reason: `ACCOUNT_${sessionUser.status}`,
+    });
 
     if (sessionUser.status === "PENDING_APPROVAL") {
       throw new ForbiddenError("Your account is pending admin approval.");
@@ -121,8 +176,23 @@ export async function signInWithRole(
 }
 
 export async function signOutUser(): Promise<void> {
+  const user = await getCurrentUser();
   const supabase = await createServerClient();
   await supabase.auth.signOut();
+
+  if (user) {
+    await writeAuditLog({
+      organizationId: user.organizationId,
+      actorUserId: user.id,
+      action: "USER_LOGGED_OUT",
+      entityType: "User",
+      entityId: user.id,
+      metadata: {
+        logoutAt: nowIso(),
+        entityName: user.fullName,
+      },
+    });
+  }
 }
 
 export async function getSessionUser(): Promise<SessionUser | null> {
@@ -240,10 +310,25 @@ export async function updatePassword(
 ): Promise<{ message: string }> {
   const parsed = z.string().min(8).parse(password);
   const supabase = await createServerClient();
+  const user = await getCurrentUser();
   const { error } = await supabase.auth.updateUser({ password: parsed });
 
   if (error) {
     throw new ValidationError(error.message);
+  }
+
+  if (user) {
+    await writeAuditLog({
+      organizationId: user.organizationId,
+      actorUserId: user.id,
+      action: "USER_PASSWORD_CHANGED",
+      entityType: "User",
+      entityId: user.id,
+      metadata: {
+        entityName: user.fullName,
+        changedAt: nowIso(),
+      },
+    });
   }
 
   return { message: "Password updated successfully." };

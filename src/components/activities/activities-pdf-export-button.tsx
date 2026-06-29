@@ -4,6 +4,7 @@ import { useState } from "react";
 import { FileText } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { recordAuditExportEvent } from "@/lib/api/resources";
 import type { ActivityExcelFilterState } from "@/lib/filters/activity-excel-filter-params";
 import type { EntityFilterValues } from "@/lib/filters/entity-filter-params";
 import { exportDailyActivitiesPdf } from "@/lib/reports/export-daily-activities-pdf";
@@ -74,6 +75,24 @@ export function ActivitiesPdfExportButton({
         activities: exportActivities,
         filterContext,
         includeApprovalDetails,
+      });
+      await recordAuditExportEvent({
+        action: "ACTIVITY_EXPORTED",
+        entityType: "DailyActivity",
+        entityName: "Daily Activities PDF",
+        format: "pdf",
+        rowCount: exportActivities.length,
+        filters: {
+          mode: filterContext.mode,
+          entityFilters,
+          excelFilters,
+          includeAllStatuses,
+          includeApprovalDetails,
+        },
+      }).catch((auditError) => {
+        console.error("Failed to record activity PDF export audit event", {
+          auditError,
+        });
       });
       onSuccess?.();
     } catch (error) {

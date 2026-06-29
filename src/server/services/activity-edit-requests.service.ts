@@ -242,11 +242,14 @@ export async function createEditRequest(
 
   if (scope.role === TEAM_LEAD) {
     if (!scope.teamId || scope.teamId !== activityTeamId) {
-      throw new ForbiddenError("You can only submit edits for activities on your team.");
+      throw new ForbiddenError(
+        "You can only submit edits for activities on your team.",
+      );
     }
   }
 
-  const originalStatus = originalActivity.approvalStatus as ActivityApprovalStatus;
+  const originalStatus =
+    originalActivity.approvalStatus as ActivityApprovalStatus;
   if (originalStatus !== APPROVED) {
     throw new ValidationError(
       "Only approved activities use the edit request workflow.",
@@ -303,10 +306,13 @@ export async function createEditRequest(
   await writeAuditLog({
     organizationId: scope.organizationId,
     actorUserId: actor.id,
-    action: "ACTIVITY_SUBMITTED",
+    action: "ACTIVITY_EDIT_REQUEST_SUBMITTED",
     entityType: "ActivityEditRequest",
     entityId: row.id as string,
     metadata: {
+      entityName: `${originalActivity.carrierNameSnapshot as string} - ${String(
+        originalActivity.activityDate,
+      ).slice(0, 10)}`,
       originalActivityId: originalActivity.id as string,
       previousData,
       proposedChanges: proposed,
@@ -339,7 +345,9 @@ export async function listPendingEditRequests(
         : [];
 
   if (approvalStatuses.length === 0) {
-    throw new ForbiddenError("You do not have access to pending edit requests.");
+    throw new ForbiddenError(
+      "You do not have access to pending edit requests.",
+    );
   }
 
   let query = db()
@@ -459,10 +467,8 @@ async function applyApprovedChanges(
             ?.toString()
             .trim() || null
         : null,
-    totalMiles:
-      status === DELIVERED ? toDecimalString(totalMiles) : null,
-    loadAmount:
-      status === DELIVERED ? toDecimalString(loadAmount) : null,
+    totalMiles: status === DELIVERED ? toDecimalString(totalMiles) : null,
+    loadAmount: status === DELIVERED ? toDecimalString(loadAmount) : null,
     ratePerMile: toDecimalString(ratePerMile),
     dispatchFee: toDecimalString(dispatchFee),
     reason:
@@ -579,6 +585,9 @@ export async function approveEditRequest(
     entityType: "ActivityEditRequest",
     entityId: id,
     metadata: {
+      entityName: `${previousData.carrierNameSnapshot ?? "Activity"} - ${String(
+        previousData.activityDate ?? "",
+      ).slice(0, 10)}`,
       previousData,
       proposedChanges: proposed,
       originalActivityId: existing.originalActivityId as string,
@@ -666,10 +675,15 @@ export async function rejectEditRequest(
   await writeAuditLog({
     organizationId: scope.organizationId,
     actorUserId: actor.id,
-    action: "ACTIVITY_REJECTED",
+    action: parsed.requestChanges
+      ? "ACTIVITY_CHANGES_REQUESTED"
+      : "ACTIVITY_REJECTED",
     entityType: "ActivityEditRequest",
     entityId: id,
     metadata: {
+      entityName: `${previousData.carrierNameSnapshot ?? "Activity"} - ${String(
+        previousData.activityDate ?? "",
+      ).slice(0, 10)}`,
       reason: rejectionReason,
       requestChanges: parsed.requestChanges ?? false,
       previousData,

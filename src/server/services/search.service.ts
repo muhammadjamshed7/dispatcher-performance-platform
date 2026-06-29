@@ -8,18 +8,10 @@ import {
 } from "@/server/utils/scope-filters";
 import { T, db } from "@/lib/db/client";
 import { applyScopeWhere, asFilterable } from "@/lib/db/query";
-import { assertDb, toDateOnly } from "@/lib/db/utils";
+import { assertDb, toDateOnly, unwrapRelation } from "@/lib/db/utils";
 import { buildIlikeOr } from "@/server/utils/text-search";
 
 import type { SearchResults } from "@/lib/types";
-
-function unwrapRelation<T>(value: T | T[] | null | undefined): T | null {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  return Array.isArray(value) ? (value[0] ?? null) : value;
-}
 
 function roleActivitiesPath(role: AccessScope["role"]): string {
   if (role === "ADMIN") {

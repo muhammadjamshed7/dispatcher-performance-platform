@@ -12,7 +12,7 @@ import { STATUSES } from "@/lib/constants/statuses";
 import { TRUCK_TYPES } from "@/lib/constants/truck-types";
 import { T, db } from "@/lib/db/client";
 import { applyScopeWhere, asFilterable } from "@/lib/db/query";
-import { assertDb, countRows, decimalToNumber } from "@/lib/db/utils";
+import { assertDb, countRows, toAmount, unwrapRelation } from "@/lib/db/utils";
 import type { AdminDashboardBundle } from "@/lib/types";
 import type { AccessScope } from "@/server/auth/types";
 import {
@@ -34,14 +34,6 @@ import {
 } from "@/server/utils/scope-filters";
 import { getOrganizationPreferences } from "@/server/services/settings.service";
 import { getDateKeyInTimeZone } from "@/lib/utils/resolve-date-range";
-
-function unwrapRelation<T>(value: T | T[] | null | undefined): T | null {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  return Array.isArray(value) ? (value[0] ?? null) : value;
-}
 
 type ActivityRecord = {
   id: string;
@@ -66,10 +58,6 @@ const STATUS_CHART_META: Record<
   NOT_BOOKED: { label: "Pending", color: "#F97316" },
   CANCELLED: { label: "Canceled", color: "#EF4444" },
 };
-
-function toAmount(value: string | null | undefined): number {
-  return decimalToNumber(value) ?? 0;
-}
 
 function getInitials(name: string): string {
   return name

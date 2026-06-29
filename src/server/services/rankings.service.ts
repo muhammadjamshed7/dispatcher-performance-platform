@@ -5,7 +5,7 @@ import { APPROVED } from "@/lib/constants/activity-approval";
 import { sanitizeFilterId } from "@/lib/constants/filters";
 import { T, db } from "@/lib/db/client";
 import { applyScopeWhere, asFilterable } from "@/lib/db/query";
-import { assertDb, decimalToNumber } from "@/lib/db/utils";
+import { assertDb, decimalToNumber, unwrapRelation } from "@/lib/db/utils";
 import type {
   CarrierRanking,
   DispatcherRanking,
@@ -23,14 +23,6 @@ export type RankingFilters = {
   teamId?: string;
   dispatcherId?: string;
 };
-
-function unwrapRelation<T>(value: T | T[] | null | undefined): T | null {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  return Array.isArray(value) ? (value[0] ?? null) : value;
-}
 
 function buildScopedRankingFilters(
   scope: AccessScope,
@@ -160,7 +152,10 @@ export async function getCarrierRankings(
   );
 
   if (scopedFilters.teamId) {
-    carrierQuery = carrierQuery.eq("teamId", scopedFilters.teamId) as typeof carrierQuery;
+    carrierQuery = carrierQuery.eq(
+      "teamId",
+      scopedFilters.teamId,
+    ) as typeof carrierQuery;
   }
 
   if (scopedFilters.dispatcherId) {

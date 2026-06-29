@@ -3,6 +3,7 @@ import "server-only";
 import { z } from "zod";
 import { T, db } from "@/lib/db/client";
 import type {
+  JsonValue,
   OrganizationSettings,
   StatusReason,
   TruckType,
@@ -43,6 +44,13 @@ const updateSettingsInputSchema = z.object({
 });
 
 type UpdateSettingsInput = z.infer<typeof updateSettingsInputSchema>;
+
+const DISPATCH_FEE_SETTING_FIELDS = [
+  "dispatchFeeMethod",
+  "defaultDispatchFeePercent",
+  "minimumDispatchFee",
+  "roundToNearestDollar",
+] as const;
 
 function requireAdmin(scope: AccessScope): void {
   if (!scope.isCompanyWide) {
@@ -305,6 +313,7 @@ export async function updateSettings(
 ): Promise<AppSettings> {
   requireAdmin(scope);
   const parsed = updateSettingsInputSchema.parse(input);
+  const changedFields = Object.keys(parsed);
 
   if (parsed.timezone !== undefined) {
     try {
@@ -327,7 +336,16 @@ export async function updateSettings(
     }
   }
 
-  await getOrCreateSettings(scope.organizationId);
+  const previousSettings = await getOrCreateSettings(scope.organizationId);
+  const previousStatusReasons = await loadStatusReasons(scope.organizationId);
+  const previousPreferences = await getOrganizationPreferences(
+    scope.organizationId,
+  );
+  const previousSnapshot = mapSettings(
+    previousSettings,
+    previousStatusReasons,
+    previousPreferences.currency,
+  );
 
   const updatePayload: Record<string, unknown> = {
     updatedAt: nowIso(),
@@ -407,6 +425,11 @@ export async function updateSettings(
 
   const statusReasons = await loadStatusReasons(scope.organizationId);
   const preferences = await getOrganizationPreferences(scope.organizationId);
+  const nextSnapshot = mapSettings(
+    settings,
+    statusReasons,
+    preferences.currency,
+  );
 
   await writeAuditLog({
     organizationId: scope.organizationId,
@@ -414,8 +437,68 @@ export async function updateSettings(
     action: "SETTINGS_UPDATED",
     entityType: "OrganizationSettings",
     entityId: settings.id,
-    metadata: parsed,
+    metadata: {
+      entityName: "Organization Settings",
+      changedFields,
+      oldData: previousSnapshot,
+      newData: nextSnapshot,
+    } as unknown as JsonValue,
   });
 
-  return mapSettings(settings, statusReasons, preferences.currency);
+  const categoryAuditMetadata = {
+    entityName: "Organization Settings",
+    changedFields,
+    oldData: previousSnapshot,
+    newData: nextSnapshot,
+  } as unknown as JsonValue;
+
+  if (
+    DISPATCH_FEE_SETTING_FIELDS.some((field) =>
+      Object.prototype.hasOwnProperty.call(parsed, field),
+    )
+  ) {
+    await writeAuditLog({
+      organizationId: scope.organizationId,
+      actorUserId: actor.id,
+      action: "SETTINGS_DISPATCH_FEE_RULES_UPDATED",
+      entityType: "OrganizationSettings",
+      entityId: settings.id,
+      metadata: categoryAuditMetadata,
+    });
+  }
+
+  if (parsed.allowedTruckTypes !== undefined) {
+    await writeAuditLog({
+      organizationId: scope.organizationId,
+      actorUserId: actor.id,
+      action: "SETTINGS_TRUCK_TYPES_UPDATED",
+      entityType: "OrganizationSettings",
+      entityId: settings.id,
+      metadata: categoryAuditMetadata,
+    });
+  }
+
+  if (parsed.allowedStatusReasons !== undefined) {
+    await writeAuditLog({
+      organizationId: scope.organizationId,
+      actorUserId: actor.id,
+      action: "SETTINGS_STATUS_REASONS_UPDATED",
+      entityType: "OrganizationSettings",
+      entityId: settings.id,
+      metadata: categoryAuditMetadata,
+    });
+  }
+
+  if (parsed.directAdminApprovalMode !== undefined) {
+    await writeAuditLog({
+      organizationId: scope.organizationId,
+      actorUserId: actor.id,
+      action: "SETTINGS_DIRECT_APPROVAL_UPDATED",
+      entityType: "OrganizationSettings",
+      entityId: settings.id,
+      metadata: categoryAuditMetadata,
+    });
+  }
+
+  return nextSnapshot;
 }

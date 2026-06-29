@@ -5,11 +5,19 @@ import { T, db } from "@/lib/db/client";
 import type {
   Carrier,
   CarrierStatus,
+  JsonValue,
   Team,
   TruckType,
   User,
 } from "@/lib/db/types";
-import { assertDb, assertDbVoid, createId, nowIso } from "@/lib/db/utils";
+import {
+  assertDb,
+  assertDbVoid,
+  createId,
+  ignoreDbError,
+  nowIso,
+  unwrapRelation,
+} from "@/lib/db/utils";
 import { ForbiddenError } from "@/lib/errors/forbidden-error";
 import { NotFoundError } from "@/lib/errors/not-found-error";
 import { ValidationError } from "@/lib/errors/validation-error";
@@ -98,22 +106,6 @@ function applyCarrierScopeQuery<T extends FilterableQuery>(
   }
 
   return scopedQuery as T;
-}
-
-async function ignoreDbError(promise: PromiseLike<unknown>): Promise<void> {
-  try {
-    await promise;
-  } catch {
-    // best-effort rollback
-  }
-}
-
-function unwrapRelation<T>(value: T | T[] | null | undefined): T | null {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  return Array.isArray(value) ? (value[0] ?? null) : value;
 }
 
 function normalizeCarrierRow(row: CarrierRow): CarrierRow {
@@ -233,7 +225,9 @@ export async function listCarriers(
   scope: AccessScope,
   filters: CarrierListFilters = {},
 ): Promise<CarrierDto[]> {
-  const parsed = normalizeCarrierListFilters(carrierListFiltersSchema.parse(filters));
+  const parsed = normalizeCarrierListFilters(
+    carrierListFiltersSchema.parse(filters),
+  );
   await assertCarrierListFilterAccess(scope, parsed);
   const carrierId = parsed.carrierId;
 
@@ -456,7 +450,17 @@ export async function createCarrier(
     action: "CARRIER_CREATED",
     entityType: "Carrier",
     entityId: carrierId!,
-    metadata: { mcNumber },
+    metadata: {
+      entityName: parsed.carrierName,
+      carrierName: parsed.carrierName,
+      driverName: parsed.driverName,
+      mcNumber,
+      teamId: parsed.teamId,
+      teamName,
+      dispatcherId: parsed.dispatcherId,
+      dispatcherName,
+      status: parsed.status,
+    },
   });
 
   return mapCarrier(await getCarrierRecord(scope, carrierId!));
@@ -530,6 +534,7 @@ export async function updateCarrier(
     .eq("organizationId", scope.organizationId);
 
   assertDbVoid(updateResult);
+  const updated = await getCarrierRecord(scope, id);
 
   await writeAuditLog({
     organizationId: scope.organizationId,
@@ -537,10 +542,31 @@ export async function updateCarrier(
     action: "CARRIER_UPDATED",
     entityType: "Carrier",
     entityId: id,
-    metadata: parsed,
+    metadata: {
+      entityName: updated.carrierName,
+      oldData: {
+        carrierName: existing.carrierName,
+        driverName: existing.driverName,
+        mcNumber: existing.mcNumber,
+        truckType: existing.truckType,
+        dispatchFeePercentage: existing.dispatchFeePercentage,
+        status: existing.status,
+        notes: existing.notes,
+      },
+      newData: {
+        carrierName: updated.carrierName,
+        driverName: updated.driverName,
+        mcNumber: updated.mcNumber,
+        truckType: updated.truckType,
+        dispatchFeePercentage: updated.dispatchFeePercentage,
+        status: updated.status,
+        notes: updated.notes,
+      },
+      changedFields: Object.keys(parsed),
+    } as JsonValue,
   });
 
-  return mapCarrier(await getCarrierRecord(scope, id));
+  return mapCarrier(updated);
 }
 
 export async function activateCarrier(
@@ -549,7 +575,7 @@ export async function activateCarrier(
   id: string,
 ): Promise<CarrierDto> {
   requireAdminOrTeamLead(scope);
-  await getCarrierRecord(scope, id);
+  const existing = await getCarrierRecord(scope, id);
 
   const updateResult = await db()
     .from(T.Carrier)
@@ -558,17 +584,22 @@ export async function activateCarrier(
     .eq("organizationId", scope.organizationId);
 
   assertDbVoid(updateResult);
+  const updated = await getCarrierRecord(scope, id);
 
   await writeAuditLog({
     organizationId: scope.organizationId,
     actorUserId: actor.id,
-    action: "CARRIER_UPDATED",
+    action: "CARRIER_ACTIVATED",
     entityType: "Carrier",
     entityId: id,
-    metadata: { status: "ACTIVE" },
+    metadata: {
+      entityName: updated.carrierName,
+      oldData: { status: existing.status },
+      newData: { status: "ACTIVE" },
+    } as JsonValue,
   });
 
-  return mapCarrier(await getCarrierRecord(scope, id));
+  return mapCarrier(updated);
 }
 
 export async function deactivateCarrier(
@@ -577,7 +608,7 @@ export async function deactivateCarrier(
   id: string,
 ): Promise<CarrierDto> {
   requireAdminOrTeamLead(scope);
-  await getCarrierRecord(scope, id);
+  const existing = await getCarrierRecord(scope, id);
 
   const updateResult = await db()
     .from(T.Carrier)
@@ -586,6 +617,7 @@ export async function deactivateCarrier(
     .eq("organizationId", scope.organizationId);
 
   assertDbVoid(updateResult);
+  const updated = await getCarrierRecord(scope, id);
 
   await writeAuditLog({
     organizationId: scope.organizationId,
@@ -593,9 +625,14 @@ export async function deactivateCarrier(
     action: "CARRIER_DEACTIVATED",
     entityType: "Carrier",
     entityId: id,
+    metadata: {
+      entityName: updated.carrierName,
+      oldData: { status: existing.status },
+      newData: { status: "INACTIVE" },
+    } as JsonValue,
   });
 
-  return mapCarrier(await getCarrierRecord(scope, id));
+  return mapCarrier(updated);
 }
 
 export async function reassignCarrier(
@@ -607,7 +644,7 @@ export async function reassignCarrier(
   requireAdminOrTeamLead(scope);
   const parsed = reassignCarrierInputSchema.parse(input);
 
-  await getCarrierRecord(scope, id);
+  const existing = await getCarrierRecord(scope, id);
   assertTeamAssignment(scope, parsed.teamId);
 
   const { teamName, dispatcherName } = await validateAssignment(
@@ -693,8 +730,19 @@ export async function reassignCarrier(
     entityType: "Carrier",
     entityId: id,
     metadata: {
-      teamId: parsed.teamId,
-      dispatcherId: parsed.dispatcherId,
+      entityName: existing.carrierName,
+      oldData: {
+        teamId: existing.teamId,
+        dispatcherId: existing.dispatcherId,
+        teamName: existing.team.name,
+        dispatcherName: existing.dispatcher?.user.fullName ?? null,
+      },
+      newData: {
+        teamId: parsed.teamId,
+        dispatcherId: parsed.dispatcherId,
+        teamName,
+        dispatcherName,
+      },
     },
   });
 

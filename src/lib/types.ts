@@ -25,6 +25,31 @@ export type User = {
   phoneNumber?: string;
 };
 
+export type ManagedUser = User & {
+  role: typeof DISPATCHER | typeof TEAM_LEAD;
+  createdAt: string;
+  hasAuthUser: boolean;
+  loginPath: string;
+};
+
+export type ManagedUserCredentials = {
+  fullName: string;
+  email: string;
+  password: string;
+  role: typeof DISPATCHER | typeof TEAM_LEAD;
+  loginPath: string;
+};
+
+export type CreateManagedUserResult = {
+  user: ManagedUser;
+  credentials: ManagedUserCredentials;
+};
+
+export type ResetManagedUserPasswordResult = {
+  user: ManagedUser;
+  credentials: ManagedUserCredentials;
+};
+
 export type PendingUserRequest = {
   id: string;
   fullName: string;
@@ -185,15 +210,19 @@ export type AuditLogEntry = {
   action: string;
   entityType: string;
   entityId: string | null;
+  entityName: string | null;
   actorName: string | null;
+  actorEmail: string | null;
   actorRole: UserRole | null;
   teamName: string | null;
   dispatcherName: string | null;
   approvalStatus: ActivityApprovalStatus | null;
   status: string;
+  message: string | null;
   notes: string | null;
   oldData: Record<string, unknown> | null;
   newData: Record<string, unknown> | null;
+  metadata: Record<string, unknown> | null;
   createdAt: string;
 };
 

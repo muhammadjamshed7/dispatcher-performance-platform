@@ -8,7 +8,11 @@ import type { Role } from "@/lib/constants/roles";
 import type { AccessScope } from "@/server/auth/types";
 import { ForbiddenError } from "@/lib/errors/forbidden-error";
 import { ADMIN } from "@/lib/constants/roles";
-import { actionsForStatus, deriveAuditStatus } from "@/lib/audit/audit-log-format";
+import {
+  actionsForStatus,
+  deriveAuditStatus,
+  formatAuditAction,
+} from "@/lib/audit/audit-log-format";
 
 type ListAuditLogsInput = {
   limit?: number;
@@ -131,16 +135,34 @@ export async function listAuditLogs(
       ? userMap.get(row.actorUserId as string)
       : null;
     const action = row.action as string;
+    const entityName =
+      (metadata.entityName as string | null) ??
+      (metadata.carrierName as string | null) ??
+      (metadata.name as string | null) ??
+      (metadata.fullName as string | null) ??
+      (metadata.fileName as string | null) ??
+      null;
+    const actorName =
+      actor?.fullName ?? (metadata.actorName as string | null) ?? null;
+    const actorEmail =
+      actor?.email ?? (metadata.actorEmail as string | null) ?? null;
+    const message =
+      (metadata.message as string | null) ??
+      (metadata.reason as string | null) ??
+      `${formatAuditAction(action)}${entityName ? `: ${entityName}` : ""}`;
 
     return {
       id: row.id as string,
       action,
       entityType: row.entityType as string,
       entityId: (row.entityId as string | null) ?? null,
-      actorName:
-        actor?.fullName ?? (metadata.actorName as string | null) ?? null,
+      entityName,
+      actorName,
+      actorEmail,
       actorRole:
-        actor?.role ?? (metadata.role as AuditLogEntry["actorRole"]) ?? null,
+        actor?.role ??
+        (metadata.actorRole as AuditLogEntry["actorRole"]) ??
+        null,
       teamName:
         (metadata.teamName as string | null) ??
         actor?.teamName ??
@@ -153,6 +175,7 @@ export async function listAuditLogs(
       approvalStatus:
         (metadata.approvalStatus as AuditLogEntry["approvalStatus"]) ?? null,
       status: deriveAuditStatus(action),
+      message,
       notes:
         (metadata.reason as string | null) ??
         (metadata.approvalNotes as string | null) ??
@@ -165,6 +188,7 @@ export async function listAuditLogs(
         (metadata.proposedChanges as Record<string, unknown> | null) ??
         (metadata.newData as Record<string, unknown> | null) ??
         null,
+      metadata,
       createdAt: toIsoString(row.createdAt as string),
     };
   });
@@ -177,14 +201,18 @@ export async function listAuditLogs(
   return entries.filter((entry) => {
     const haystack = [
       entry.actorName,
+      entry.actorEmail,
       entry.actorRole,
       entry.action,
       entry.entityType,
       entry.entityId,
+      entry.entityName,
       entry.teamName,
       entry.dispatcherName,
+      entry.message,
       entry.notes,
       entry.status,
+      JSON.stringify(entry.metadata ?? {}),
     ]
       .filter(Boolean)
       .join(" ")

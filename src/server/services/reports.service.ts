@@ -26,13 +26,18 @@ import {
   type ReportPeriod,
 } from "@/lib/constants/report-periods";
 import { T, db } from "@/lib/db/client";
-import { applyScopeWhere, asFilterable, type FilterableQuery } from "@/lib/db/query";
+import {
+  applyScopeWhere,
+  asFilterable,
+  type FilterableQuery,
+} from "@/lib/db/query";
 import {
   assertDb,
   assertDbVoid,
   createId,
-  decimalToNumber,
   nowIso,
+  toAmount,
+  unwrapRelation,
 } from "@/lib/db/utils";
 import type {
   CarrierReportRow,
@@ -63,18 +68,6 @@ const reportFiltersSchema = z.object({
 });
 
 type ReportFilters = z.infer<typeof reportFiltersSchema>;
-
-function toAmount(value: string | null | undefined): number {
-  return decimalToNumber(value) ?? 0;
-}
-
-function unwrapRelation<T>(value: T | T[] | null | undefined): T | null {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  return Array.isArray(value) ? (value[0] ?? null) : value;
-}
 
 function parseDate(dateStr: string): Date {
   const [year, month, day] = dateStr.split("-").map(Number);
@@ -513,6 +506,34 @@ export async function getReportBundle(
   };
 }
 
+export async function viewReportBundle(
+  scope: AccessScope,
+  actor: AuthContextUser,
+  period: ReportPeriod,
+  filters: ReportFilters = {},
+): Promise<ReportBundle> {
+  const parsedPeriod = z.enum(REPORT_PERIODS).parse(period);
+  const parsedFilters = reportFiltersSchema.parse(filters);
+  const bundle = await getReportBundle(scope, parsedPeriod, parsedFilters);
+
+  await writeAuditLog({
+    organizationId: scope.organizationId,
+    actorUserId: actor.id,
+    action: "REPORT_VIEWED",
+    entityType: "ReportExport",
+    entityId: null,
+    metadata: {
+      entityName: "Reports",
+      reportType: "daily-activities",
+      period: parsedPeriod,
+      filters: parsedFilters,
+      rowCount: bundle.daily.length,
+    },
+  });
+
+  return bundle;
+}
+
 export async function exportReportCsv(
   scope: AccessScope,
   actor: AuthContextUser,
@@ -613,7 +634,14 @@ export async function exportReportCsv(
     action: "REPORT_EXPORTED",
     entityType: "ReportExport",
     entityId: exportId,
-    metadata: { period: parsedPeriod, rowCount: bundle.daily.length },
+    metadata: {
+      entityName: fileName,
+      reportType: "daily-activities",
+      period: parsedPeriod,
+      filters: parsedFilters,
+      rowCount: bundle.daily.length,
+      fileName,
+    },
   });
 
   return {

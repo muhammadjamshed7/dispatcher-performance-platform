@@ -2,7 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 import { T, db } from "@/lib/db/client";
-import type { Team, TeamStatus } from "@/lib/db/types";
+import type { JsonValue, Team, TeamStatus } from "@/lib/db/types";
 import { assertDb, createId, nowIso } from "@/lib/db/utils";
 import { ForbiddenError } from "@/lib/errors/forbidden-error";
 import { NotFoundError } from "@/lib/errors/not-found-error";
@@ -236,7 +236,12 @@ export async function createTeam(
     action: "TEAM_CREATED",
     entityType: "Team",
     entityId: team.id,
-    metadata: { name: team.name },
+    metadata: {
+      entityName: team.name,
+      name: team.name,
+      status: team.status,
+      teamLeadUserId: team.teamLeadUserId,
+    },
   });
 
   return mapTeam(enriched);
@@ -253,7 +258,7 @@ export async function updateTeam(
 
   const existingResult = await db()
     .from(T.Team)
-    .select("id, name")
+    .select("id, name, status, teamLeadUserId")
     .eq("id", id)
     .eq("organizationId", scope.organizationId)
     .is("deletedAt", null)
@@ -340,15 +345,49 @@ export async function updateTeam(
 
   const team = assertDb(updateResult) as TeamRow;
   const [enriched] = await enrichTeamsWithCounts(scope.organizationId, [team]);
+  const auditAction =
+    parsed.status === "ACTIVE" && existing.status !== "ACTIVE"
+      ? "TEAM_ACTIVATED"
+      : parsed.status === "INACTIVE" && existing.status !== "INACTIVE"
+        ? "TEAM_DEACTIVATED"
+        : "TEAM_UPDATED";
+  const auditMetadata = {
+    entityName: team.name,
+    oldData: {
+      name: existing.name,
+      status: existing.status,
+      teamLeadUserId: existing.teamLeadUserId,
+    },
+    newData: {
+      name: team.name,
+      status: team.status,
+      teamLeadUserId: team.teamLeadUserId,
+    },
+    changedFields: Object.keys(parsed),
+  } as JsonValue;
 
   await writeAuditLog({
     organizationId: scope.organizationId,
     actorUserId: actor.id,
-    action: "TEAM_UPDATED",
+    action: auditAction,
     entityType: "Team",
     entityId: team.id,
-    metadata: parsed,
+    metadata: auditMetadata,
   });
+
+  if (
+    parsed.teamLeadUserId !== undefined &&
+    parsed.teamLeadUserId !== existing.teamLeadUserId
+  ) {
+    await writeAuditLog({
+      organizationId: scope.organizationId,
+      actorUserId: actor.id,
+      action: "TEAM_LEAD_ASSIGNED",
+      entityType: "Team",
+      entityId: team.id,
+      metadata: auditMetadata,
+    });
+  }
 
   return mapTeam(enriched);
 }
@@ -362,7 +401,7 @@ export async function deactivateTeam(
 
   const existingResult = await db()
     .from(T.Team)
-    .select("id")
+    .select("id, name, status, teamLeadUserId")
     .eq("id", id)
     .eq("organizationId", scope.organizationId)
     .is("deletedAt", null)
@@ -392,6 +431,15 @@ export async function deactivateTeam(
     action: "TEAM_DEACTIVATED",
     entityType: "Team",
     entityId: team.id,
+    metadata: {
+      entityName: team.name,
+      oldData: existingResult.data,
+      newData: {
+        name: team.name,
+        status: team.status,
+        teamLeadUserId: team.teamLeadUserId,
+      },
+    } as JsonValue,
   });
 
   return mapTeam(enriched);

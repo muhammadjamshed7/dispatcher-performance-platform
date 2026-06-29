@@ -6,7 +6,7 @@ import { REPORT_PERIODS } from "@/lib/constants/report-periods";
 import { parseSearchParams } from "@/server/api/request";
 import { handleApi } from "@/server/api/response";
 import { requireAdminOrTeamLeadScope } from "@/server/auth/require-auth";
-import { getReportBundle } from "@/server/services/reports.service";
+import { viewReportBundle } from "@/server/services/reports.service";
 
 const reportQuerySchema = z.object({
   period: z.enum(REPORT_PERIODS),
@@ -21,10 +21,10 @@ const reportQuerySchema = z.object({
 
 export async function GET(request: Request) {
   return handleApi(async () => {
-    const { scope } = await requireAdminOrTeamLeadScope();
+    const { user, scope } = await requireAdminOrTeamLeadScope();
     const url = new URL(request.url);
     const query = parseSearchParams(url.searchParams, reportQuerySchema);
     const { period, ...filters } = query;
-    return getReportBundle(scope, period, filters);
+    return viewReportBundle(scope, user, period, filters);
   });
 }

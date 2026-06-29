@@ -20,6 +20,7 @@ import type { AppNotification } from "@/lib/types";
 import type { AccessScope } from "@/server/auth/types";
 import { ForbiddenError } from "@/lib/errors/forbidden-error";
 import { toIsoString } from "@/lib/db/utils";
+import { writeAuditLog } from "@/server/services/audit.service";
 
 type CreateNotificationInput = {
   organizationId: string;
@@ -62,7 +63,9 @@ async function getTeamLeadUserId(teamId: string): Promise<string | null> {
   return (result.data?.teamLeadUserId as string | null) ?? null;
 }
 
-async function getDispatcherUserId(dispatcherId: string): Promise<string | null> {
+async function getDispatcherUserId(
+  dispatcherId: string,
+): Promise<string | null> {
   const result = await db()
     .from(T.Dispatcher)
     .select("userId")
@@ -303,10 +306,12 @@ export async function updateEntityNotificationStatuses(input: {
   // When an approval-required notification is auto-resolved (e.g. another
   // authorized approver finalized the item), also mark it read so it no longer
   // inflates the recipient's unread badge for an action they can no longer take.
-  const updatePayload: { notificationStatus: NotificationStatus; readAt?: string } =
-    {
-      notificationStatus: input.notificationStatus,
-    };
+  const updatePayload: {
+    notificationStatus: NotificationStatus;
+    readAt?: string;
+  } = {
+    notificationStatus: input.notificationStatus,
+  };
 
   if (input.notificationStatus === NOTIFICATION_COMPLETED) {
     updatePayload.readAt = nowIso();
@@ -378,7 +383,7 @@ export async function markNotificationRead(
 ): Promise<void> {
   const existing = await db()
     .from(T.Notification)
-    .select("id, recipientUserId")
+    .select("id, recipientUserId, title, notificationStatus")
     .eq("id", notificationId)
     .eq("organizationId", scope.organizationId)
     .maybeSingle();
@@ -397,12 +402,36 @@ export async function markNotificationRead(
     .eq("id", notificationId);
 
   assertDbVoid(result);
+
+  await writeAuditLog({
+    organizationId: scope.organizationId,
+    actorUserId: userId,
+    action: "NOTIFICATION_READ",
+    entityType: "Notification",
+    entityId: notificationId,
+    metadata: {
+      entityName: existing.data.title,
+      notificationStatus: existing.data.notificationStatus,
+      rowCount: 1,
+    },
+  });
 }
 
 export async function markAllNotificationsRead(
   scope: AccessScope,
   userId: string,
 ): Promise<void> {
+  const unreadResult = await db()
+    .from(T.Notification)
+    .select("id", { count: "exact", head: true })
+    .eq("organizationId", scope.organizationId)
+    .eq("recipientUserId", userId)
+    .is("readAt", null);
+
+  if (unreadResult.error) {
+    throw new Error(unreadResult.error.message);
+  }
+
   const result = await db()
     .from(T.Notification)
     .update({ readAt: nowIso() })
@@ -411,6 +440,18 @@ export async function markAllNotificationsRead(
     .is("readAt", null);
 
   assertDbVoid(result);
+
+  await writeAuditLog({
+    organizationId: scope.organizationId,
+    actorUserId: userId,
+    action: "NOTIFICATION_MARK_ALL_READ",
+    entityType: "Notification",
+    entityId: null,
+    metadata: {
+      entityName: "Notifications",
+      rowCount: unreadResult.count ?? 0,
+    },
+  });
 }
 
 export async function countUnreadNotifications(

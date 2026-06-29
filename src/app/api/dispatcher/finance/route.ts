@@ -5,7 +5,7 @@ import { NotFoundError } from "@/lib/errors/not-found-error";
 import { parseSearchParams } from "@/server/api/request";
 import { handleApi } from "@/server/api/response";
 import { requireAccessScope } from "@/server/auth/require-auth";
-import { getDispatcherFinanceBundle } from "@/server/services/dispatcher-finance.service";
+import { viewDispatcherFinanceBundle } from "@/server/services/dispatcher-finance.service";
 
 const financeFiltersSchema = z.object({
   dateRange: z
@@ -19,7 +19,7 @@ const financeFiltersSchema = z.object({
 
 export async function GET(request: Request) {
   return handleApi(async () => {
-    const { scope } = await requireAccessScope("DISPATCHER");
+    const { user, scope } = await requireAccessScope("DISPATCHER");
 
     if (!scope.dispatcherId) {
       throw new NotFoundError("Dispatcher profile not found.");
@@ -27,6 +27,11 @@ export async function GET(request: Request) {
 
     const url = new URL(request.url);
     const filters = parseSearchParams(url.searchParams, financeFiltersSchema);
-    return getDispatcherFinanceBundle(scope, scope.dispatcherId, filters);
+    return viewDispatcherFinanceBundle(
+      scope,
+      user,
+      scope.dispatcherId,
+      filters,
+    );
   });
 }
