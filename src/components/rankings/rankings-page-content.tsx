@@ -115,7 +115,7 @@ export function RankingsPageContent() {
       title="Rankings"
       description="Performance rankings scoped to your role and team access."
     >
-      <RoleScopeBanner />
+      {/* <RoleScopeBanner /> */}
 
       <div className="flex flex-wrap gap-2">
         {RANKING_TABS.map((tab) => (

@@ -13,7 +13,6 @@ import { ActivityDetailView } from "@/components/details/activity-detail-view";
 import { PageContentGate } from "@/components/feedback/page-content-gate";
 import type { PageContentState } from "@/components/feedback/page-content-gate";
 import { AppToast } from "@/components/feedback/app-toast";
-import { RoleScopeBanner } from "@/components/layout/role-scope-banner";
 import { PageShell } from "@/components/layout/page-shell";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -428,7 +427,6 @@ export function PendingApprovalsPageContent() {
 
   return (
     <PageShell title="Pending Approvals">
-      <RoleScopeBanner />
       <PageContentGate
         state={pageState}
         onRetry={reload}

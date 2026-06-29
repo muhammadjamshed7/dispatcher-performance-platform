@@ -132,7 +132,7 @@ export function TeamsPageContent() {
         title="Teams"
         description="Manage dispatcher teams, leads, and assignments."
       >
-        <RoleScopeBanner message="Admin-only company team management" />
+        {/* <RoleScopeBanner message="Admin-only company team management" /> */}
 
         <div className="flex justify-end">
           <Button type="button" onClick={() => openModal("create")}>

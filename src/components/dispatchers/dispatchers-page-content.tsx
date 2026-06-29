@@ -228,7 +228,7 @@ function DispatchersPageState({
         title="Dispatchers"
         description="Manage dispatcher profiles, team assignments, and carrier ownership."
       >
-        <RoleScopeBanner />
+        {/* <RoleScopeBanner /> */}
 
         <div className="flex justify-end">
           <Button type="button" onClick={() => openModal("create")}>
