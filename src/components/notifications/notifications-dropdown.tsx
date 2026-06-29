@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell } from "lucide-react";
+import { Bell, Volume2, VolumeX } from "lucide-react";
 
 import { useApiData } from "@/hooks/use-api-data";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
+import { useNotificationSound } from "@/hooks/use-notification-sound";
 import { useSession } from "@/components/auth/session-provider";
 import {
   fetchNotifications,
@@ -48,6 +49,20 @@ export function NotificationsDropdown() {
 
   const notifications = useMemo(() => data?.notifications ?? [], [data]);
   const unreadCount = data?.unreadCount ?? 0;
+
+  const { muted, toggleMuted, playBeep } = useNotificationSound();
+  const previousUnreadCountRef = useRef<number | null>(null);
+
+  // Beep whenever the unread count grows (a new notification arrived). The
+  // first observed value only seeds the baseline so we don't beep on load.
+  useEffect(() => {
+    const previous = previousUnreadCountRef.current;
+    previousUnreadCountRef.current = unreadCount;
+
+    if (previous !== null && unreadCount > previous) {
+      playBeep();
+    }
+  }, [unreadCount, playBeep]);
   const notificationsPath = session
     ? getNotificationsPathForRole(session.role)
     : "#";
@@ -97,16 +112,43 @@ export function NotificationsDropdown() {
         <DropdownMenuGroup>
           <DropdownMenuLabel className="flex items-center justify-between">
             <span>Notifications</span>
-            {unreadCount > 0 ? (
+            <div className="flex items-center gap-1">
+              {unreadCount > 0 ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto px-2 py-1 text-xs"
+                  onClick={handleMarkAllRead}
+                >
+                  Mark all read
+                </Button>
+              ) : null}
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-auto px-2 py-1 text-xs"
-                onClick={handleMarkAllRead}
+                className="h-auto p-1"
+                onClick={(event) => {
+                  event.preventDefault();
+                  toggleMuted();
+                }}
+                aria-label={
+                  muted
+                    ? "Unmute notification sound"
+                    : "Mute notification sound"
+                }
+                title={
+                  muted
+                    ? "Unmute notification sound"
+                    : "Mute notification sound"
+                }
               >
-                Mark all read
+                {muted ? (
+                  <VolumeX className="size-4" />
+                ) : (
+                  <Volume2 className="size-4" />
+                )}
               </Button>
-            ) : null}
+            </div>
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />

@@ -1,13 +1,9 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import { DateRangeFilter } from "@/components/filters/date-range-filter";
-import { DispatcherFilter } from "@/components/filters/dispatcher-filter";
-import { StatusFilter } from "@/components/filters/status-filter";
+import { useCallback, useMemo } from "react";
 import { MetricCard } from "@/components/metric-card";
 import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -120,23 +116,19 @@ type CarrierDetailViewProps = {
 };
 
 export function CarrierDetailView({ carrier }: CarrierDetailViewProps) {
-  const [draftFilters, setDraftFilters] = useState<CarrierDetailFilters>(
-    DEFAULT_CARRIER_DETAIL_FILTERS,
-  );
-  const [appliedFilters, setAppliedFilters] = useState<CarrierDetailFilters>(
-    DEFAULT_CARRIER_DETAIL_FILTERS,
-  );
-
   const loadActivities = useCallback(
-    () => fetchActivities(filtersToActivityParams(carrier.id, appliedFilters)),
-    [appliedFilters, carrier.id],
+    () =>
+      fetchActivities(
+        filtersToActivityParams(carrier.id, DEFAULT_CARRIER_DETAIL_FILTERS),
+      ),
+    [carrier.id],
   );
 
   const {
     data: activities = [],
     isLoading,
     error,
-  } = useApiData(loadActivities, [carrier.id, appliedFilters]);
+  } = useApiData(loadActivities, [carrier.id]);
 
   const summary = useMemo(
     () => computePerformanceSummary(activities),
@@ -193,52 +185,6 @@ export function CarrierDetailView({ carrier }: CarrierDetailViewProps) {
               <p className="font-medium">{carrier.notes}</p>
             </div>
           ) : null}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Activity Filters</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap items-end gap-3">
-          <DateRangeFilter
-            value={draftFilters.dateRange}
-            onValueChange={(value) => {
-              if (value) {
-                setDraftFilters((current) => ({
-                  ...current,
-                  dateRange: value,
-                }));
-              }
-            }}
-          />
-          <StatusFilter
-            value={draftFilters.status}
-            onValueChange={(value) => {
-              if (value) {
-                setDraftFilters((current) => ({ ...current, status: value }));
-              }
-            }}
-          />
-          <DispatcherFilter
-            value={draftFilters.dispatcherId}
-            onValueChange={(value) => {
-              if (value) {
-                setDraftFilters((current) => ({
-                  ...current,
-                  dispatcherId: value,
-                }));
-              }
-            }}
-          />
-          <Button
-            type="button"
-            size="sm"
-            className="mb-0.5"
-            onClick={() => setAppliedFilters(draftFilters)}
-          >
-            Apply filters
-          </Button>
         </CardContent>
       </Card>
 

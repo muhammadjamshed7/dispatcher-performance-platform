@@ -35,16 +35,18 @@ import {
 } from "@/lib/filters/entity-filter-params";
 import {
   createCarrierRequest,
+  fetchActivities,
   fetchCarriers,
   reassignCarrierRequest,
   updateCarrierRequest,
 } from "@/lib/api/resources";
+import { exportCarrierActivityPdf } from "@/lib/reports/export-carrier-activity-pdf";
 import { useEntityOptions } from "@/hooks/use-entity-options";
 import {
   TEAM_STATUS_ACTIVE,
   TEAM_STATUS_INACTIVE,
 } from "@/lib/constants/team-statuses";
-import { DISPATCHER } from "@/lib/constants/roles";
+import { ADMIN, DISPATCHER } from "@/lib/constants/roles";
 import type { Carrier } from "@/lib/types";
 import type {
   CarrierFormValues,
@@ -103,6 +105,7 @@ function CarriersPageState({
 }) {
   const { role } = useRoleScope();
   const canManageCarriers = role !== DISPATCHER;
+  const canExportCarrier = role === ADMIN;
   const [draftFilters, setDraftFilters] = useState<EntityFilterValues>(
     initialEntityFilters,
   );
@@ -180,12 +183,28 @@ function CarriersPageState({
     setModalOpen(true);
   }
 
+  async function handleExportCarrier(carrier: Carrier) {
+    try {
+      showToast(`Generating report for "${carrier.carrierName}"...`);
+      const activities = await fetchActivities({ carrierId: carrier.id });
+      await exportCarrierActivityPdf({ carrier, activities });
+      showToast(`Report for "${carrier.carrierName}" downloaded.`);
+    } catch (err) {
+      showToast(getErrorMessage(err, "Failed to export carrier report."));
+    }
+  }
+
   function handleRowAction(carrier: Carrier, action: CarrierRowAction) {
     if (action === "toggle-status") {
       openModal(
         carrier.status === TEAM_STATUS_ACTIVE ? "deactivate" : "activate",
         carrier,
       );
+      return;
+    }
+
+    if (action === "export") {
+      void handleExportCarrier(carrier);
       return;
     }
 
@@ -344,6 +363,7 @@ function CarriersPageState({
           <CarriersTable
             carriers={visibleCarriers}
             readOnly={!canManageCarriers}
+            canExport={canExportCarrier}
             onAction={handleRowAction}
           />
         </PageContentGate>

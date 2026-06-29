@@ -23,17 +23,24 @@ import { TEAM_STATUS_ACTIVE } from "@/lib/constants/team-statuses";
 import type { Carrier } from "@/lib/types";
 import { formatDateShort } from "@/lib/utils/format-date";
 
-export type CarrierRowAction = "view" | "edit" | "reassign" | "toggle-status";
+export type CarrierRowAction =
+  | "view"
+  | "edit"
+  | "reassign"
+  | "toggle-status"
+  | "export";
 
 type CarriersTableProps = {
   carriers: Carrier[];
   readOnly?: boolean;
+  canExport?: boolean;
   onAction: (carrier: Carrier, action: CarrierRowAction) => void;
 };
 
 export function CarriersTable({
   carriers,
   readOnly = false,
+  canExport = false,
   onAction,
 }: CarriersTableProps) {
   return (
@@ -113,6 +120,13 @@ export function CarriersTable({
                         >
                           View
                         </DropdownMenuItem>
+                        {canExport ? (
+                          <DropdownMenuItem
+                            onClick={() => onAction(carrier, "export")}
+                          >
+                            Export
+                          </DropdownMenuItem>
+                        ) : null}
                         {!readOnly ? (
                           <>
                             <DropdownMenuItem

@@ -48,7 +48,7 @@ export function AccountPageContent() {
             </Badge>
           </CardHeader>
           <CardContent className="space-y-4">
-            <dl className="space-y-3">
+            <dl className="space-y-3 ">
               <DetailRow label="Full Name" value={session.fullName} />
               <DetailRow label="Email" value={session.email} />
               <DetailRow

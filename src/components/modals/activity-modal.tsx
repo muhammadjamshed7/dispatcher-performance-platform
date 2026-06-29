@@ -7,6 +7,7 @@ import { DailyActivityForm } from "@/components/forms/daily-activity-form";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -15,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import type { ActivityEditRequestDto, DailyActivity } from "@/lib/types";
 import type { DailyActivityFormValues } from "@/lib/validation/daily-activity-form";
+import { XIcon } from "lucide-react";
 
 export type ActivityModalMode = "create" | "edit" | "view";
 
@@ -102,20 +104,62 @@ export function ActivityModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
+        showCloseButton={false}
+        overlayClassName="bg-slate-950/20 supports-backdrop-filter:backdrop-blur-sm"
         className={
           isView
             ? "flex max-h-[92vh] w-full max-w-5xl flex-col gap-0 overflow-hidden"
-            : "flex max-h-[92vh] w-full max-w-3xl flex-col gap-0 overflow-hidden"
+            : "flex max-h-[calc(100vh-2rem)] w-full max-w-[calc(100%-1rem)] flex-col gap-0 overflow-hidden rounded-2xl p-0 shadow-2xl sm:max-w-4xl"
         }
       >
-        <DialogHeader className="border-b pb-4 pr-10">
-          <DialogTitle className="text-xl font-semibold">
+        <DialogHeader
+          className={
+            isView
+              ? "border-b pr-10 pb-4"
+              : "px-6 pt-7 pr-16 pb-5 sm:px-10 sm:pt-10 sm:pb-7"
+          }
+        >
+          <DialogTitle
+            className={
+              isView
+                ? "text-xl font-semibold"
+                : "text-foreground text-3xl leading-tight font-semibold tracking-normal sm:text-4xl"
+            }
+          >
             {titles[mode]}
           </DialogTitle>
-          <DialogDescription>{descriptions[mode]}</DialogDescription>
+          <DialogDescription
+            className={
+              isView
+                ? undefined
+                : "text-muted-foreground text-base leading-7 sm:text-lg"
+            }
+          >
+            {descriptions[mode]}
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="-mx-1 flex-1 overflow-y-auto px-1 py-4">
+        <DialogClose
+          render={
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-lg"
+              className="text-foreground hover:bg-muted absolute top-5 right-5 rounded-full sm:top-8 sm:right-8"
+            />
+          }
+        >
+          <XIcon className="size-6" />
+          <span className="sr-only">Close</span>
+        </DialogClose>
+
+        <div
+          className={
+            isView
+              ? "-mx-1 flex-1 overflow-y-auto px-1 py-4"
+              : "flex-1 overflow-y-auto px-6 pb-7 sm:px-10 sm:pb-9"
+          }
+        >
           {mode === "view" && activity ? (
             <ActivityDetailView
               activity={activity}
@@ -135,24 +179,41 @@ export function ActivityModal({
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter
+          className={
+            isView
+              ? undefined
+              : "bg-background mx-0 mb-0 flex-none rounded-none rounded-b-2xl px-6 py-5 sm:px-10 sm:py-6"
+          }
+        >
           <Button
             type="button"
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={isSubmitting}
+            className={!isView ? "h-11 min-w-32 px-6 text-base" : undefined}
           >
             Cancel
           </Button>
 
           {mode === "create" ? (
-            <Button type="submit" form={FORM_ID} disabled={isSubmitting}>
+            <Button
+              type="submit"
+              form={FORM_ID}
+              disabled={isSubmitting}
+              className={!isView ? "h-11 min-w-40 px-6 text-base" : undefined}
+            >
               {isSubmitting ? "Adding..." : "Add Activity"}
             </Button>
           ) : null}
 
           {mode === "edit" ? (
-            <Button type="submit" form={FORM_ID} disabled={isSubmitting}>
+            <Button
+              type="submit"
+              form={FORM_ID}
+              disabled={isSubmitting}
+              className={!isView ? "h-11 min-w-40 px-6 text-base" : undefined}
+            >
               {isSubmitting ? "Saving..." : "Save Changes"}
             </Button>
           ) : null}

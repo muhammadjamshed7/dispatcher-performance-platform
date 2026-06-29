@@ -101,10 +101,17 @@ function toUpdateActivityPayload(values: DailyActivityFormValues) {
 
 type ActivitiesPageContentProps = {
   compact?: boolean;
+  /**
+   * Controls whether the role scope banner and entity filter bar render.
+   * Disabled on the Admin Activities page, which shows only the title,
+   * action buttons, and the activities table.
+   */
+  showScopeAndFilters?: boolean;
 };
 
 function ActivitiesPageContentInner({
   compact = false,
+  showScopeAndFilters = true,
 }: ActivitiesPageContentProps) {
   const searchParams = useSearchParams();
   const searchParamKey = searchParams.toString();
@@ -127,6 +134,7 @@ function ActivitiesPageContentInner({
       initialEntityFilters={urlEntityFilters}
       initialExcelFilters={urlExcelFilters}
       compact={compact}
+      showScopeAndFilters={showScopeAndFilters}
     />
   );
 }
@@ -135,10 +143,12 @@ function ActivitiesPageState({
   initialEntityFilters,
   initialExcelFilters,
   compact,
+  showScopeAndFilters,
 }: {
   initialEntityFilters: EntityFilterValues;
   initialExcelFilters: ActivityExcelFilterState;
   compact: boolean;
+  showScopeAndFilters: boolean;
 }) {
   const { session } = useSession();
   const isDispatcher = session?.role === DISPATCHER;
@@ -345,9 +355,9 @@ function ActivitiesPageState({
           </div>
         }
       >
-        {!compact ? <RoleScopeBanner /> : null}
+        {!compact && showScopeAndFilters ? <RoleScopeBanner /> : null}
 
-        {!compact ? (
+        {!compact && showScopeAndFilters ? (
           <EntityFilterBar
             values={draftFilters}
             onChange={setDraftFilters}
@@ -402,6 +412,7 @@ function ActivitiesPageState({
 
 export function ActivitiesPageContent({
   compact = false,
+  showScopeAndFilters = true,
 }: ActivitiesPageContentProps = {}) {
   return (
     <Suspense
@@ -409,7 +420,10 @@ export function ActivitiesPageContent({
         <div className="py-10 text-sm text-[#64748B]">Loading activities...</div>
       }
     >
-      <ActivitiesPageContentInner compact={compact} />
+      <ActivitiesPageContentInner
+        compact={compact}
+        showScopeAndFilters={showScopeAndFilters}
+      />
     </Suspense>
   );
 }

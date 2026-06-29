@@ -3,5 +3,5 @@ import { ActivitiesPageContent } from "@/components/activities/activities-page-c
 export const dynamic = "force-dynamic";
 
 export default function AdminActivitiesPage() {
-  return <ActivitiesPageContent />;
+  return <ActivitiesPageContent showScopeAndFilters={false} />;
 }

@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useMemo } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { CircleDollarSign, Gauge } from "lucide-react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -14,7 +16,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent } from "@/components/ui/card";
 import { useEntityOptions } from "@/hooks/use-entity-options";
 import { useApiData } from "@/hooks/use-api-data";
 import { fetchDispatchFeeRules } from "@/lib/api/resources";
@@ -43,6 +44,16 @@ type DailyActivityFormProps = {
   carrierLabelFallback?: string;
   onSubmit: (values: DailyActivityFormValues) => void | Promise<void>;
 };
+
+const fieldGroupClass = "space-y-2.5";
+const fieldLabelClass = "text-base leading-none font-semibold text-foreground";
+const fieldControlClass =
+  "h-12 rounded-xl border-border/90 bg-background px-4 text-base shadow-sm placeholder:text-muted-foreground/90 focus-visible:ring-2 md:text-base";
+const selectControlClass =
+  "w-full rounded-xl border-border/90 bg-background px-4 text-base shadow-sm focus-visible:ring-2 data-[size=default]:h-12";
+const textareaControlClass =
+  "min-h-28 rounded-xl border-border/90 bg-background px-4 py-3 text-base shadow-sm placeholder:text-muted-foreground/90 focus-visible:ring-2 md:text-base";
+const fieldErrorClass = "text-sm text-destructive";
 
 export function DailyActivityForm({
   formId,
@@ -190,27 +201,32 @@ export function DailyActivityForm({
   return (
     <form
       id={formId}
-      className="max-h-[65vh] space-y-4 overflow-y-auto pr-1"
+      className="space-y-7"
       onSubmit={handleSubmit((values) => onSubmit(values))}
       noValidate
     >
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor={`${formId}-date`}>Date</Label>
+      <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
+        <div className={fieldGroupClass}>
+          <Label className={fieldLabelClass} htmlFor={`${formId}-date`}>
+            Date
+          </Label>
           <Input
             id={`${formId}-date`}
             type="date"
+            className={fieldControlClass}
             disabled={readOnly}
             aria-invalid={Boolean(errors.date)}
             {...register("date")}
           />
           {errors.date ? (
-            <p className="text-destructive text-sm">{errors.date.message}</p>
+            <p className={fieldErrorClass}>{errors.date.message}</p>
           ) : null}
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor={`${formId}-carrier`}>Carrier</Label>
+        <div className={fieldGroupClass}>
+          <Label className={fieldLabelClass} htmlFor={`${formId}-carrier`}>
+            Carrier
+          </Label>
           <Controller
             name="carrierId"
             control={control}
@@ -224,7 +240,10 @@ export function DailyActivityForm({
                 }}
                 disabled={readOnly || carriersLoading}
               >
-                <SelectTrigger id={`${formId}-carrier`} className="w-full">
+                <SelectTrigger
+                  id={`${formId}-carrier`}
+                  className={selectControlClass}
+                >
                   <SelectValue placeholder={carrierPlaceholder}>
                     {selectedCarrierLabel || null}
                   </SelectValue>
@@ -240,15 +259,15 @@ export function DailyActivityForm({
             )}
           />
           {errors.carrierId ? (
-            <p className="text-destructive text-sm">
-              {errors.carrierId.message}
-            </p>
+            <p className={fieldErrorClass}>{errors.carrierId.message}</p>
           ) : null}
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor={`${formId}-status`}>Status</Label>
+      <div className={fieldGroupClass}>
+        <Label className={fieldLabelClass} htmlFor={`${formId}-status`}>
+          Status
+        </Label>
         <Controller
           name="status"
           control={control}
@@ -257,12 +276,17 @@ export function DailyActivityForm({
               value={field.value}
               onValueChange={(value) => {
                 if (value) {
-                  handleStatusChange(value as DailyActivityFormValues["status"]);
+                  handleStatusChange(
+                    value as DailyActivityFormValues["status"],
+                  );
                 }
               }}
               disabled={readOnly}
             >
-              <SelectTrigger id={`${formId}-status`} className="w-full">
+              <SelectTrigger
+                id={`${formId}-status`}
+                className={selectControlClass}
+              >
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
@@ -276,102 +300,134 @@ export function DailyActivityForm({
           )}
         />
         {errors.status ? (
-          <p className="text-destructive text-sm">{errors.status.message}</p>
+          <p className={fieldErrorClass}>{errors.status.message}</p>
         ) : null}
       </div>
 
       {isDelivered ? (
         <>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor={`${formId}-origin`}>Origin</Label>
+          <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
+            <div className={fieldGroupClass}>
+              <Label className={fieldLabelClass} htmlFor={`${formId}-origin`}>
+                Origin
+              </Label>
               <Input
                 id={`${formId}-origin`}
                 placeholder="City, ST"
+                className={fieldControlClass}
                 disabled={readOnly}
                 aria-invalid={Boolean(errors.origin)}
                 {...register("origin")}
               />
               {errors.origin ? (
-                <p className="text-destructive text-sm">
-                  {errors.origin.message}
-                </p>
+                <p className={fieldErrorClass}>{errors.origin.message}</p>
               ) : null}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor={`${formId}-destination`}>Destination</Label>
+            <div className={fieldGroupClass}>
+              <Label
+                className={fieldLabelClass}
+                htmlFor={`${formId}-destination`}
+              >
+                Destination
+              </Label>
               <Input
                 id={`${formId}-destination`}
                 placeholder="City, ST"
+                className={fieldControlClass}
                 disabled={readOnly}
                 aria-invalid={Boolean(errors.destination)}
                 {...register("destination")}
               />
               {errors.destination ? (
-                <p className="text-destructive text-sm">
-                  {errors.destination.message}
-                </p>
+                <p className={fieldErrorClass}>{errors.destination.message}</p>
               ) : null}
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor={`${formId}-total-miles`}>Total Miles</Label>
+          <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
+            <div className={fieldGroupClass}>
+              <Label
+                className={fieldLabelClass}
+                htmlFor={`${formId}-total-miles`}
+              >
+                Total Miles
+              </Label>
               <Input
                 id={`${formId}-total-miles`}
                 type="number"
                 min={0}
                 step="0.1"
+                className={fieldControlClass}
                 disabled={readOnly}
                 aria-invalid={Boolean(errors.totalMiles)}
                 {...register("totalMiles", { setValueAs: parseOptionalNumber })}
               />
               {errors.totalMiles ? (
-                <p className="text-destructive text-sm">
-                  {errors.totalMiles.message}
-                </p>
+                <p className={fieldErrorClass}>{errors.totalMiles.message}</p>
               ) : null}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor={`${formId}-load-amount`}>Load Amount</Label>
+            <div className={fieldGroupClass}>
+              <Label
+                className={fieldLabelClass}
+                htmlFor={`${formId}-load-amount`}
+              >
+                Load Amount
+              </Label>
               <Input
                 id={`${formId}-load-amount`}
                 type="number"
                 min={0}
                 step="0.01"
+                className={fieldControlClass}
                 disabled={readOnly}
                 aria-invalid={Boolean(errors.loadAmount)}
                 {...register("loadAmount", { setValueAs: parseOptionalNumber })}
               />
               {errors.loadAmount ? (
-                <p className="text-destructive text-sm">
-                  {errors.loadAmount.message}
-                </p>
+                <p className={fieldErrorClass}>{errors.loadAmount.message}</p>
               ) : null}
             </div>
           </div>
 
-          <Card>
-            <CardContent className="grid gap-2 py-4 text-sm sm:grid-cols-2">
-              <p>
-                <span className="text-muted-foreground">Rate Per Mile:</span>{" "}
-                {formatRatePerMile(calculatedRatePerMile, "—")}
-              </p>
-              <p>
-                <span className="text-muted-foreground">
-                  Dispatch Fee Earned:
-                </span>{" "}
-                {formatCurrency(calculatedDispatchFee, { nullLabel: "—" })}
-              </p>
+          <Card className="border-border/90 bg-muted/30 rounded-xl border py-0 shadow-none ring-0">
+            <CardContent className="grid gap-0 p-0 sm:grid-cols-2">
+              <div className="flex items-center gap-4 p-5 sm:p-6">
+                <span className="bg-background text-foreground ring-border/80 flex size-14 shrink-0 items-center justify-center rounded-full shadow-sm ring-1">
+                  <Gauge className="size-7" aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-muted-foreground text-sm font-medium">
+                    Rate Per Mile
+                  </p>
+                  <p className="text-foreground mt-1 text-3xl leading-none font-semibold whitespace-nowrap">
+                    {formatRatePerMile(calculatedRatePerMile, "-")}
+                  </p>
+                </div>
+              </div>
+
+              <div className="border-border/80 flex items-center gap-4 border-t p-5 sm:border-t-0 sm:border-l sm:p-6">
+                <span className="bg-background text-foreground ring-border/80 flex size-14 shrink-0 items-center justify-center rounded-full shadow-sm ring-1">
+                  <CircleDollarSign className="size-7" aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-muted-foreground text-sm font-medium">
+                    Dispatch Fee Earned
+                  </p>
+                  <p className="text-foreground mt-1 text-3xl leading-none font-semibold whitespace-nowrap">
+                    {formatCurrency(calculatedDispatchFee, { nullLabel: "-" })}
+                  </p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </>
       ) : (
-        <div className="space-y-2">
-          <Label htmlFor={`${formId}-reason`}>Reason</Label>
+        <div className={fieldGroupClass}>
+          <Label className={fieldLabelClass} htmlFor={`${formId}-reason`}>
+            Reason
+          </Label>
           {allowedStatusReasons.length > 0 ? (
             <Controller
               name="reason"
@@ -386,7 +442,10 @@ export function DailyActivityForm({
                   }}
                   disabled={readOnly}
                 >
-                  <SelectTrigger id={`${formId}-reason`} className="w-full">
+                  <SelectTrigger
+                    id={`${formId}-reason`}
+                    className={selectControlClass}
+                  >
                     <SelectValue placeholder="Select reason" />
                   </SelectTrigger>
                   <SelectContent>
@@ -400,22 +459,25 @@ export function DailyActivityForm({
               )}
             />
           ) : (
-            <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
               No status reasons are configured. Ask an admin to add allowed
               reasons in Settings.
             </p>
           )}
           {errors.reason ? (
-            <p className="text-destructive text-sm">{errors.reason.message}</p>
+            <p className={fieldErrorClass}>{errors.reason.message}</p>
           ) : null}
         </div>
       )}
 
-      <div className="space-y-2">
-        <Label htmlFor={`${formId}-notes`}>Notes</Label>
+      <div className={fieldGroupClass}>
+        <Label className={fieldLabelClass} htmlFor={`${formId}-notes`}>
+          Notes
+        </Label>
         <Textarea
           id={`${formId}-notes`}
           placeholder="Optional notes"
+          className={textareaControlClass}
           disabled={readOnly}
           {...register("notes")}
         />
