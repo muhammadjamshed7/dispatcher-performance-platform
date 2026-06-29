@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useMemo, useState } from "react";
 import { DollarSign, PackageCheck, Route, Truck } from "lucide-react";
 
@@ -10,10 +11,8 @@ import {
   DEFAULT_DISPATCHER_FILTERS,
   DispatcherFilterBar,
 } from "@/components/dashboard/dispatcher/dispatcher-filter-bar";
-import { DispatcherLoadStatusChart } from "@/components/dashboard/dispatcher/dispatcher-load-status-chart";
 import { DispatcherRecentActivitiesTable } from "@/components/dashboard/dispatcher/dispatcher-recent-activities-table";
 import { PendingCarrierEntriesCard } from "@/components/dashboard/dispatcher/pending-carrier-entries-card";
-import { PersonalRevenueTrendChart } from "@/components/dashboard/dispatcher/personal-revenue-trend-chart";
 import { TodayEntryCompletionCard } from "@/components/dashboard/dispatcher/today-entry-completion-card";
 import { PageContentGate } from "@/components/feedback/page-content-gate";
 import type { PageContentState } from "@/components/feedback/page-content-gate";
@@ -23,6 +22,24 @@ import { dispatcherDashboardFiltersToParams } from "@/lib/dashboard/dispatcher-f
 import type { DispatcherDashboardFilterValues } from "@/lib/dashboard/dispatcher-filter-params";
 import { formatCurrencyCompact } from "@/lib/utils/format-currency";
 import { formatRatePerMile } from "@/lib/utils/format-rate-per-mile";
+
+// Charts pull in the heavy recharts bundle. Load them lazily (client-only) so
+// they don't block the dashboard's initial JS, matching the admin dashboard.
+const DispatcherLoadStatusChart = dynamic(
+  () =>
+    import("@/components/dashboard/dispatcher/dispatcher-load-status-chart").then(
+      (module) => module.DispatcherLoadStatusChart,
+    ),
+  { ssr: false },
+);
+
+const PersonalRevenueTrendChart = dynamic(
+  () =>
+    import("@/components/dashboard/dispatcher/personal-revenue-trend-chart").then(
+      (module) => module.PersonalRevenueTrendChart,
+    ),
+  { ssr: false },
+);
 
 export function DispatcherDashboardPage() {
   const [filters, setFilters] = useState<DispatcherDashboardFilterValues>(
@@ -108,10 +125,7 @@ export function DispatcherDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <DispatcherDashboardHeader
-        onRefresh={reload}
-        isRefreshing={isLoading}
-      />
+      <DispatcherDashboardHeader onRefresh={reload} isRefreshing={isLoading} />
 
       <PageContentGate
         state={pageState}

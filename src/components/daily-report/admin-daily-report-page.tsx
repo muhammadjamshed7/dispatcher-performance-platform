@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useMemo, useState } from "react";
 import {
   Activity,
@@ -14,13 +15,8 @@ import {
   Wallet,
 } from "lucide-react";
 
-import { LoadStatusDonutChart } from "@/components/dashboard/admin/load-status-donut-chart";
 import { DashboardMetricCard } from "@/components/dashboard/admin/dashboard-metric-card";
 import { DailyReportFilterBar } from "@/components/daily-report/daily-report-filter-bar";
-import {
-  RevenueByTeamChart,
-  TeamComparisonChart,
-} from "@/components/daily-report/daily-report-charts";
 import { LiveActivityTable } from "@/components/daily-report/live-activity-table";
 import { PageContentGate } from "@/components/feedback/page-content-gate";
 import type { PageContentState } from "@/components/feedback/page-content-gate";
@@ -34,6 +30,32 @@ import {
   type DailyReportFilterValues,
 } from "@/lib/dashboard/daily-report-filter-params";
 import { formatCurrencyCompact } from "@/lib/utils/format-currency";
+
+// Charts pull in the heavy recharts bundle. Load them lazily (client-only) so
+// they don't block the daily report's initial JS, matching the admin dashboard.
+const LoadStatusDonutChart = dynamic(
+  () =>
+    import("@/components/dashboard/admin/load-status-donut-chart").then(
+      (module) => module.LoadStatusDonutChart,
+    ),
+  { ssr: false },
+);
+
+const RevenueByTeamChart = dynamic(
+  () =>
+    import("@/components/daily-report/daily-report-charts").then(
+      (module) => module.RevenueByTeamChart,
+    ),
+  { ssr: false },
+);
+
+const TeamComparisonChart = dynamic(
+  () =>
+    import("@/components/daily-report/daily-report-charts").then(
+      (module) => module.TeamComparisonChart,
+    ),
+  { ssr: false },
+);
 
 export function AdminDailyReportPage() {
   const [filters, setFilters] = useState<DailyReportFilterValues>(

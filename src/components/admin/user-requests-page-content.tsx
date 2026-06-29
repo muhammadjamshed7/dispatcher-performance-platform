@@ -43,13 +43,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useApiData } from "@/hooks/use-api-data";
+import { useEntityOptions } from "@/hooks/use-entity-options";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { ApiClientError } from "@/lib/api/client";
 import {
   approveUserRequest,
   createManagedUserRequest,
   fetchManagedUsers,
-  fetchTeams,
   fetchUserRequests,
   rejectUserRequest,
   resetManagedUserPasswordRequest,
@@ -229,7 +229,6 @@ export function UserRequestsPageContent() {
     useState<CredentialConfirmation | null>(null);
 
   const loadRequests = useCallback(() => fetchUserRequests(), []);
-  const loadTeams = useCallback(() => fetchTeams(), []);
   const loadManagedUsers = useCallback(() => fetchManagedUsers(), []);
 
   const {
@@ -239,7 +238,10 @@ export function UserRequestsPageContent() {
     isEmpty,
     reload,
   } = useApiData(loadRequests, []);
-  const { data: teams = [] } = useApiData(loadTeams, []);
+  // Reuse the teams already loaded by EntityOptionsProvider (admin scope = all
+  // teams) for the approve/create-user team pickers instead of a duplicate
+  // /api/teams request.
+  const { teams } = useEntityOptions();
   const {
     data: managedUsers = [],
     error: managedUsersError,

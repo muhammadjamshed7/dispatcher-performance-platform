@@ -32,12 +32,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useApiData } from "@/hooks/use-api-data";
+import { useEntityOptions } from "@/hooks/use-entity-options";
 import { useRoleScope } from "@/hooks/use-role-scope";
 import { ApiClientError } from "@/lib/api/client";
 import {
   createDispatcherRequest,
   fetchDispatchers,
-  fetchTeams,
   toggleDispatcherStatusRequest,
   updateDispatcherRequest,
 } from "@/lib/api/resources";
@@ -77,12 +77,10 @@ function DispatchersPageState({
 }) {
   const router = useRouter();
   const { filterDispatchers, user } = useRoleScope();
-  const [draftFilters, setDraftFilters] = useState<EntityFilterValues>(
-    initialFilters,
-  );
-  const [appliedFilters, setAppliedFilters] = useState<EntityFilterValues>(
-    initialFilters,
-  );
+  const [draftFilters, setDraftFilters] =
+    useState<EntityFilterValues>(initialFilters);
+  const [appliedFilters, setAppliedFilters] =
+    useState<EntityFilterValues>(initialFilters);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<DispatcherModalMode>("create");
   const [selectedDispatcher, setSelectedDispatcher] =
@@ -95,7 +93,6 @@ function DispatchersPageState({
     () => fetchDispatchers(entityFiltersToDispatcherParams(appliedFilters)),
     [appliedFilters],
   );
-  const loadTeams = useCallback(() => fetchTeams(), []);
   const {
     data: dispatchers = [],
     error,
@@ -103,7 +100,10 @@ function DispatchersPageState({
     isEmpty,
     reload,
   } = useApiData(loadDispatchers, [appliedFilters]);
-  const { data: teams = [] } = useApiData(loadTeams, []);
+  // Reuse the teams already loaded by EntityOptionsProvider (also used by the
+  // dispatcher form's team picker) instead of issuing a duplicate /api/teams
+  // request here. Only used for name → id lookup on create/edit.
+  const { teams } = useEntityOptions();
 
   const visibleDispatchers = useMemo(
     () => filterDispatchers(dispatchers),
