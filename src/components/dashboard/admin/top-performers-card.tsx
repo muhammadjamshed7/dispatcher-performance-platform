@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 
 import { DASHBOARD_CHART_CARD_CLASS } from "@/components/dashboard/admin/dashboard-chart-styles";
+import { cn } from "@/lib/utils";
 import { formatCurrencyCompact } from "@/lib/utils/format-currency";
 
 type TopPerformer = {
@@ -15,15 +16,19 @@ type TopPerformer = {
 
 type TopPerformersCardProps = {
   performers: TopPerformer[];
+  className?: string;
 };
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
-export function TopPerformersCard({ performers }: TopPerformersCardProps) {
+export function TopPerformersCard({
+  performers,
+  className,
+}: TopPerformersCardProps) {
   const hasPerformers = performers.length > 0;
 
   return (
-    <div className={DASHBOARD_CHART_CARD_CLASS}>
+    <div className={cn(DASHBOARD_CHART_CARD_CLASS, className)}>
       <div className="mb-4 flex shrink-0 items-center justify-between gap-3">
         <h3 className="truncate text-base font-semibold text-[#0F172A]">
           Top Performers

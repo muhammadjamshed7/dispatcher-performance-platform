@@ -10,7 +10,6 @@ import { ActiveFilterChips } from "@/components/dashboard/admin/filters/active-f
 import { AdminDashboardHeader } from "@/components/dashboard/admin/admin-dashboard-header";
 import { DashboardSecondaryMetricCard } from "@/components/dashboard/admin/dashboard-secondary-metric-card";
 import { RecentActivitiesTable } from "@/components/dashboard/admin/recent-activities-table";
-import { TopPerformersCard } from "@/components/dashboard/admin/top-performers-card";
 import { PageContentGate } from "@/components/feedback/page-content-gate";
 import type { PageContentState } from "@/components/feedback/page-content-gate";
 import { useApiData } from "@/hooks/use-api-data";
@@ -147,6 +146,8 @@ function AdminDashboardPageContent() {
               metrics={metrics}
               filterOptions={filterOptions}
               appliedFilters={dashboard.filters}
+              dispatcherRevenue={dashboard.dispatcherRevenue}
+              topPerformers={dashboard.topPerformers}
             />
           ) : null}
 
@@ -170,13 +171,12 @@ function AdminDashboardPageContent() {
           ) : null}
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <RevenueTrendChart data={dashboard?.revenueTrend ?? []} />
+            <RevenueTrendChart data={dashboard?.revenueComparison ?? []} />
             <LoadsByTeamChart data={dashboard?.loadsByTeam ?? []} />
             <LoadStatusDonutChart
               data={dashboard?.statusBreakdown ?? []}
               totalLoads={metrics?.totalLoads ?? 0}
             />
-            <TopPerformersCard performers={dashboard?.topPerformers ?? []} />
           </div>
 
           <RecentActivitiesTable rows={dashboard?.recentActivities ?? []} />

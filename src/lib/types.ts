@@ -297,6 +297,17 @@ export type AdminDashboardBundle = {
   };
   metrics: AdminDashboardMetrics;
   revenueTrend: { date: string; revenue: number }[];
+  revenueComparison: {
+    label: string;
+    group: "Dispatcher" | "Team";
+    revenue: number;
+  }[];
+  dispatcherRevenue: {
+    dispatcherId: string;
+    dispatcher: string;
+    team: string;
+    revenue: number;
+  }[];
   loadsByTeam: { team: string; loads: number }[];
   statusBreakdown: {
     name: string;

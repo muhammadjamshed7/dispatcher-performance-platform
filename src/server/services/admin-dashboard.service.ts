@@ -41,6 +41,7 @@ type ActivityRecord = {
   createdAt: string;
   status: LoadActivityStatus;
   loadAmount: string | null;
+  dispatcherId: string;
   teamNameSnapshot: string;
   dispatcherNameSnapshot: string;
   carrierNameSnapshot: string;
@@ -48,6 +49,8 @@ type ActivityRecord = {
   origin: string | null;
   destination: string | null;
 };
+
+type DispatcherRevenueLookup = Map<string, { name: string; team: string }>;
 
 const STATUS_CHART_META: Record<
   LoadActivityStatus,
@@ -233,15 +236,17 @@ function filterActivitiesByDateRange(
 function summarizeActivities(
   activities: ActivityRecord[],
   trendDateKeys: string[],
+  dispatcherLookup: DispatcherRevenueLookup = new Map(),
 ) {
   const revenueByDate = new Map<string, number>();
   const loadsByDate = new Map<string, number>();
   const deliveredByDate = new Map<string, number>();
   const loadsByTeamMap = new Map<string, number>();
+  const revenueByTeamMap = new Map<string, number>();
   const statusCounts = new Map<LoadActivityStatus, number>();
   const revenueByDispatcher = new Map<
     string,
-    { name: string; team: string; revenue: number }
+    { id: string; name: string; team: string; revenue: number }
   >();
 
   for (const status of STATUSES) {
@@ -268,14 +273,21 @@ function summarizeActivities(
     const amount = toAmount(row.loadAmount);
     totalRevenue += amount;
     revenueByDate.set(dateKey, (revenueByDate.get(dateKey) ?? 0) + amount);
+    revenueByTeamMap.set(team, (revenueByTeamMap.get(team) ?? 0) + amount);
 
-    const existing = revenueByDispatcher.get(row.dispatcherNameSnapshot) ?? {
-      name: row.dispatcherNameSnapshot,
-      team: row.teamNameSnapshot,
+    const dispatcher = dispatcherLookup.get(row.dispatcherId);
+    const dispatcherName =
+      dispatcher?.name || row.dispatcherNameSnapshot || "Unknown Dispatcher";
+    const dispatcherTeam =
+      dispatcher?.team || row.teamNameSnapshot || "Unassigned";
+    const existing = revenueByDispatcher.get(row.dispatcherId) ?? {
+      id: row.dispatcherId,
+      name: dispatcherName,
+      team: dispatcherTeam,
       revenue: 0,
     };
     existing.revenue += amount;
-    revenueByDispatcher.set(row.dispatcherNameSnapshot, existing);
+    revenueByDispatcher.set(row.dispatcherId, existing);
   }
 
   return {
@@ -294,6 +306,33 @@ function summarizeActivities(
           day: "numeric",
         }),
         revenue: Math.round(revenue),
+      })),
+    revenueComparison: [
+      ...[...revenueByDispatcher.values()]
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 5)
+        .map((entry) => ({
+          label: entry.name,
+          group: "Dispatcher" as const,
+          revenue: Math.round(entry.revenue * 100) / 100,
+        })),
+      ...[...revenueByTeamMap.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([team, revenue]) => ({
+          label: team,
+          group: "Team" as const,
+          revenue: Math.round(revenue * 100) / 100,
+        })),
+    ],
+    dispatcherRevenue: [...revenueByDispatcher.values()]
+      .filter((entry) => entry.revenue > 0)
+      .sort((a, b) => b.revenue - a.revenue)
+      .map((entry) => ({
+        dispatcherId: entry.id,
+        dispatcher: entry.name,
+        team: entry.team || "Unassigned",
+        revenue: Math.round(entry.revenue * 100) / 100,
       })),
     loadsByTeam: [...loadsByTeamMap.entries()]
       .sort((a, b) => b[1] - a[1])
@@ -358,7 +397,7 @@ async function fetchActivities(
       db()
         .from(T.DailyActivity)
         .select(
-          "id, activityDate, createdAt, status, loadAmount, teamNameSnapshot, dispatcherNameSnapshot, carrierNameSnapshot, truckTypeSnapshot, origin, destination",
+          "id, activityDate, createdAt, status, loadAmount, dispatcherId, teamNameSnapshot, dispatcherNameSnapshot, carrierNameSnapshot, truckTypeSnapshot, origin, destination",
         )
         .eq("approvalStatus", APPROVED)
         .order("activityDate", { ascending: false })
@@ -588,9 +627,29 @@ export async function getAdminDashboardBundle(
     yearTrendFrom,
     yearTrendTo,
   );
+  const teamNameById = new Map(
+    filterOptions.teams.map((team) => [team.id, team.name]),
+  );
+  const dispatcherLookup: DispatcherRevenueLookup = new Map(
+    filterOptions.dispatchers.map((dispatcher) => [
+      dispatcher.id,
+      {
+        name: dispatcher.name,
+        team: teamNameById.get(dispatcher.teamId) ?? "Unassigned",
+      },
+    ]),
+  );
 
-  const current = summarizeActivities(currentActivities, trendDateKeys);
-  const previous = summarizeActivities(previousActivities, trendDateKeys);
+  const current = summarizeActivities(
+    currentActivities,
+    trendDateKeys,
+    dispatcherLookup,
+  );
+  const previous = summarizeActivities(
+    previousActivities,
+    trendDateKeys,
+    dispatcherLookup,
+  );
 
   const monthlyGrowth = computeGrowthPercent(
     current.totalRevenue,
@@ -640,6 +699,8 @@ export async function getAdminDashboardBundle(
       monthlyGrowthTrend: buildMonthlyGrowthTrend(yearTrendActivities),
     },
     revenueTrend: current.revenueTrend,
+    revenueComparison: current.revenueComparison,
+    dispatcherRevenue: current.dispatcherRevenue,
     loadsByTeam: current.loadsByTeam,
     statusBreakdown: current.statusBreakdown,
     topPerformers: current.topPerformers,

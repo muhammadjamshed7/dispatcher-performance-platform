@@ -30,7 +30,7 @@ export type DashboardStatusFilterOption = {
 };
 
 export const DEFAULT_ADMIN_DASHBOARD_FILTERS: AdminDashboardFilterState = {
-  dateRange: "this-month",
+  dateRange: "today",
   customDateFrom: "",
   customDateTo: "",
   teamIds: [],
@@ -152,7 +152,7 @@ export function parseAdminDashboardFiltersFromSearchParams(
   params: URLSearchParams,
 ): AdminDashboardFilterState {
   const dateRange = (params.get("dateRange") ??
-    "this-month") as AdminDashboardDatePreset;
+    DEFAULT_ADMIN_DASHBOARD_FILTERS.dateRange) as AdminDashboardDatePreset;
 
   const truckTypes = parseCsv(params.get("truckTypes")).filter(
     (value): value is TruckType => TRUCK_TYPES.includes(value as TruckType),

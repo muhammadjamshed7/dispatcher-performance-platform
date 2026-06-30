@@ -336,10 +336,8 @@ export function resolveDashboardDateRange(
   }
 
   const todayKey = getDateKeyInTimeZone(new Date(), timezone ?? "UTC");
-  const now = new Date(`${todayKey}T00:00:00Z`);
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   return {
-    dateFrom: formatActivityDate(start),
+    dateFrom: todayKey,
     dateTo: todayKey,
   };
 }
