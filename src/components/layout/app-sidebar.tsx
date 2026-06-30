@@ -10,6 +10,7 @@ import {
   DollarSign,
   FileText,
   LayoutDashboard,
+  ReceiptText,
   Settings,
   Trophy,
   Truck,
@@ -42,6 +43,7 @@ const NAV_ICONS: Record<string, typeof LayoutDashboard> = {
   users: UserPlus,
   performance: BarChart3,
   finance: DollarSign,
+  invoices: ReceiptText,
   account: UserCircle,
 };
 

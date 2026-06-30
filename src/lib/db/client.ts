@@ -32,4 +32,7 @@ export const T = {
   ReportExport: "ReportExport",
   ActivityEditRequest: "ActivityEditRequest",
   Notification: "Notification",
+  Invoice: "Invoice",
+  InvoiceItem: "InvoiceItem",
+  InvoicePayment: "InvoicePayment",
 } as const;

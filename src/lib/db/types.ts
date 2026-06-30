@@ -34,6 +34,21 @@ export type TruckType =
   | "CARGO_VAN";
 export type RegistrationRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
 export type ReportExportStatus = "PENDING" | "COMPLETED" | "FAILED";
+export type InvoiceType = "DISPATCHER_PAYABLE" | "CARRIER_RECEIVABLE";
+export type InvoiceStatus =
+  | "DRAFT"
+  | "ISSUED"
+  | "PARTIALLY_PAID"
+  | "PAID"
+  | "OVERDUE"
+  | "CANCELLED";
+export type PaymentStatus = "UNPAID" | "PARTIALLY_PAID" | "PAID";
+export type InvoicePaymentMethod =
+  | "CASH"
+  | "BANK_TRANSFER"
+  | "CARD"
+  | "CHECK"
+  | "OTHER";
 export type AuditAction =
   | "USER_APPROVED"
   | "USER_MANUALLY_CREATED"
@@ -84,7 +99,14 @@ export type AuditAction =
   | "REPORT_EXPORTED"
   | "FINANCE_VIEWED"
   | "FINANCE_EXPORTED"
-  | "AUDIT_LOGS_EXPORTED";
+  | "AUDIT_LOGS_EXPORTED"
+  | "INVOICE_GENERATED"
+  | "INVOICE_UPDATED"
+  | "INVOICE_PAYMENT_RECORDED"
+  | "INVOICE_MARKED_PAID"
+  | "INVOICE_CANCELLED"
+  | "INVOICE_EXPORTED"
+  | "INVOICE_VIEWED";
 
 export type Organization = {
   id: string;
@@ -300,6 +322,67 @@ export type ReportExport = {
   errorMessage: string | null;
   createdAt: string;
   completedAt: string | null;
+};
+
+export type Invoice = {
+  id: string;
+  organizationId: string;
+  invoiceNumber: string;
+  invoiceType: InvoiceType;
+  invoiceStatus: InvoiceStatus;
+  paymentStatus: PaymentStatus;
+  dispatcherId: string | null;
+  carrierId: string | null;
+  teamId: string | null;
+  periodStart: string;
+  periodEnd: string;
+  issueDate: string;
+  dueDate: string;
+  subtotalAmount: string;
+  totalAmount: string;
+  paidAmount: string;
+  pendingAmount: string;
+  notes: string | null;
+  createdById: string;
+  updatedById: string | null;
+  paidAt: string | null;
+  cancelledAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+};
+
+export type InvoiceItem = {
+  id: string;
+  invoiceId: string;
+  dailyActivityId: string | null;
+  activityDate: string;
+  carrierId: string;
+  dispatcherId: string;
+  teamId: string;
+  status: LoadActivityStatus;
+  origin: string | null;
+  destination: string | null;
+  totalMiles: string | null;
+  loadAmount: string | null;
+  dispatchFee: string | null;
+  ratePerMile: string | null;
+  itemDescription: string | null;
+  amount: string;
+  createdAt: string;
+};
+
+export type InvoicePayment = {
+  id: string;
+  invoiceId: string;
+  organizationId: string;
+  paymentAmount: string;
+  paymentDate: string;
+  paymentMethod: InvoicePaymentMethod;
+  paymentReference: string | null;
+  notes: string | null;
+  recordedById: string;
+  createdAt: string;
 };
 
 export type JsonValue =

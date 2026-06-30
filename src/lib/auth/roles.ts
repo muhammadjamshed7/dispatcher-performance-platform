@@ -57,6 +57,7 @@ export const ADMIN_NAV_ITEMS: RoleNavItem[] = [
   { label: "Notifications", href: "/admin/notifications", iconKey: "notifications" },
   { label: "Rankings", href: "/admin/rankings", iconKey: "rankings" },
   { label: "Reports", href: "/admin/reports", iconKey: "reports" },
+  { label: "Invoices", href: "/admin/invoices", iconKey: "invoices" },
   {
     label: "Daily Report",
     href: "/admin/daily-report",
@@ -84,6 +85,7 @@ export const TEAM_LEAD_NAV_ITEMS: RoleNavItem[] = [
   { label: "Notifications", href: "/team-lead/notifications", iconKey: "notifications" },
   { label: "Rankings", href: "/team-lead/rankings", iconKey: "rankings" },
   { label: "Reports", href: "/team-lead/reports", iconKey: "reports" },
+  { label: "Invoices", href: "/team-lead/invoices", iconKey: "invoices" },
   { label: "Account", href: "/team-lead/account", iconKey: "account" },
 ];
 
@@ -111,6 +113,7 @@ export const DISPATCHER_NAV_ITEMS: RoleNavItem[] = [
     iconKey: "performance",
   },
   { label: "Finance", href: "/dispatcher/finance", iconKey: "finance" },
+  { label: "My Invoices", href: "/dispatcher/invoices", iconKey: "invoices" },
   { label: "Account", href: "/dispatcher/account", iconKey: "account" },
 ];
 

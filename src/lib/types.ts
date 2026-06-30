@@ -7,6 +7,12 @@ import type { Status } from "@/lib/constants/statuses";
 import type { TeamStatus } from "@/lib/constants/team-statuses";
 import type { TruckType } from "@/lib/constants/truck-types";
 import type { UserStatus as AuthUserStatus } from "@/lib/auth/user-statuses";
+import type {
+  InvoicePaymentMethod,
+  InvoiceStatus,
+  InvoiceType,
+  PaymentStatus,
+} from "@/lib/constants/invoices";
 
 export type UserRole = Role;
 export type UserStatus = AuthUserStatus;
@@ -642,6 +648,155 @@ export type DispatcherFinanceBundle = {
   carrierBreakdown: FinanceCarrierRow[];
   loadHistory: FinanceLoadRow[];
   paymentTracking: FinancePaymentTracking;
+};
+
+export type InvoiceSummaryMetrics = {
+  totalDeliveredLoads: number;
+  totalCancelledLoads: number;
+  totalNotBooked: number;
+  totalNotWorking: number;
+  totalRevenue: number;
+  totalDispatchFee: number;
+  totalMiles: number;
+  averageRatePerMile: number | null;
+  payableReceivableAmount: number;
+  paidAmount: number;
+  pendingAmount: number;
+};
+
+export type InvoiceListItem = {
+  id: string;
+  invoiceNumber: string;
+  invoiceType: InvoiceType;
+  invoiceStatus: InvoiceStatus;
+  paymentStatus: PaymentStatus;
+  entityName: string;
+  entityEmail: string | null;
+  teamName: string | null;
+  dispatcherName: string | null;
+  carrierName: string | null;
+  periodStart: string;
+  periodEnd: string;
+  issueDate: string;
+  dueDate: string;
+  totalAmount: number;
+  paidAmount: number;
+  pendingAmount: number;
+  createdAt: string;
+  summary: InvoiceSummaryMetrics;
+};
+
+export type InvoiceDetailItem = {
+  id: string;
+  dailyActivityId: string | null;
+  activityDate: string;
+  carrierId: string;
+  carrierName: string;
+  dispatcherId: string;
+  dispatcherName: string;
+  teamId: string;
+  teamName: string;
+  status: LoadActivityStatus;
+  origin: string | null;
+  destination: string | null;
+  totalMiles: number | null;
+  loadAmount: number | null;
+  dispatchFee: number | null;
+  ratePerMile: number | null;
+  itemDescription: string | null;
+  amount: number;
+};
+
+export type InvoicePaymentEntry = {
+  id: string;
+  paymentAmount: number;
+  paymentDate: string;
+  paymentMethod: InvoicePaymentMethod;
+  paymentReference: string | null;
+  notes: string | null;
+  recordedByName: string | null;
+  createdAt: string;
+};
+
+export type InvoiceDetail = InvoiceListItem & {
+  notes: string | null;
+  entity: {
+    dispatcherName: string | null;
+    dispatcherEmail: string | null;
+    dispatcherPhone: string | null;
+    carrierName: string | null;
+    driverName: string | null;
+    mcNumber: string | null;
+    truckType: TruckType | null;
+    teamName: string | null;
+  };
+  generatedByName: string | null;
+  items: InvoiceDetailItem[];
+  payments: InvoicePaymentEntry[];
+};
+
+export type InvoiceDashboardMetrics = {
+  totalInvoices: number;
+  totalInvoiceAmount: number;
+  paidInvoices: number;
+  paidAmount: number;
+  unpaidInvoices: number;
+  unpaidAmount: number;
+  partiallyPaidInvoices: number;
+  partiallyPaidAmount: number;
+  overdueInvoices: number;
+  overdueAmount: number;
+  dispatcherInvoiceCount: number;
+  dispatcherPaidCount: number;
+  dispatcherUnpaidCount: number;
+  dispatcherPaidAmount: number;
+  dispatcherPendingAmount: number;
+  carrierInvoiceCount: number;
+  carrierPaidCount: number;
+  carrierUnpaidCount: number;
+  carrierPaidAmount: number;
+  carrierPendingAmount: number;
+};
+
+export type InvoiceDashboardBundle = {
+  metrics: InvoiceDashboardMetrics;
+  paidVsPending: { label: string; paid: number; pending: number }[];
+  typePaidVsPending: { label: string; paid: number; pending: number }[];
+  monthlyTrend: {
+    month: string;
+    totalAmount: number;
+    paidAmount: number;
+    pendingAmount: number;
+  }[];
+};
+
+export type InvoiceFilterOptions = {
+  teams: { id: string; name: string }[];
+  dispatchers: { id: string; name: string; teamId: string }[];
+  carriers: {
+    id: string;
+    name: string;
+    teamId: string;
+    dispatcherId: string | null;
+  }[];
+};
+
+export type InvoiceListBundle = {
+  invoices: InvoiceListItem[];
+  dashboard: InvoiceDashboardBundle;
+  filterOptions: InvoiceFilterOptions;
+};
+
+export type InvoicePreview = {
+  activityCount: number;
+  deliveredLoads: number;
+  cancelledLoads: number;
+  notBooked: number;
+  notWorking: number;
+  totalLoadAmount: number;
+  totalDispatchFee: number;
+  expectedInvoiceAmount: number;
+  activities: InvoiceDetailItem[];
 };
 
 export type AppSettings = {

@@ -12,6 +12,9 @@ import type {
   DispatcherFinanceBundle,
   Dispatcher,
   DispatchFeeRules,
+  InvoiceDetail,
+  InvoiceListBundle,
+  InvoicePreview,
   CreateManagedUserResult,
   ManagedUser,
   PendingUserRequest,
@@ -430,4 +433,96 @@ export function exportAdminDispatcherFinanceRequest(
       body: JSON.stringify(input),
     },
   );
+}
+
+export function fetchInvoices(
+  scope: "admin" | "dispatcher" | "team-lead",
+  params?: Record<string, string>,
+) {
+  const base =
+    scope === "admin"
+      ? "/api/invoices"
+      : scope === "dispatcher"
+        ? "/api/dispatcher/invoices"
+        : "/api/team-lead/invoices";
+  const query = params ? `?${new URLSearchParams(params).toString()}` : "";
+  return apiFetch<InvoiceListBundle>(`${base}${query}`);
+}
+
+export function fetchInvoiceDetail(
+  scope: "admin" | "dispatcher" | "team-lead",
+  id: string,
+) {
+  const base =
+    scope === "admin"
+      ? "/api/invoices"
+      : scope === "dispatcher"
+        ? "/api/dispatcher/invoices"
+        : "/api/team-lead/invoices";
+  return apiFetch<InvoiceDetail>(`${base}/${id}`);
+}
+
+export function generateInvoiceRequest(input: Record<string, unknown>) {
+  return apiFetch<InvoiceDetail | InvoicePreview>("/api/invoices/generate", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateInvoiceRequest(id: string, input: Record<string, unknown>) {
+  return apiFetch<InvoiceDetail>(`/api/invoices/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function recordInvoicePaymentRequest(
+  id: string,
+  input: Record<string, unknown>,
+) {
+  return apiFetch<InvoiceDetail>(`/api/invoices/${id}/payments`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function markInvoicePaidRequest(id: string) {
+  return apiFetch<InvoiceDetail>(`/api/invoices/${id}/mark-paid`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export function cancelInvoiceRequest(id: string, notes?: string) {
+  return apiFetch<InvoiceDetail>(`/api/invoices/${id}/cancel`, {
+    method: "POST",
+    body: JSON.stringify({ notes }),
+  });
+}
+
+export function exportInvoiceRequest(
+  scope: "admin" | "dispatcher" | "team-lead",
+  id: string,
+  input: { format: "pdf" | "csv" | "payments-csv" },
+) {
+  const base =
+    scope === "admin"
+      ? "/api/invoices"
+      : scope === "dispatcher"
+        ? "/api/dispatcher/invoices"
+        : "/api/team-lead/invoices";
+  return apiFetch<{ fileName: string; csv?: string; invoice?: InvoiceDetail }>(
+    `${base}/${id}/export`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function exportInvoiceListRequest(input: Record<string, unknown>) {
+  return apiFetch<{ fileName: string; csv: string }>("/api/invoices/export", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
