@@ -90,8 +90,14 @@ export function ActivitiesTable({
               activities.map((activity) => (
                 <TableRow key={activity.id}>
                   <TableCell>{formatActivityDate(activity.date)}</TableCell>
-                  <TableCell className="font-medium">
-                    {activity.carrierName}
+                  <TableCell>
+                    <button
+                      type="button"
+                      className="cursor-pointer text-left font-medium underline-offset-4 hover:text-blue-600 hover:underline focus-visible:text-blue-600 focus-visible:underline focus-visible:outline-none"
+                      onClick={() => onAction(activity, "view")}
+                    >
+                      {activity.carrierName}
+                    </button>
                   </TableCell>
                   <TableCell>
                     {formatDate(activity.submittedAt, "MMM d, h:mm a", "-")}

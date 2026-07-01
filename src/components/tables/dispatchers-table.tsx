@@ -69,8 +69,14 @@ export function DispatchersTable({
             ) : (
               dispatchers.map((dispatcher) => (
                 <TableRow key={dispatcher.id}>
-                  <TableCell className="font-medium">
-                    {dispatcher.fullName}
+                  <TableCell>
+                    <button
+                      type="button"
+                      className="cursor-pointer text-left font-medium underline-offset-4 hover:text-blue-600 hover:underline focus-visible:text-blue-600 focus-visible:underline focus-visible:outline-none"
+                      onClick={() => onAction(dispatcher, "view")}
+                    >
+                      {dispatcher.fullName}
+                    </button>
                   </TableCell>
                   <TableCell>{dispatcher.email}</TableCell>
                   <TableCell>{dispatcher.phoneNumber}</TableCell>

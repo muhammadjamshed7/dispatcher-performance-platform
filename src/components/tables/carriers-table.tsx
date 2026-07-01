@@ -77,8 +77,14 @@ export function CarriersTable({
             ) : (
               carriers.map((carrier) => (
                 <TableRow key={carrier.id}>
-                  <TableCell className="font-medium">
-                    {carrier.carrierName}
+                  <TableCell>
+                    <button
+                      type="button"
+                      className="cursor-pointer text-left font-medium underline-offset-4 hover:text-blue-600 hover:underline focus-visible:text-blue-600 focus-visible:underline focus-visible:outline-none"
+                      onClick={() => onAction(carrier, "view")}
+                    >
+                      {carrier.carrierName}
+                    </button>
                   </TableCell>
                   <TableCell>{carrier.driverName}</TableCell>
                   <TableCell>{carrier.mcNumber}</TableCell>
