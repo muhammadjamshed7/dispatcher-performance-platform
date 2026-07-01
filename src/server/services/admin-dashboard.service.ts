@@ -13,7 +13,10 @@ import { TRUCK_TYPES } from "@/lib/constants/truck-types";
 import { T, db } from "@/lib/db/client";
 import { applyScopeWhere, asFilterable } from "@/lib/db/query";
 import { assertDb, countRows, toAmount, unwrapRelation } from "@/lib/db/utils";
-import type { AdminDashboardBundle } from "@/lib/types";
+import type {
+  AdminDashboardBundle,
+  AdminDashboardDispatcherOutcomeRatio,
+} from "@/lib/types";
 import type { AccessScope } from "@/server/auth/types";
 import {
   applyActivityFilters,
@@ -39,7 +42,7 @@ type ActivityRecord = {
   id: string;
   activityDate: string;
   createdAt: string;
-  status: LoadActivityStatus;
+  status: LoadActivityStatus | "IN_TRANSIT";
   loadAmount: string | null;
   dispatcherId: string;
   teamNameSnapshot: string;
@@ -51,6 +54,8 @@ type ActivityRecord = {
 };
 
 type DispatcherRevenueLookup = Map<string, { name: string; team: string }>;
+
+type AdminDashboardFilterOptions = AdminDashboardBundle["filterOptions"];
 
 const STATUS_CHART_META: Record<
   LoadActivityStatus,
@@ -78,7 +83,11 @@ function formatTruckTypeLabel(value: string): string {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function mapStatusToDisplay(status: LoadActivityStatus): string {
+function mapStatusToDisplay(status: ActivityRecord["status"]): string {
+  if (status === "IN_TRANSIT") {
+    return "In Transit";
+  }
+
   return STATUS_CHART_META[status].label;
 }
 
@@ -279,7 +288,10 @@ function summarizeActivities(
     loadsByDispatcher.set(row.dispatcherId, dispatcherLoads);
 
     loadsByTeamMap.set(team, (loadsByTeamMap.get(team) ?? 0) + 1);
-    statusCounts.set(row.status, (statusCounts.get(row.status) ?? 0) + 1);
+    if (STATUSES.includes(row.status as LoadActivityStatus)) {
+      const status = row.status as LoadActivityStatus;
+      statusCounts.set(status, (statusCounts.get(status) ?? 0) + 1);
+    }
 
     if (row.status !== DELIVERED) {
       continue;
@@ -412,6 +424,130 @@ function summarizeActivities(
     },
     statusTrend: buildStatusTrend(activities, trendDateKeys),
   };
+}
+
+function roundRatio(numerator: number, denominator: number): number {
+  if (denominator <= 0) {
+    return 0;
+  }
+
+  return Math.round((numerator / denominator) * 1000) / 10;
+}
+
+function buildDispatcherOutcomeRatios(
+  activities: ActivityRecord[],
+  filterOptions: AdminDashboardFilterOptions,
+  filters: ReturnType<typeof normalizeActivityFilters>,
+): AdminDashboardDispatcherOutcomeRatio[] {
+  const teamNameById = new Map(
+    filterOptions.teams.map((team) => [team.id, team.name]),
+  );
+  const selectedTeamIds = new Set(filters.teamIds);
+  const selectedDispatcherIds = new Set(filters.dispatcherIds);
+  const selectedCarrierIds = new Set(filters.carrierIds);
+
+  const scopedDispatchers = filterOptions.dispatchers.filter((dispatcher) => {
+    if (selectedTeamIds.size > 0 && !selectedTeamIds.has(dispatcher.teamId)) {
+      return false;
+    }
+
+    if (
+      selectedDispatcherIds.size > 0 &&
+      !selectedDispatcherIds.has(dispatcher.id)
+    ) {
+      return false;
+    }
+
+    return true;
+  });
+
+  const rowsByDispatcher = new Map<
+    string,
+    AdminDashboardDispatcherOutcomeRatio
+  >(
+    scopedDispatchers.map((dispatcher) => [
+      dispatcher.id,
+      {
+        dispatcherId: dispatcher.id,
+        dispatcher: dispatcher.name || "Unknown Dispatcher",
+        team: teamNameById.get(dispatcher.teamId) ?? "Unassigned",
+        assignedCarriers: 0,
+        delivered: 0,
+        cancelled: 0,
+        notBooked: 0,
+        notWorking: 0,
+        inTransit: 0,
+        loadRatio: 0,
+        cancellationRatio: 0,
+      },
+    ]),
+  );
+
+  for (const carrier of filterOptions.carriers) {
+    if (!carrier.dispatcherId) {
+      continue;
+    }
+
+    if (selectedTeamIds.size > 0 && !selectedTeamIds.has(carrier.teamId)) {
+      continue;
+    }
+
+    if (
+      selectedDispatcherIds.size > 0 &&
+      !selectedDispatcherIds.has(carrier.dispatcherId)
+    ) {
+      continue;
+    }
+
+    if (selectedCarrierIds.size > 0 && !selectedCarrierIds.has(carrier.id)) {
+      continue;
+    }
+
+    const row = rowsByDispatcher.get(carrier.dispatcherId);
+    if (row) {
+      row.assignedCarriers += 1;
+    }
+  }
+
+  for (const activity of activities) {
+    const row = rowsByDispatcher.get(activity.dispatcherId);
+    if (!row) {
+      continue;
+    }
+
+    switch (activity.status) {
+      case DELIVERED:
+        row.delivered += 1;
+        break;
+      case CANCELLED:
+        row.cancelled += 1;
+        break;
+      case NOT_BOOKED:
+        row.notBooked += 1;
+        break;
+      case NOT_WORKING:
+        row.notWorking += 1;
+        break;
+      case "IN_TRANSIT":
+        row.inTransit += 1;
+        break;
+      default:
+        break;
+    }
+  }
+
+  return [...rowsByDispatcher.values()]
+    .map((row) => {
+      const finalOutcomeCount =
+        row.delivered + row.cancelled + row.notBooked + row.notWorking;
+
+      return {
+        ...row,
+        loadRatio: roundRatio(row.delivered, finalOutcomeCount),
+        cancellationRatio: roundRatio(row.cancelled, finalOutcomeCount),
+      };
+    })
+    .sort((a, b) => a.dispatcher.localeCompare(b.dispatcher));
 }
 
 async function fetchActivities(
@@ -728,6 +864,11 @@ export async function getAdminDashboardBundle(
     revenueComparison: current.revenueComparison,
     dispatcherRevenue: current.dispatcherRevenue,
     dispatcherLoads: current.dispatcherLoads,
+    dispatcherOutcomeRatios: buildDispatcherOutcomeRatios(
+      currentActivities,
+      filterOptions,
+      normalizedFilters,
+    ),
     loadsByTeam: current.loadsByTeam,
     statusBreakdown: current.statusBreakdown,
     topPerformers: current.topPerformers,

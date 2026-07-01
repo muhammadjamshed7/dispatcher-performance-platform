@@ -1,8 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Bell, DollarSign, Package, PackageCheck, Users } from "lucide-react";
+import {
+  Ban,
+  Bell,
+  DollarSign,
+  Gauge,
+  Package,
+  PackageCheck,
+  Users,
+} from "lucide-react";
 
+import { DispatcherOutcomeRatioChart } from "@/components/dashboard/admin/dispatcher-outcome-ratio-chart";
 import { KpiDispatchersPanel } from "@/components/dashboard/admin/kpi-dispatchers-panel";
 import { KpiLoadsBarChart } from "@/components/dashboard/admin/kpi-loads-bar-chart";
 import { KpiRevenueChart } from "@/components/dashboard/admin/kpi-revenue-chart";
@@ -22,6 +31,7 @@ type AdminKpiSectionProps = {
   appliedFilters: AdminDashboardBundle["filters"];
   dispatcherRevenue: AdminDashboardBundle["dispatcherRevenue"];
   dispatcherLoads: AdminDashboardBundle["dispatcherLoads"];
+  dispatcherOutcomeRatios: AdminDashboardBundle["dispatcherOutcomeRatios"];
   topPerformers: AdminDashboardBundle["topPerformers"];
 };
 
@@ -31,9 +41,14 @@ export function AdminKpiSection({
   appliedFilters,
   dispatcherRevenue,
   dispatcherLoads,
+  dispatcherOutcomeRatios,
   topPerformers,
 }: AdminKpiSectionProps) {
   const growth = metrics.growth;
+  const ratioSummary = useMemo(
+    () => summarizeOutcomeRatios(dispatcherOutcomeRatios),
+    [dispatcherOutcomeRatios],
+  );
 
   const scopedDispatchers = useMemo(() => {
     let dispatchers = filterOptions.dispatchers;
@@ -150,6 +165,40 @@ export function AdminKpiSection({
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <KpiStatCardShell
+          label="Load Ratio"
+          value={formatRatioValue(ratioSummary.loadRatio)}
+          helper="Delivered / final approved outcomes"
+          accent="#16A34A"
+          iconBackground="#DCFCE7"
+          icon={Gauge}
+          className="min-h-[500px]"
+        >
+          <DispatcherOutcomeRatioChart
+            data={dispatcherOutcomeRatios}
+            mode="load"
+            emptyMessage="No dispatchers available for load ratio"
+          />
+        </KpiStatCardShell>
+
+        <KpiStatCardShell
+          label="Cancellation Ratio"
+          value={formatRatioValue(ratioSummary.cancellationRatio)}
+          helper="Cancelled / final approved outcomes"
+          accent="#EF4444"
+          iconBackground="#FEE2E2"
+          icon={Ban}
+          className="min-h-[500px]"
+        >
+          <DispatcherOutcomeRatioChart
+            data={dispatcherOutcomeRatios}
+            mode="cancellation"
+            emptyMessage="No dispatchers available for cancellation ratio"
+          />
+        </KpiStatCardShell>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <KpiStatCardShell
           label="Load Status Trend"
           value={metrics.deliveredLoads.toLocaleString()}
           helper={`Delivered loads - ${trendWindowLabel.toLowerCase()}`}
@@ -185,6 +234,38 @@ export function AdminKpiSection({
       </div>
     </section>
   );
+}
+
+function summarizeOutcomeRatios(
+  rows: AdminDashboardBundle["dispatcherOutcomeRatios"],
+) {
+  const totals = rows.reduce(
+    (acc, row) => {
+      acc.delivered += row.delivered;
+      acc.cancelled += row.cancelled;
+      acc.finalOutcomes +=
+        row.delivered + row.cancelled + row.notBooked + row.notWorking;
+      return acc;
+    },
+    { delivered: 0, cancelled: 0, finalOutcomes: 0 },
+  );
+
+  return {
+    loadRatio: computeRatio(totals.delivered, totals.finalOutcomes),
+    cancellationRatio: computeRatio(totals.cancelled, totals.finalOutcomes),
+  };
+}
+
+function computeRatio(numerator: number, denominator: number) {
+  if (denominator <= 0) {
+    return 0;
+  }
+
+  return Math.round((numerator / denominator) * 1000) / 10;
+}
+
+function formatRatioValue(value: number) {
+  return `${Number.isInteger(value) ? value : value.toFixed(1)}%`;
 }
 
 function sortNotifications(notifications: AppNotification[]) {
@@ -250,7 +331,9 @@ function DashboardNotificationsCard({ className }: { className?: string }) {
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-medium text-[#64748B]">Notifications</p>
+              <p className="text-sm font-medium text-[#64748B]">
+                Notifications
+              </p>
               {unreadCount > 0 ? (
                 <Badge className="rounded-full bg-[#EF4444] px-2 py-0 text-xs text-white">
                   {unreadCount} unread

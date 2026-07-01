@@ -98,6 +98,8 @@ export function ActivityModal({
         await onEdit?.(values);
         onOpenChange(false);
       }
+    } catch {
+      // Parent submit handlers surface API errors; keep the modal open.
     } finally {
       setIsSubmitting(false);
     }

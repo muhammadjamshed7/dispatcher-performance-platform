@@ -266,6 +266,20 @@ export type AdminDashboardStatusTrendPoint = {
   bookedButCancelled: number;
 };
 
+export type AdminDashboardDispatcherOutcomeRatio = {
+  dispatcherId: string;
+  dispatcher: string;
+  team: string;
+  assignedCarriers: number;
+  delivered: number;
+  cancelled: number;
+  notBooked: number;
+  notWorking: number;
+  inTransit: number;
+  loadRatio: number;
+  cancellationRatio: number;
+};
+
 export type AdminDashboardMetrics = {
   totalRevenue: number;
   totalLoads: number;
@@ -315,6 +329,7 @@ export type AdminDashboardBundle = {
     loads: number;
     revenue: number;
   }[];
+  dispatcherOutcomeRatios: AdminDashboardDispatcherOutcomeRatio[];
   loadsByTeam: { team: string; loads: number }[];
   statusBreakdown: {
     name: string;
