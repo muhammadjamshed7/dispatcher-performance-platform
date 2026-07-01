@@ -326,7 +326,7 @@ function CarriersPageState({
   return (
     <>
       <PageShell
-        title="Carriers"
+        title="Sales"
         description={
           compact
             ? undefined

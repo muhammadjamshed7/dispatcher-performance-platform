@@ -33,6 +33,7 @@ import {
   assertAllowedTruckType,
   getDispatchFeeRules,
 } from "@/server/services/settings.service";
+import { recalculateCarrierStatus } from "@/server/services/carrier-status.service";
 import { assertFilterAccess } from "@/server/utils/activity-filters";
 import { carrierScopeFilter } from "@/server/utils/scope-filters";
 import { buildIlikeOr } from "@/server/utils/text-search";
@@ -61,7 +62,7 @@ const createCarrierInputSchema = z.object({
   truckType: z.enum(TRUCK_TYPES),
   teamId: z.string().trim().min(1, "Assigned team is required"),
   dispatcherId: z.string().trim().min(1, "Assigned dispatcher is required"),
-  status: z.enum(TEAM_STATUSES).default("ACTIVE"),
+  status: z.enum(TEAM_STATUSES).default("INACTIVE"),
   notes: z.string().trim().optional(),
 });
 
@@ -399,9 +400,7 @@ export async function createCarrier(
         teamId: parsed.teamId,
         dispatcherId: parsed.dispatcherId,
         dispatchFeePercentage: String(dispatchFeePercentage),
-        status: (parsed.status === "ACTIVE"
-          ? "ACTIVE"
-          : "INACTIVE") as CarrierStatus,
+        status: "INACTIVE" as CarrierStatus,
         notes: parsed.notes ?? null,
         createdAt: timestamp,
         updatedAt: timestamp,
@@ -459,9 +458,11 @@ export async function createCarrier(
       teamName,
       dispatcherId: parsed.dispatcherId,
       dispatcherName,
-      status: parsed.status,
+      status: "INACTIVE",
     },
   });
+
+  await recalculateCarrierStatus(scope.organizationId, carrierId!, actor.id);
 
   return mapCarrier(await getCarrierRecord(scope, carrierId!));
 }

@@ -105,7 +105,7 @@ export function GlobalSearch() {
             <div className="max-h-72 space-y-3 overflow-y-auto">
               {visibleResults.carriers.length > 0 ? (
                 <SearchGroup
-                  title="Carriers"
+                  title="Sales"
                   items={visibleResults.carriers}
                   onSelect={closeSearch}
                 />

@@ -40,6 +40,10 @@ import {
   getDirectAdminApprovalMode,
   getDispatchFeeRules,
 } from "@/server/services/settings.service";
+import {
+  recalculateCarrierStatus,
+  recalculateCarrierStatusFromActivity,
+} from "@/server/services/carrier-status.service";
 import { parseActivityDate } from "@/server/utils/activity-filters";
 import { resolveEditRequestApprovalStatus } from "@/server/utils/approval-workflow";
 import { activityScopeFilter } from "@/server/utils/scope-filters";
@@ -615,6 +619,12 @@ export async function approveEditRequest(
     approverName: actor.fullName,
   });
 
+  await recalculateCarrierStatus(
+    scope.organizationId,
+    originalActivity.carrierId as string,
+    actor.id,
+  );
+
   return mapEditRequestRow(row);
 }
 
@@ -709,6 +719,12 @@ export async function rejectEditRequest(
     requestChanges: parsed.requestChanges,
     reason: rejectionReason,
   });
+
+  await recalculateCarrierStatusFromActivity(
+    scope.organizationId,
+    existing.originalActivityId as string,
+    actor.id,
+  );
 
   return mapEditRequestRow(row);
 }

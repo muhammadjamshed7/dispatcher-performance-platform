@@ -31,7 +31,7 @@ const createCarrierBodySchema = z.object({
   truckType: z.enum(TRUCK_TYPES),
   teamId: z.string().min(1),
   dispatcherId: z.string().min(1),
-  status: z.enum(TEAM_STATUSES).default("ACTIVE"),
+  status: z.enum(TEAM_STATUSES).default("INACTIVE"),
   notes: z.string().optional(),
 });
 

@@ -55,6 +55,7 @@ import {
   getDispatchFeeRules,
   getDirectAdminApprovalMode,
 } from "@/server/services/settings.service";
+import { recalculateCarrierStatus } from "@/server/services/carrier-status.service";
 import {
   activityFiltersSchema,
   applyActivityFilters,
@@ -326,8 +327,8 @@ async function assertCarrierAccess(
     deletedAt: string | null;
   },
 ): Promise<void> {
-  if (carrier.deletedAt || carrier.status !== "ACTIVE") {
-    throw new ValidationError("Carrier is not active.");
+  if (carrier.deletedAt) {
+    throw new ValidationError("Carrier is not available.");
   }
 
   if (scope.isCompanyWide) {
@@ -597,6 +598,8 @@ export async function createActivity(
     });
   }
 
+  await recalculateCarrierStatus(scope.organizationId, carrierRow.id, actor.id);
+
   return mapDailyActivity(activity);
 }
 
@@ -849,6 +852,12 @@ export async function updateActivity(
     });
   }
 
+  await recalculateCarrierStatus(
+    scope.organizationId,
+    existing.carrierId as string,
+    actor.id,
+  );
+
   return mapDailyActivity(activity);
 }
 
@@ -981,6 +990,12 @@ export async function approveActivity(
       approverName: actor.fullName,
     });
 
+    await recalculateCarrierStatus(
+      scope.organizationId,
+      existing.carrierId as string,
+      actor.id,
+    );
+
     return mapDailyActivity(activity);
   }
 
@@ -1054,6 +1069,12 @@ export async function approveActivity(
     approverRole: ADMIN,
     approverName: actor.fullName,
   });
+
+  await recalculateCarrierStatus(
+    scope.organizationId,
+    existing.carrierId as string,
+    actor.id,
+  );
 
   return mapDailyActivity(activity);
 }
@@ -1150,6 +1171,12 @@ export async function rejectActivity(
     requestChanges: parsed.requestChanges,
     reason: rejectionReason,
   });
+
+  await recalculateCarrierStatus(
+    scope.organizationId,
+    existing.carrierId as string,
+    actor.id,
+  );
 
   return mapDailyActivity(activity);
 }

@@ -46,7 +46,7 @@ export const ADMIN_NAV_ITEMS: RoleNavItem[] = [
   { label: "Dashboard", href: "/admin/dashboard", iconKey: "dashboard" },
   { label: "Teams", href: "/admin/teams", iconKey: "teams" },
   { label: "Dispatchers", href: "/admin/dispatchers", iconKey: "dispatchers" },
-  { label: "Carriers", href: "/admin/carriers", iconKey: "carriers" },
+  { label: "Sales", href: "/admin/carriers", iconKey: "carriers" },
   { label: "Activities", href: "/admin/activities", iconKey: "activities" },
   {
     label: "Pending Approvals",
@@ -75,7 +75,7 @@ export const TEAM_LEAD_NAV_ITEMS: RoleNavItem[] = [
     href: "/team-lead/dispatchers",
     iconKey: "dispatchers",
   },
-  { label: "Carriers", href: "/team-lead/carriers", iconKey: "carriers" },
+  { label: "Sales", href: "/team-lead/carriers", iconKey: "carriers" },
   { label: "Activities", href: "/team-lead/activities", iconKey: "activities" },
   {
     label: "Pending Approvals",
@@ -91,7 +91,7 @@ export const TEAM_LEAD_NAV_ITEMS: RoleNavItem[] = [
 
 export const DISPATCHER_NAV_ITEMS: RoleNavItem[] = [
   { label: "Dashboard", href: "/dispatcher/dashboard", iconKey: "dashboard" },
-  { label: "My Carriers", href: "/dispatcher/carriers", iconKey: "carriers" },
+  { label: "Sales", href: "/dispatcher/carriers", iconKey: "carriers" },
   {
     label: "Daily Activities",
     href: "/dispatcher/activities",

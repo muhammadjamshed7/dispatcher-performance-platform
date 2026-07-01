@@ -46,7 +46,7 @@ export function CarriersTable({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Carriers</CardTitle>
+        <CardTitle>Sales</CardTitle>
       </CardHeader>
       <CardContent className="overflow-x-auto">
         <Table>
