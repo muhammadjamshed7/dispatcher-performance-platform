@@ -912,7 +912,7 @@ function SalesFilterPanel({
 
 function SalesKpiGrid({ analytics }: { analytics: SalesAnalytics }) {
   return (
-    <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <section className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,240px),1fr))] gap-4">
       <SalesKpiCard
         title="Total Revenue"
         value={formatCurrencyCompact(analytics.totalRevenue, "$0")}
@@ -997,7 +997,7 @@ function SalesChartGrid({
 }) {
   return (
     <section className="space-y-4">
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.9fr)_minmax(320px,0.9fr)]">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,360px),1fr))] gap-4 2xl:grid-cols-[minmax(0,1.4fr)_minmax(340px,0.9fr)_minmax(340px,0.9fr)]">
         <ChartCard title="Top Carriers by Revenue" periodLabel={periodLabel}>
           <TopCarriersBarChart rows={analytics.topCarriers} />
         </ChartCard>
@@ -1217,7 +1217,7 @@ function LoadStatusDonut({
   }
 
   return (
-    <div className="grid min-h-[300px] grid-cols-1 items-center gap-4 lg:grid-cols-[minmax(0,1fr)_150px]">
+    <div className="grid min-h-[300px] grid-cols-1 items-center gap-4 2xl:grid-cols-[minmax(0,1fr)_150px]">
       <div className="relative h-[250px]">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
@@ -1285,7 +1285,7 @@ function DispatcherRevenuePie({ rows }: { rows: DispatcherRevenueRow[] }) {
   }
 
   return (
-    <div className="grid min-h-[300px] grid-cols-1 items-center gap-4 lg:grid-cols-[minmax(0,1fr)_150px]">
+    <div className="grid min-h-[300px] grid-cols-1 items-center gap-4 2xl:grid-cols-[minmax(0,1fr)_150px]">
       <div className="h-[250px]">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
