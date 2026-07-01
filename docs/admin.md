@@ -167,7 +167,7 @@ Daily activities record what happened with each carrier on a given day.
 
 ### Rules
 
-- **One activity per carrier per calendar day** (unique constraint)
+- A carrier can have **multiple daily activities on the same calendar date**. Each entry is saved as a separate activity row and counted separately in approvals, dashboards, reports, finance, invoices, and audit logs.
 - **Delivered** loads auto-calculate:
   - Rate per mile = load amount ÷ total miles
   - Dispatch fee from org settings and carrier fee %

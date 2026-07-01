@@ -507,23 +507,6 @@ export async function createActivity(
     await assertAllowedStatusReason(scope.organizationId, parsed.reason);
   }
 
-  const duplicateResult = await db()
-    .from(T.DailyActivity)
-    .select("id")
-    .eq("carrierId", parsed.carrierId)
-    .eq("activityDate", activityDateKey)
-    .maybeSingle();
-
-  if (duplicateResult.error) {
-    throw new Error(duplicateResult.error.message);
-  }
-
-  if (duplicateResult.data) {
-    throw new ValidationError(
-      "An activity for this carrier on this date already exists.",
-    );
-  }
-
   const feeRules = await getDispatchFeeRules(scope.organizationId);
   const dispatchFeePercentage =
     decimalToNumber(carrierRow.dispatchFeePercentage) ??
@@ -681,26 +664,6 @@ export async function updateActivity(
     ? parseActivityDate(parsed.activityDate)
     : parseActivityDate(existing.activityDate);
   const activityDateKey = toDateOnly(activityDate);
-
-  if (parsed.activityDate) {
-    const duplicateResult = await db()
-      .from(T.DailyActivity)
-      .select("id")
-      .eq("carrierId", existing.carrierId)
-      .eq("activityDate", activityDateKey)
-      .neq("id", id)
-      .maybeSingle();
-
-    if (duplicateResult.error) {
-      throw new Error(duplicateResult.error.message);
-    }
-
-    if (duplicateResult.data) {
-      throw new ValidationError(
-        "An activity for this carrier on this date already exists.",
-      );
-    }
-  }
 
   const dispatchFeePercentage =
     decimalToNumber(existing.dispatchFeePercentageSnapshot) ?? 0;

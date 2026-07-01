@@ -87,10 +87,6 @@ export function assertDbVoid(result: { error: PostgrestError | null }): void {
 }
 
 const UNIQUE_MESSAGES: Record<string, string> = {
-  carrierId_activityDate:
-    "An activity already exists for this carrier on that date.",
-  DailyActivity_carrierId_activityDate_key:
-    "An activity already exists for this carrier on that date.",
   organizationId_mcNumber: "A carrier with this MC number already exists.",
   Carrier_organizationId_mcNumber_key:
     "A carrier with this MC number already exists.",

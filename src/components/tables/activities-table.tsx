@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/table";
 import { DELIVERED } from "@/lib/constants/statuses";
 import type { DailyActivity } from "@/lib/types";
-import { formatActivityDate } from "@/lib/utils/format-date";
+import { formatActivityDate, formatDate } from "@/lib/utils/format-date";
 import { formatCurrency } from "@/lib/utils/format-currency";
 import {
   formatNullableNumber,
@@ -56,12 +56,15 @@ export function ActivitiesTable({
             <TableRow>
               <TableHead>Date</TableHead>
               <TableHead>Carrier</TableHead>
+              <TableHead>Submitted</TableHead>
               <TableHead>Dispatcher</TableHead>
               <TableHead>Team</TableHead>
               <TableHead>Truck Type</TableHead>
               <TableHead>Status</TableHead>
               {showApprovalStatus ? <TableHead>Approval</TableHead> : null}
-              {showApprovalStatus ? <TableHead>Rejection Reason</TableHead> : null}
+              {showApprovalStatus ? (
+                <TableHead>Rejection Reason</TableHead>
+              ) : null}
               <TableHead>Origin</TableHead>
               <TableHead>Destination</TableHead>
               <TableHead>Miles</TableHead>
@@ -77,7 +80,7 @@ export function ActivitiesTable({
             {activities.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={showApprovalStatus ? 17 : 15}
+                  colSpan={showApprovalStatus ? 18 : 16}
                   className="text-muted-foreground py-8 text-center"
                 >
                   No activities found.
@@ -89,6 +92,9 @@ export function ActivitiesTable({
                   <TableCell>{formatActivityDate(activity.date)}</TableCell>
                   <TableCell className="font-medium">
                     {activity.carrierName}
+                  </TableCell>
+                  <TableCell>
+                    {formatDate(activity.submittedAt, "MMM d, h:mm a", "-")}
                   </TableCell>
                   <TableCell>{activity.dispatcherName}</TableCell>
                   <TableCell>{activity.teamName}</TableCell>

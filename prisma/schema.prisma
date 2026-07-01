@@ -388,7 +388,7 @@ model DailyActivity {
   editRequests ActivityEditRequest[] @relation("OriginalActivity")
   invoiceItems InvoiceItem[]
 
-  @@unique([carrierId, activityDate])
+  @@index([carrierId, activityDate])
   @@index([organizationId, activityDate])
   @@index([dispatcherId, activityDate])
   @@index([teamId, activityDate])
@@ -537,30 +537,30 @@ model Notification {
 }
 
 model Invoice {
-  id             String          @id @default(cuid())
+  id             String        @id @default(cuid())
   organizationId String
   invoiceNumber  String
   invoiceType    InvoiceType
-  invoiceStatus  InvoiceStatus   @default(ISSUED)
-  paymentStatus  PaymentStatus   @default(UNPAID)
+  invoiceStatus  InvoiceStatus @default(ISSUED)
+  paymentStatus  PaymentStatus @default(UNPAID)
   dispatcherId   String?
   carrierId      String?
   teamId         String?
-  periodStart    DateTime        @db.Date
-  periodEnd      DateTime        @db.Date
-  issueDate      DateTime        @db.Date
-  dueDate        DateTime        @db.Date
-  subtotalAmount Decimal         @default(0) @db.Decimal(12, 2)
-  totalAmount    Decimal         @default(0) @db.Decimal(12, 2)
-  paidAmount     Decimal         @default(0) @db.Decimal(12, 2)
-  pendingAmount  Decimal         @default(0) @db.Decimal(12, 2)
+  periodStart    DateTime      @db.Date
+  periodEnd      DateTime      @db.Date
+  issueDate      DateTime      @db.Date
+  dueDate        DateTime      @db.Date
+  subtotalAmount Decimal       @default(0) @db.Decimal(12, 2)
+  totalAmount    Decimal       @default(0) @db.Decimal(12, 2)
+  paidAmount     Decimal       @default(0) @db.Decimal(12, 2)
+  pendingAmount  Decimal       @default(0) @db.Decimal(12, 2)
   notes          String?
   createdById    String
   updatedById    String?
   paidAt         DateTime?
   cancelledAt    DateTime?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
   deletedAt      DateTime?
 
   organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -602,11 +602,11 @@ model InvoiceItem {
   amount          Decimal            @default(0) @db.Decimal(12, 2)
   createdAt       DateTime           @default(now())
 
-  invoice      Invoice        @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoice       Invoice        @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   dailyActivity DailyActivity? @relation(fields: [dailyActivityId], references: [id], onDelete: SetNull)
-  carrier      Carrier        @relation(fields: [carrierId], references: [id], onDelete: Restrict)
-  dispatcher   Dispatcher     @relation(fields: [dispatcherId], references: [id], onDelete: Restrict)
-  team         Team           @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  carrier       Carrier        @relation(fields: [carrierId], references: [id], onDelete: Restrict)
+  dispatcher    Dispatcher     @relation(fields: [dispatcherId], references: [id], onDelete: Restrict)
+  team          Team           @relation(fields: [teamId], references: [id], onDelete: Restrict)
 
   @@index([invoiceId])
   @@index([dailyActivityId])

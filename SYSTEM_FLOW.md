@@ -30,7 +30,7 @@
 18. [Important Business Rules](#18-important-business-rules)
 19. [Known Issues or Missing Items](#19-known-issues-or-missing-items)
 20. [Final Developer Notes](#20-final-developer-notes)
-21. [Invoice Module Overview](#invoice-module-overview) *(extended module — same document)*
+21. [Invoice Module Overview](#invoice-module-overview) _(extended module — same document)_
 
 ---
 
@@ -57,13 +57,13 @@ Dispatch organizations need one system to:
 
 There are **three login roles** (`UserRole` enum in `prisma/schema.prisma`): `ADMIN`, `TEAM_LEAD`, `DISPATCHER`.
 
-| Persona | In code | How they use the platform |
-|---------|---------|---------------------------|
-| **Admin** | `UserRole.ADMIN` | Company-wide access: teams, dispatchers, carriers, activities, pending approvals, audit logs, notifications, rankings, reports, daily report, settings, user registration approvals, managed-user creation, and per-dispatcher finance. |
-| **Team Lead** | `UserRole.TEAM_LEAD` | Team-scoped access: monitor and manage dispatchers and carriers on their team; review **Pending Approvals** and **Notifications** for their team; view team-scoped rankings and reports; approve team submissions. |
-| **Dispatcher** | `UserRole.DISPATCHER` | Personal scope: view assigned carriers (read-only), log daily activities (which enter approval), track their own submissions, receive notifications, view personal performance and finance. |
-| **Carrier** | *Not a login role* | A **business entity** (trucking company / driver). Carriers never sign in; admins/team leads manage them and they appear in dispatcher activity forms. |
-| **Finance / Account user** | *Not a separate role* | Finance is a **feature area**, not a role. Dispatchers use `/dispatcher/finance`; admins use `/admin/dispatchers/[dispatcherId]/finance`. Every role has an **Account** page. |
+| Persona                    | In code               | How they use the platform                                                                                                                                                                                                               |
+| -------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Admin**                  | `UserRole.ADMIN`      | Company-wide access: teams, dispatchers, carriers, activities, pending approvals, audit logs, notifications, rankings, reports, daily report, settings, user registration approvals, managed-user creation, and per-dispatcher finance. |
+| **Team Lead**              | `UserRole.TEAM_LEAD`  | Team-scoped access: monitor and manage dispatchers and carriers on their team; review **Pending Approvals** and **Notifications** for their team; view team-scoped rankings and reports; approve team submissions.                      |
+| **Dispatcher**             | `UserRole.DISPATCHER` | Personal scope: view assigned carriers (read-only), log daily activities (which enter approval), track their own submissions, receive notifications, view personal performance and finance.                                             |
+| **Carrier**                | _Not a login role_    | A **business entity** (trucking company / driver). Carriers never sign in; admins/team leads manage them and they appear in dispatcher activity forms.                                                                                  |
+| **Finance / Account user** | _Not a separate role_ | Finance is a **feature area**, not a role. Dispatchers use `/dispatcher/finance`; admins use `/admin/dispatchers/[dispatcherId]/finance`. Every role has an **Account** page.                                                           |
 
 ---
 
@@ -158,20 +158,20 @@ dispatcher-performance-platform/
 
 ### Important files at a glance
 
-| File | Role |
-|------|------|
-| `src/proxy.ts` → `src/lib/supabase/middleware.ts` | Edge middleware: session refresh + protected-route enforcement. |
-| `src/server/auth/session.ts` | `getCurrentUser()` — request-cached current user via `getClaims()`. |
-| `src/server/auth/require-auth.ts` | Route guards: `requireAccessScope`, `requireActiveUser`, `requireRole`, `requireAdminOrTeamLeadScope`. |
-| `src/server/api/response.ts` | `handleApi()` envelope + error→status mapping + same-origin check. |
-| `src/lib/db/client.ts` | Supabase service-role client (`db()`) + table name map (`T`). |
-| `src/lib/api/resources.ts` | Frontend → API call map (the "where used in frontend" source). |
-| `src/lib/reports/pdf-theme.ts` | Shared PDF theme (palette, badges, header/footer, logo) — used by activity, carrier, audit-adjacent, performance, and invoice PDFs. |
-| `src/lib/invoices/export-invoice-pdf.ts` | Single-invoice branded PDF (shared `pdf-theme`). |
-| `src/lib/invoices/export-invoice-list-pdf.ts` | Invoice list PDF export. |
-| `src/components/providers/entity-options-provider.tsx` | Lazy entity lists (`teams`/`dispatchers`/`carriers`) — fetch-on-first-consume via `ensureLoaded()`. |
-| `src/lib/audit/audit-log-format.ts` | Readable audit data formatting (table/CSV/PDF). |
-| `src/lib/utils/csv.ts` | CSV builder + formula-injection guard. |
+| File                                                   | Role                                                                                                                                |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `src/proxy.ts` → `src/lib/supabase/middleware.ts`      | Edge middleware: session refresh + protected-route enforcement.                                                                     |
+| `src/server/auth/session.ts`                           | `getCurrentUser()` — request-cached current user via `getClaims()`.                                                                 |
+| `src/server/auth/require-auth.ts`                      | Route guards: `requireAccessScope`, `requireActiveUser`, `requireRole`, `requireAdminOrTeamLeadScope`.                              |
+| `src/server/api/response.ts`                           | `handleApi()` envelope + error→status mapping + same-origin check.                                                                  |
+| `src/lib/db/client.ts`                                 | Supabase service-role client (`db()`) + table name map (`T`).                                                                       |
+| `src/lib/api/resources.ts`                             | Frontend → API call map (the "where used in frontend" source).                                                                      |
+| `src/lib/reports/pdf-theme.ts`                         | Shared PDF theme (palette, badges, header/footer, logo) — used by activity, carrier, audit-adjacent, performance, and invoice PDFs. |
+| `src/lib/invoices/export-invoice-pdf.ts`               | Single-invoice branded PDF (shared `pdf-theme`).                                                                                    |
+| `src/lib/invoices/export-invoice-list-pdf.ts`          | Invoice list PDF export.                                                                                                            |
+| `src/components/providers/entity-options-provider.tsx` | Lazy entity lists (`teams`/`dispatchers`/`carriers`) — fetch-on-first-consume via `ensureLoaded()`.                                 |
+| `src/lib/audit/audit-log-format.ts`                    | Readable audit data formatting (table/CSV/PDF).                                                                                     |
+| `src/lib/utils/csv.ts`                                 | CSV builder + formula-injection guard.                                                                                              |
 
 ---
 
@@ -179,24 +179,24 @@ dispatcher-performance-platform/
 
 From `package.json` (verified):
 
-| Layer | Technology |
-|-------|------------|
-| Framework | **Next.js 16** (App Router), **React 19**, **TypeScript 5** |
-| API structure | Next.js route handlers under `src/app/api/**/route.ts`; uniform JSON envelope `{ ok, data }` / `{ ok, error }` |
-| Database | **PostgreSQL** (hosted via Supabase) |
-| ORM / schema | **Prisma 7** (`@prisma/client`, `prisma`, `@prisma/adapter-pg`) — used for schema, migrations, generate, and scripts only |
-| Runtime DB access | **Supabase JS service-role client** (`@supabase/supabase-js`) via `db()` — *not* Prisma at runtime |
-| Auth | **Supabase Auth** (`@supabase/ssr` + `@supabase/supabase-js`); local JWT verification via `getClaims()` + cached JWKS |
-| Realtime | **Supabase Realtime** (`postgres_changes`) |
-| Styling / UI | **Tailwind CSS 4**, **@base-ui/react** (shadcn-style primitives), `class-variance-authority`, `clsx`, `tailwind-merge`, `tw-animate-css`, `lucide-react` icons |
-| Forms / validation | **react-hook-form** + `@hookform/resolvers`, **zod 4** |
-| Charts | **recharts 3** |
-| PDF export | **jspdf 4** + **jspdf-autotable 5** (client-side) |
-| CSV export | Shared hardened builder (`src/lib/utils/csv.ts`) with formula-injection protection |
-| Money precision | **decimal.js** (schema uses Postgres `Decimal`) |
-| Dates | **date-fns 4** |
-| DB driver (scripts/readiness) | **pg 8** |
-| Tooling | ESLint 9, Prettier 3, tsx, `shadcn` CLI |
+| Layer                         | Technology                                                                                                                                                     |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Framework                     | **Next.js 16** (App Router), **React 19**, **TypeScript 5**                                                                                                    |
+| API structure                 | Next.js route handlers under `src/app/api/**/route.ts`; uniform JSON envelope `{ ok, data }` / `{ ok, error }`                                                 |
+| Database                      | **PostgreSQL** (hosted via Supabase)                                                                                                                           |
+| ORM / schema                  | **Prisma 7** (`@prisma/client`, `prisma`, `@prisma/adapter-pg`) — used for schema, migrations, generate, and scripts only                                      |
+| Runtime DB access             | **Supabase JS service-role client** (`@supabase/supabase-js`) via `db()` — _not_ Prisma at runtime                                                             |
+| Auth                          | **Supabase Auth** (`@supabase/ssr` + `@supabase/supabase-js`); local JWT verification via `getClaims()` + cached JWKS                                          |
+| Realtime                      | **Supabase Realtime** (`postgres_changes`)                                                                                                                     |
+| Styling / UI                  | **Tailwind CSS 4**, **@base-ui/react** (shadcn-style primitives), `class-variance-authority`, `clsx`, `tailwind-merge`, `tw-animate-css`, `lucide-react` icons |
+| Forms / validation            | **react-hook-form** + `@hookform/resolvers`, **zod 4**                                                                                                         |
+| Charts                        | **recharts 3**                                                                                                                                                 |
+| PDF export                    | **jspdf 4** + **jspdf-autotable 5** (client-side)                                                                                                              |
+| CSV export                    | Shared hardened builder (`src/lib/utils/csv.ts`) with formula-injection protection                                                                             |
+| Money precision               | **decimal.js** (schema uses Postgres `Decimal`)                                                                                                                |
+| Dates                         | **date-fns 4**                                                                                                                                                 |
+| DB driver (scripts/readiness) | **pg 8**                                                                                                                                                       |
+| Tooling                       | ESLint 9, Prettier 3, tsx, `shadcn` CLI                                                                                                                        |
 
 > `@tanstack/react-table` is a dependency but is **not imported** anywhere in `src/` — tables are not interactively sortable. `Status: Unused dependency`.
 
@@ -232,12 +232,12 @@ On failure the server records `USER_LOGIN_FAILED` (with `actorUserId: null` and 
 
 ### Session / current-user check
 
-| Layer | Mechanism |
-|-------|-----------|
-| Supabase cookies | `sb-*-auth-token` — refreshed in the edge proxy (skipped for `/api/*` and public paths). |
-| Role hint cookie | `dpp_user_role` (httpOnly) — fast route-role checks in middleware. |
-| Client state | `SessionProvider` + `useSession()` (fetches `/api/auth/me` once on mount). |
-| Server | `getCurrentUser()` (`src/server/auth/session.ts`) — wrapped in React `cache()` (deduped per request), resolves the Supabase user id via `getClaims()` (local JWT verify against a **module-cached JWKS**, `src/server/auth/jwks-cache.ts`), then loads the DB user. Legacy symmetric (HS256) projects transparently fall back to network `getUser()`. |
+| Layer            | Mechanism                                                                                                                                                                                                                                                                                                                                             |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Supabase cookies | `sb-*-auth-token` — refreshed in the edge proxy (skipped for `/api/*` and public paths).                                                                                                                                                                                                                                                              |
+| Role hint cookie | `dpp_user_role` (httpOnly) — fast route-role checks in middleware.                                                                                                                                                                                                                                                                                    |
+| Client state     | `SessionProvider` + `useSession()` (fetches `/api/auth/me` once on mount).                                                                                                                                                                                                                                                                            |
+| Server           | `getCurrentUser()` (`src/server/auth/session.ts`) — wrapped in React `cache()` (deduped per request), resolves the Supabase user id via `getClaims()` (local JWT verify against a **module-cached JWKS**, `src/server/auth/jwks-cache.ts`), then loads the DB user. Legacy symmetric (HS256) projects transparently fall back to network `getUser()`. |
 
 ### Password reset / logout
 
@@ -256,19 +256,19 @@ flowchart LR
   D --> E["Service: scope-filters + assert*"]
 ```
 
-| Layer | Behavior |
-|-------|----------|
-| Edge (`middleware.ts`) | Refreshes Supabase session (3s timeout race; skipped for `/`, public auth paths, `/api/public/*`, `/api/health`, and all `/api/*`). Then `enforceProtectedRouteAccess` redirects unauthenticated users to the role login and wrong-role users to their own dashboard. |
-| Client (`RoleGuard`) | Shows session/status screens; redirects wrong-role to own dashboard. |
-| API (`require-auth.ts`) | `requireAccessScope([role])` → 401 (`UnauthorizedError`) or 403 (`ForbiddenError`) JSON. |
-| Service (`scope-filters.ts`) | Supabase queries filtered by org + team/dispatcher; cross-scope access throws `ForbiddenError`. |
+| Layer                        | Behavior                                                                                                                                                                                                                                                              |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Edge (`middleware.ts`)       | Refreshes Supabase session (3s timeout race; skipped for `/`, public auth paths, `/api/public/*`, `/api/health`, and all `/api/*`). Then `enforceProtectedRouteAccess` redirects unauthenticated users to the role login and wrong-role users to their own dashboard. |
+| Client (`RoleGuard`)         | Shows session/status screens; redirects wrong-role to own dashboard.                                                                                                                                                                                                  |
+| API (`require-auth.ts`)      | `requireAccessScope([role])` → 401 (`UnauthorizedError`) or 403 (`ForbiddenError`) JSON.                                                                                                                                                                              |
+| Service (`scope-filters.ts`) | Supabase queries filtered by org + team/dispatcher; cross-scope access throws `ForbiddenError`.                                                                                                                                                                       |
 
-| Condition | Redirect |
-|-----------|----------|
-| Protected role path, no auth cookies | Role login (`ROLE_LOGIN_PATH`) |
-| Wrong role cookie vs path | User's dashboard (`ROLE_DASHBOARD_PATH`) |
-| Client: no session | `router.replace(loginPath)` |
-| API 401 from client | Login with `?expired=1` or `/session-expired` |
+| Condition                            | Redirect                                      |
+| ------------------------------------ | --------------------------------------------- |
+| Protected role path, no auth cookies | Role login (`ROLE_LOGIN_PATH`)                |
+| Wrong role cookie vs path            | User's dashboard (`ROLE_DASHBOARD_PATH`)      |
+| Client: no session                   | `router.replace(loginPath)`                   |
+| API 401 from client                  | Login with `?expired=1` or `/session-expired` |
 
 ---
 
@@ -276,51 +276,51 @@ flowchart LR
 
 ### Statuses & scope
 
-| `UserStatus` | Meaning | UI behavior |
-|--------------|---------|-------------|
-| `ACTIVE` | Approved, can use the app | Full access per role |
+| `UserStatus`       | Meaning                    | UI behavior             |
+| ------------------ | -------------------------- | ----------------------- |
+| `ACTIVE`           | Approved, can use the app  | Full access per role    |
 | `PENDING_APPROVAL` | Registered, awaiting admin | `PendingApprovalScreen` |
-| `INACTIVE` | Deactivated | `AccessDenied` screen |
-| `INVITED` | Invitation not accepted | `AccessDenied` screen |
+| `INACTIVE`         | Deactivated                | `AccessDenied` screen   |
+| `INVITED`          | Invitation not accepted    | `AccessDenied` screen   |
 
 Scope (`AccessScope`) is `{ organizationId, role, userId, teamId, dispatcherId, isCompanyWide }`. `isCompanyWide = role === ADMIN`. Built in `src/server/auth/types.ts`; client mirror in `src/lib/role-scope.ts`. `scope-filters.ts`: admin → no constraint; team lead → own `teamId`; dispatcher → own `dispatcherId`; otherwise a sentinel that matches nothing.
 
 ### Permission matrix (verified against route guards + services)
 
-| Capability | Admin | Team Lead | Dispatcher |
-|------------|:-----:|:---------:|:----------:|
-| Create teams | ✓ | — | — |
-| Edit / activate / deactivate teams | ✓ | — | — |
-| List teams | ✓ | ✓ (scoped) | — |
-| Create dispatcher (DISPATCHER role) | ✓ | ✓ (own team) | — |
-| Create team lead (TEAM_LEAD role) | ✓ | — | — |
-| Edit / activate / deactivate dispatchers | ✓ | ✓ (team) | — |
-| Create / edit / reassign / deactivate carriers | ✓ | ✓ (team) | — |
-| List carriers | ✓ | ✓ (team) | ✓ (assigned, read-only) |
-| Add activity (auto-approved) | ✓ | ✓ (→ admin approval) | — |
-| Add activity (enters approval) | — | — | ✓ (own carriers) |
-| Edit activity directly | ✓ | via edit request → admin | — |
-| Edit activity via edit-request | — | ✓ | ✓ |
-| Approve / reject / request changes | ✓ | ✓ (team, TL-pending only) | — |
-| Pending Approvals page | ✓ | ✓ (team) | — |
-| My Submissions page | — | — | ✓ |
-| View dashboards | ✓ (company) | ✓ (team) | ✓ (self) |
-| View / export reports (CSV) | ✓ | ✓ (team) | — |
-| Daily Report (live snapshot) | ✓ | — | — |
-| View finance | ✓ (any dispatcher) | — | ✓ (self) |
-| Export finance (CSV) | ✓ (per dispatcher) | — | ✓ (self) |
-| Finance PDF | ✓ (`window.print()`) | — | ✓ (`window.print()`) |
-| View audit logs + export | ✓ | — | — |
-| View notifications / mark read | ✓ | ✓ | ✓ |
-| Manage settings | ✓ | — | — |
-| Approve/reject user registration requests | ✓ | — | — |
-| Create managed users / reset their password | ✓ | — | — |
-| Activities PDF export | ✓ | ✓ | ✓ (incl. approval column) |
-| Carrier PDF export (admin carriers menu) | ✓ | — | — |
-| View invoices / export invoice PDF | ✓ (manage all) | ✓ (team-scoped) | ✓ (own payable, view + PDF) |
-| Global search | ✓ | ✓ | ✓ (scoped) |
-| Rankings — dispatcher | ✓ | ✓ (team) | ✓ (self only) |
-| Rankings — carrier / team | ✓ | ✓ (team) | — |
+| Capability                                     |        Admin         |         Team Lead         |         Dispatcher          |
+| ---------------------------------------------- | :------------------: | :-----------------------: | :-------------------------: |
+| Create teams                                   |          ✓           |             —             |              —              |
+| Edit / activate / deactivate teams             |          ✓           |             —             |              —              |
+| List teams                                     |          ✓           |        ✓ (scoped)         |              —              |
+| Create dispatcher (DISPATCHER role)            |          ✓           |       ✓ (own team)        |              —              |
+| Create team lead (TEAM_LEAD role)              |          ✓           |             —             |              —              |
+| Edit / activate / deactivate dispatchers       |          ✓           |         ✓ (team)          |              —              |
+| Create / edit / reassign / deactivate carriers |          ✓           |         ✓ (team)          |              —              |
+| List carriers                                  |          ✓           |         ✓ (team)          |   ✓ (assigned, read-only)   |
+| Add activity (auto-approved)                   |          ✓           |   ✓ (→ admin approval)    |              —              |
+| Add activity (enters approval)                 |          —           |             —             |      ✓ (own carriers)       |
+| Edit activity directly                         |          ✓           | via edit request → admin  |              —              |
+| Edit activity via edit-request                 |          —           |             ✓             |              ✓              |
+| Approve / reject / request changes             |          ✓           | ✓ (team, TL-pending only) |              —              |
+| Pending Approvals page                         |          ✓           |         ✓ (team)          |              —              |
+| My Submissions page                            |          —           |             —             |              ✓              |
+| View dashboards                                |     ✓ (company)      |         ✓ (team)          |          ✓ (self)           |
+| View / export reports (CSV)                    |          ✓           |         ✓ (team)          |              —              |
+| Daily Report (live snapshot)                   |          ✓           |             —             |              —              |
+| View finance                                   |  ✓ (any dispatcher)  |             —             |          ✓ (self)           |
+| Export finance (CSV)                           |  ✓ (per dispatcher)  |             —             |          ✓ (self)           |
+| Finance PDF                                    | ✓ (`window.print()`) |             —             |    ✓ (`window.print()`)     |
+| View audit logs + export                       |          ✓           |             —             |              —              |
+| View notifications / mark read                 |          ✓           |             ✓             |              ✓              |
+| Manage settings                                |          ✓           |             —             |              —              |
+| Approve/reject user registration requests      |          ✓           |             —             |              —              |
+| Create managed users / reset their password    |          ✓           |             —             |              —              |
+| Activities PDF export                          |          ✓           |             ✓             |  ✓ (incl. approval column)  |
+| Carrier PDF export (admin carriers menu)       |          ✓           |             —             |              —              |
+| View invoices / export invoice PDF             |    ✓ (manage all)    |      ✓ (team-scoped)      | ✓ (own payable, view + PDF) |
+| Global search                                  |          ✓           |             ✓             |         ✓ (scoped)          |
+| Rankings — dispatcher                          |          ✓           |         ✓ (team)          |        ✓ (self only)        |
+| Rankings — carrier / team                      |          ✓           |         ✓ (team)          |              —              |
 
 > **Team Lead creation note:** the "Create Dispatcher" form only offers the `DISPATCHER` role. New **Team Leads** are created via the **User Requests** approval flow, the **managed-user** create endpoint (`POST /api/users`), or scripts — never as a `Dispatcher` row.
 
@@ -372,54 +372,54 @@ erDiagram
 
 ### Model reference
 
-| Model | Purpose | Important fields | Key relations | Used by |
-|-------|---------|------------------|---------------|---------|
-| **Organization** | Tenant root | `name`, `slug` (unique), `timezone`, `currency`, `deletedAt` | parent of all entities | All modules |
-| **User** | Login identity | `email`, `fullName`, `role`, `status`, `teamId`, `supabaseUserId` (unique), `lastLoginAt`, `deletedAt` | `team`, `ledTeams`, `dispatcher`, notifications, audit actor, edit-request approver | Auth, users, dispatchers, teams, notifications |
-| **Team** | Dispatch team | `name`, `teamLeadUserId`, `status` | `teamLead`, `members`, `dispatchers`, `carriers` | Teams, scoping |
-| **Dispatcher** | Dispatcher profile | `userId` (unique), `teamId`, `status` | `user`, `team`, `carriers`, `dailyActivities` | Dispatchers, activities, finance |
-| **Carrier** | Trucking company / driver | `carrierName`, `driverName`, `mcNumber`, `truckType`, `teamId`, `dispatcherId`, `dispatchFeePercentage`, `status`, **`notes`** | `team`, `dispatcher`, `dailyActivities`, `assignmentHistory` | Carriers, activities, finance |
-| **CarrierAssignmentHistory** | Reassignment trail | `carrierId`, `teamId`, `dispatcherId`, name snapshots, `assignedAt`, `unassignedAt`, `assignedByUserId` | `carrier`, `team`, `dispatcher`, `assignedBy` | Carrier reassign |
-| **DailyActivity** | Daily load record | `activityDate`, `carrierId`, `dispatcherId`, `teamId`, `status`, snapshots (carrier/driver/dispatcher/team/truckType/fee%), `origin`, `destination`, `totalMiles`, `loadAmount`, `ratePerMile`, `dispatchFee`, `reason`, `notes`, **`approvalStatus`**, **`approvalType`**, `submittedById`, `teamLeadApprovedById`, `adminApprovedById`, `rejectedById`, `rejectionReason`, `approvalNotes`, plus `submittedAt`/`teamLeadApprovedAt`/`adminApprovedAt`/`rejectedAt` | `carrier`, `dispatcher`, `team`, `editRequests` | Activities, approvals, dashboards, reports, finance |
-| **DailySubmission** | Per-dispatcher per-day completion roll-up | `dispatcherId`, `submissionDate`, `carrierCount`, `activityCount` | `dispatcher`, `team` | Daily submissions, dispatcher dashboard |
-| **StatusReason** | Org-specific cancel/not-booked reasons | `label`, `isActive`, `sortOrder` | org | Activities, settings |
-| **OrganizationSettings** | Fee rules + CSV + approval mode | `dispatchFeeMethod` (`percentage`), `defaultDispatchFeePercent`, `minimumDispatchFee`, `roundToNearestDollar`, `allowedTruckTypes`, `timezone`, `csvIncludeHeaders`, `csvDateFormat`, `csvMaxRows` (default 10000), `csvFileNamePrefix`, **`directAdminApprovalMode`** | org | Settings, activities, finance, reports |
-| **RegistrationRequest** | Self-registration queue | `email`, `requestedRole`, `preferredTeamId`/`Name`, `assignedRole`, `assignedTeamId`, `status`, `rejectionReason` | org, `reviewedBy` | Auth, user requests |
-| **ActivityEditRequest** | Pending edit to an APPROVED activity | `originalActivityId`, `teamId`, `dispatcherId`, `approvalStatus`, `proposedChanges` (JSON), `previousData` (JSON), approver/submitter ids + timestamps, `rejectionReason`, `approvalNotes` | `originalActivity`, `team`, `dispatcher`, submitter/editor/approvers | Edit requests, approvals |
-| **Notification** | In-app notification | `recipientUserId`, `title`, `message`, `notificationStatus`, `activityId?`, `editRequestId?`, `metadata` (JSON), `readAt` | org, `recipient` | Notifications |
-| **AuditLog** | Immutable action log | `actorUserId?`, `action` (`AuditAction`), `entityType`, `entityId?`, `metadata` | org, `actor` | Audit logs |
-| **ReportExport** | Report export job record | `requestedById`, `reportType`, `period`, `filters` (JSON), `status`, `fileName`, `rowCount`, `errorMessage`, `completedAt` | org, `requestedBy` | Reports |
-| **Invoice** | Invoice header (dispatcher payable or carrier receivable) | `invoiceNumber`, `invoiceType`, `invoiceStatus`, `paymentStatus`, `dispatcherId?`, `carrierId?`, `teamId`, period dates, `totalAmount`, `paidAmount`, `pendingAmount`, `issueDate`, `dueDate`, soft delete | org, dispatcher, carrier, team, items, payments | Invoices |
-| **InvoiceItem** | Activity line on an invoice | `dailyActivityId`, route/miles/load/fee snapshots, `amount`, `description` | invoice, activity | Invoices |
-| **InvoicePayment** | Payment against an invoice | `amount`, `paymentDate`, `paymentMethod`, `reference`, `notes`, `recordedById` | invoice | Invoices |
+| Model                        | Purpose                                                   | Important fields                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Key relations                                                                       | Used by                                             |
+| ---------------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------- |
+| **Organization**             | Tenant root                                               | `name`, `slug` (unique), `timezone`, `currency`, `deletedAt`                                                                                                                                                                                                                                                                                                                                                                                                         | parent of all entities                                                              | All modules                                         |
+| **User**                     | Login identity                                            | `email`, `fullName`, `role`, `status`, `teamId`, `supabaseUserId` (unique), `lastLoginAt`, `deletedAt`                                                                                                                                                                                                                                                                                                                                                               | `team`, `ledTeams`, `dispatcher`, notifications, audit actor, edit-request approver | Auth, users, dispatchers, teams, notifications      |
+| **Team**                     | Dispatch team                                             | `name`, `teamLeadUserId`, `status`                                                                                                                                                                                                                                                                                                                                                                                                                                   | `teamLead`, `members`, `dispatchers`, `carriers`                                    | Teams, scoping                                      |
+| **Dispatcher**               | Dispatcher profile                                        | `userId` (unique), `teamId`, `status`                                                                                                                                                                                                                                                                                                                                                                                                                                | `user`, `team`, `carriers`, `dailyActivities`                                       | Dispatchers, activities, finance                    |
+| **Carrier**                  | Trucking company / driver                                 | `carrierName`, `driverName`, `mcNumber`, `truckType`, `teamId`, `dispatcherId`, `dispatchFeePercentage`, `status`, **`notes`**                                                                                                                                                                                                                                                                                                                                       | `team`, `dispatcher`, `dailyActivities`, `assignmentHistory`                        | Carriers, activities, finance                       |
+| **CarrierAssignmentHistory** | Reassignment trail                                        | `carrierId`, `teamId`, `dispatcherId`, name snapshots, `assignedAt`, `unassignedAt`, `assignedByUserId`                                                                                                                                                                                                                                                                                                                                                              | `carrier`, `team`, `dispatcher`, `assignedBy`                                       | Carrier reassign                                    |
+| **DailyActivity**            | Daily load record                                         | `activityDate`, `carrierId`, `dispatcherId`, `teamId`, `status`, snapshots (carrier/driver/dispatcher/team/truckType/fee%), `origin`, `destination`, `totalMiles`, `loadAmount`, `ratePerMile`, `dispatchFee`, `reason`, `notes`, **`approvalStatus`**, **`approvalType`**, `submittedById`, `teamLeadApprovedById`, `adminApprovedById`, `rejectedById`, `rejectionReason`, `approvalNotes`, plus `submittedAt`/`teamLeadApprovedAt`/`adminApprovedAt`/`rejectedAt` | `carrier`, `dispatcher`, `team`, `editRequests`                                     | Activities, approvals, dashboards, reports, finance |
+| **DailySubmission**          | Per-dispatcher per-day completion roll-up                 | `dispatcherId`, `submissionDate`, `carrierCount`, `activityCount`                                                                                                                                                                                                                                                                                                                                                                                                    | `dispatcher`, `team`                                                                | Daily submissions, dispatcher dashboard             |
+| **StatusReason**             | Org-specific cancel/not-booked reasons                    | `label`, `isActive`, `sortOrder`                                                                                                                                                                                                                                                                                                                                                                                                                                     | org                                                                                 | Activities, settings                                |
+| **OrganizationSettings**     | Fee rules + CSV + approval mode                           | `dispatchFeeMethod` (`percentage`), `defaultDispatchFeePercent`, `minimumDispatchFee`, `roundToNearestDollar`, `allowedTruckTypes`, `timezone`, `csvIncludeHeaders`, `csvDateFormat`, `csvMaxRows` (default 10000), `csvFileNamePrefix`, **`directAdminApprovalMode`**                                                                                                                                                                                               | org                                                                                 | Settings, activities, finance, reports              |
+| **RegistrationRequest**      | Self-registration queue                                   | `email`, `requestedRole`, `preferredTeamId`/`Name`, `assignedRole`, `assignedTeamId`, `status`, `rejectionReason`                                                                                                                                                                                                                                                                                                                                                    | org, `reviewedBy`                                                                   | Auth, user requests                                 |
+| **ActivityEditRequest**      | Pending edit to an APPROVED activity                      | `originalActivityId`, `teamId`, `dispatcherId`, `approvalStatus`, `proposedChanges` (JSON), `previousData` (JSON), approver/submitter ids + timestamps, `rejectionReason`, `approvalNotes`                                                                                                                                                                                                                                                                           | `originalActivity`, `team`, `dispatcher`, submitter/editor/approvers                | Edit requests, approvals                            |
+| **Notification**             | In-app notification                                       | `recipientUserId`, `title`, `message`, `notificationStatus`, `activityId?`, `editRequestId?`, `metadata` (JSON), `readAt`                                                                                                                                                                                                                                                                                                                                            | org, `recipient`                                                                    | Notifications                                       |
+| **AuditLog**                 | Immutable action log                                      | `actorUserId?`, `action` (`AuditAction`), `entityType`, `entityId?`, `metadata`                                                                                                                                                                                                                                                                                                                                                                                      | org, `actor`                                                                        | Audit logs                                          |
+| **ReportExport**             | Report export job record                                  | `requestedById`, `reportType`, `period`, `filters` (JSON), `status`, `fileName`, `rowCount`, `errorMessage`, `completedAt`                                                                                                                                                                                                                                                                                                                                           | org, `requestedBy`                                                                  | Reports                                             |
+| **Invoice**                  | Invoice header (dispatcher payable or carrier receivable) | `invoiceNumber`, `invoiceType`, `invoiceStatus`, `paymentStatus`, `dispatcherId?`, `carrierId?`, `teamId`, period dates, `totalAmount`, `paidAmount`, `pendingAmount`, `issueDate`, `dueDate`, soft delete                                                                                                                                                                                                                                                           | org, dispatcher, carrier, team, items, payments                                     | Invoices                                            |
+| **InvoiceItem**              | Activity line on an invoice                               | `dailyActivityId`, route/miles/load/fee snapshots, `amount`, `description`                                                                                                                                                                                                                                                                                                                                                                                           | invoice, activity                                                                   | Invoices                                            |
+| **InvoicePayment**           | Payment against an invoice                                | `amount`, `paymentDate`, `paymentMethod`, `reference`, `notes`, `recordedById`                                                                                                                                                                                                                                                                                                                                                                                       | invoice                                                                             | Invoices                                            |
 
 ### Enums
 
-| Enum | Values |
-|------|--------|
-| `UserRole` | ADMIN, TEAM_LEAD, DISPATCHER |
-| `UserStatus` | ACTIVE, PENDING_APPROVAL, INACTIVE, INVITED |
-| `TeamStatus` (also dispatcher status) | ACTIVE, INACTIVE |
-| `CarrierStatus` | ACTIVE, INACTIVE |
-| `LoadActivityStatus` | DELIVERED, CANCELLED, NOT_BOOKED, NOT_WORKING |
-| `TruckType` | DRY_VAN, REEFER, FLATBED, BOX_TRUCK, HOTSHOT, POWER_ONLY, CARGO_VAN |
-| `RegistrationRequestStatus` | PENDING, APPROVED, REJECTED |
-| `ReportExportStatus` | PENDING, COMPLETED, FAILED |
-| `ActivityApprovalStatus` | APPROVED, PENDING_TEAM_LEAD_APPROVAL, PENDING_ADMIN_APPROVAL, REJECTED |
-| `ActivityApprovalType` | NEW_ACTIVITY, EDIT_ACTIVITY |
-| `NotificationStatus` | PENDING, APPROVED, REJECTED, CHANGES_REQUESTED, ADMIN_APPROVAL_REQUIRED, TEAM_LEAD_APPROVAL_REQUIRED, COMPLETED |
-| `AuditAction` | 50+ values (see [§10](#10-audit-log-flow); invoice actions listed in [Invoice Audit Log Flow](#invoice-audit-log-flow)) |
-| `InvoiceType` | DISPATCHER_PAYABLE, CARRIER_RECEIVABLE |
-| `InvoiceStatus` | DRAFT, ISSUED, PARTIALLY_PAID, PAID, OVERDUE, CANCELLED |
-| `PaymentStatus` | UNPAID, PARTIALLY_PAID, PAID |
-| `InvoicePaymentMethod` | CASH, BANK_TRANSFER, CARD, CHECK, OTHER |
+| Enum                                  | Values                                                                                                                  |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `UserRole`                            | ADMIN, TEAM_LEAD, DISPATCHER                                                                                            |
+| `UserStatus`                          | ACTIVE, PENDING_APPROVAL, INACTIVE, INVITED                                                                             |
+| `TeamStatus` (also dispatcher status) | ACTIVE, INACTIVE                                                                                                        |
+| `CarrierStatus`                       | ACTIVE, INACTIVE                                                                                                        |
+| `LoadActivityStatus`                  | DELIVERED, CANCELLED, NOT_BOOKED, NOT_WORKING                                                                           |
+| `TruckType`                           | DRY_VAN, REEFER, FLATBED, BOX_TRUCK, HOTSHOT, POWER_ONLY, CARGO_VAN                                                     |
+| `RegistrationRequestStatus`           | PENDING, APPROVED, REJECTED                                                                                             |
+| `ReportExportStatus`                  | PENDING, COMPLETED, FAILED                                                                                              |
+| `ActivityApprovalStatus`              | APPROVED, PENDING_TEAM_LEAD_APPROVAL, PENDING_ADMIN_APPROVAL, REJECTED                                                  |
+| `ActivityApprovalType`                | NEW_ACTIVITY, EDIT_ACTIVITY                                                                                             |
+| `NotificationStatus`                  | PENDING, APPROVED, REJECTED, CHANGES_REQUESTED, ADMIN_APPROVAL_REQUIRED, TEAM_LEAD_APPROVAL_REQUIRED, COMPLETED         |
+| `AuditAction`                         | 50+ values (see [§10](#10-audit-log-flow); invoice actions listed in [Invoice Audit Log Flow](#invoice-audit-log-flow)) |
+| `InvoiceType`                         | DISPATCHER_PAYABLE, CARRIER_RECEIVABLE                                                                                  |
+| `InvoiceStatus`                       | DRAFT, ISSUED, PARTIALLY_PAID, PAID, OVERDUE, CANCELLED                                                                 |
+| `PaymentStatus`                       | UNPAID, PARTIALLY_PAID, PAID                                                                                            |
+| `InvoicePaymentMethod`                | CASH, BANK_TRANSFER, CARD, CHECK, OTHER                                                                                 |
 
 ### Key constraints & indexes
 
 - `User`: unique `(organizationId, email)`, unique `supabaseUserId`; index `(organizationId, role, status)`.
 - `Team`: unique `(organizationId, name)`.
 - `Carrier`: unique `(organizationId, mcNumber)`.
-- `DailyActivity`: unique `(carrierId, activityDate)`; indexes on `(organizationId, approvalStatus)`, `(teamId, approvalStatus)`, plus date/status indexes.
+- `DailyActivity`: non-unique `(carrierId, activityDate)` lookup index; indexes on `(organizationId, approvalStatus)`, `(teamId, approvalStatus)`, plus date/status indexes. Multiple activities for the same carrier/date are allowed and stored as separate rows.
 - `ActivityEditRequest`: indexes on `(organizationId|originalActivityId|teamId|dispatcherId, approvalStatus)`.
 - `Notification`: indexes on `(recipientUserId, readAt, createdAt)`, `(organizationId, createdAt)`.
 - `DailySubmission`: unique `(dispatcherId, submissionDate)`.
@@ -434,6 +434,7 @@ erDiagram
 **Base URL:** `/api` · **Auth:** Supabase session cookies on protected routes · **Envelope:** `{ ok: true, data }` or `{ ok: false, error }` (`src/server/api/response.ts`). **Total: ~76 HTTP handlers across 65 `route.ts` files** (core platform APIs below + [Invoice APIs](#invoice-api-documentation)).
 
 **Conventions:**
+
 - `handleApi(fn, request?)` wraps responses. Mutating handlers (POST/PATCH) pass `request`, enforcing `assertSameOrigin`; most GET handlers omit it (no origin check on reads).
 - Guards (`require-auth.ts`): `requireUser` (authenticated), `requireActiveUser` (active), `requireRole(role)`, `requireAccessScope([role])` (returns `{ user, scope }`), `requireAdminOrTeamLeadScope`. Admin-only routes use `requireAccessScope("ADMIN")`. Several routes do inline `ForbiddenError` role checks.
 - Errors: `ValidationError`→400, `UnauthorizedError`→401, `ForbiddenError`→403, `NotFoundError`→404, infra/DB→503, else 500.
@@ -441,137 +442,137 @@ erDiagram
 
 ### 7.1 Auth
 
-| Method · Path | Purpose | Role | Body | Audit / Notification |
-|---|---|---|---|---|
-| POST `/api/auth/login` | Sign in to a portal | Public (rate-limited, same-origin) | `{ email, password, expectedRole }` | `USER_LOGGED_IN` / `USER_LOGIN_FAILED` |
-| POST `/api/auth/logout` | Sign out | Public (same-origin) | — | `USER_LOGGED_OUT` |
-| GET `/api/auth/me` | Current session user (or null) | Public | — | — |
-| POST `/api/auth/register` | Dispatcher self-registration | Public (rate-limited) | `{ fullName, email, phoneNumber, preferredTeamId?, preferredTeamName?, notes? }` | — |
-| POST `/api/auth/forgot-password` | Send reset email | Public (rate-limited) | `{ email }` | — |
-| POST `/api/auth/update-password` | Set own password | Authenticated (`requireUser`) | `{ password (min 8) }` | `USER_PASSWORD_CHANGED` |
+| Method · Path                    | Purpose                        | Role                               | Body                                                                             | Audit / Notification                   |
+| -------------------------------- | ------------------------------ | ---------------------------------- | -------------------------------------------------------------------------------- | -------------------------------------- |
+| POST `/api/auth/login`           | Sign in to a portal            | Public (rate-limited, same-origin) | `{ email, password, expectedRole }`                                              | `USER_LOGGED_IN` / `USER_LOGIN_FAILED` |
+| POST `/api/auth/logout`          | Sign out                       | Public (same-origin)               | —                                                                                | `USER_LOGGED_OUT`                      |
+| GET `/api/auth/me`               | Current session user (or null) | Public                             | —                                                                                | —                                      |
+| POST `/api/auth/register`        | Dispatcher self-registration   | Public (rate-limited)              | `{ fullName, email, phoneNumber, preferredTeamId?, preferredTeamName?, notes? }` | —                                      |
+| POST `/api/auth/forgot-password` | Send reset email               | Public (rate-limited)              | `{ email }`                                                                      | —                                      |
+| POST `/api/auth/update-password` | Set own password               | Authenticated (`requireUser`)      | `{ password (min 8) }`                                                           | `USER_PASSWORD_CHANGED`                |
 
 ### 7.2 Users & registration requests
 
-| Method · Path | Purpose | Role | Body | Audit |
-|---|---|---|---|---|
-| GET `/api/users` | List managed dispatcher/team-lead users | Admin | — | — |
-| POST `/api/users` | Create dispatcher/team-lead (Supabase user + rows) | Admin | `{ fullName, email, phoneNumber?, role(DISPATCHER\|TEAM_LEAD), teamId, password(min8), confirmPassword, status?="ACTIVE" }` | `USER_MANUALLY_CREATED` (+ `TEAM_LEAD_CREATED`) |
-| POST `/api/users/[id]/password` | Admin resets a managed user's password | Admin | `{ password(min8), confirmPassword }` | `USER_PASSWORD_RESET` |
-| GET `/api/users/requests` | List registration requests | Admin | — | — |
-| POST `/api/users/requests/[id]/approve` | Approve → provision user | Admin | `{ role, teamId, temporaryPassword(min8) }` | `USER_APPROVED` |
-| POST `/api/users/requests/[id]/reject` | Reject with reason | Admin | `{ reason }` | `USER_REJECTED` |
+| Method · Path                           | Purpose                                            | Role  | Body                                                                                                                        | Audit                                           |
+| --------------------------------------- | -------------------------------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| GET `/api/users`                        | List managed dispatcher/team-lead users            | Admin | —                                                                                                                           | —                                               |
+| POST `/api/users`                       | Create dispatcher/team-lead (Supabase user + rows) | Admin | `{ fullName, email, phoneNumber?, role(DISPATCHER\|TEAM_LEAD), teamId, password(min8), confirmPassword, status?="ACTIVE" }` | `USER_MANUALLY_CREATED` (+ `TEAM_LEAD_CREATED`) |
+| POST `/api/users/[id]/password`         | Admin resets a managed user's password             | Admin | `{ password(min8), confirmPassword }`                                                                                       | `USER_PASSWORD_RESET`                           |
+| GET `/api/users/requests`               | List registration requests                         | Admin | —                                                                                                                           | —                                               |
+| POST `/api/users/requests/[id]/approve` | Approve → provision user                           | Admin | `{ role, teamId, temporaryPassword(min8) }`                                                                                 | `USER_APPROVED`                                 |
+| POST `/api/users/requests/[id]/reject`  | Reject with reason                                 | Admin | `{ reason }`                                                                                                                | `USER_REJECTED`                                 |
 
 Responses for create/reset return `{ user: ManagedUser, credentials: { fullName, email, password, role, loginPath } }` (one-time credentials dialog).
 
 ### 7.3 Health & public
 
-| Method · Path | Purpose | Role | Notes |
-|---|---|---|---|
-| GET `/api/health` | Liveness | Public | Raw `{ status:"ok", service }` (not enveloped) |
-| GET `/api/health/ready` | Readiness (env + `SELECT 1`) | Public | 200 ready / 503 not_ready |
-| GET `/api/public/teams` | Active teams for registration | Public | `[{ id, name }]` |
+| Method · Path           | Purpose                       | Role   | Notes                                          |
+| ----------------------- | ----------------------------- | ------ | ---------------------------------------------- |
+| GET `/api/health`       | Liveness                      | Public | Raw `{ status:"ok", service }` (not enveloped) |
+| GET `/api/health/ready` | Readiness (env + `SELECT 1`)  | Public | 200 ready / 503 not_ready                      |
+| GET `/api/public/teams` | Active teams for registration | Public | `[{ id, name }]`                               |
 
 ### 7.4 Teams
 
-| Method · Path | Purpose | Role | Body | Audit |
-|---|---|---|---|---|
-| GET `/api/teams` | List (scoped) | Any active | — | — |
-| POST `/api/teams` | Create team | Admin | `{ name, teamLeadUserId?, status }` | `TEAM_CREATED` (+ `TEAM_LEAD_ASSIGNED`) |
-| PATCH `/api/teams/[id]` | Update team | Admin | `{ name?, teamLeadUserId?, status? }` | `TEAM_UPDATED`/`TEAM_ACTIVATED`/`TEAM_DEACTIVATED`, `TEAM_LEAD_ASSIGNED` |
+| Method · Path           | Purpose       | Role       | Body                                  | Audit                                                                    |
+| ----------------------- | ------------- | ---------- | ------------------------------------- | ------------------------------------------------------------------------ |
+| GET `/api/teams`        | List (scoped) | Any active | —                                     | —                                                                        |
+| POST `/api/teams`       | Create team   | Admin      | `{ name, teamLeadUserId?, status }`   | `TEAM_CREATED` (+ `TEAM_LEAD_ASSIGNED`)                                  |
+| PATCH `/api/teams/[id]` | Update team   | Admin      | `{ name?, teamLeadUserId?, status? }` | `TEAM_UPDATED`/`TEAM_ACTIVATED`/`TEAM_DEACTIVATED`, `TEAM_LEAD_ASSIGNED` |
 
 ### 7.5 Dispatchers
 
-| Method · Path | Purpose | Role | Body / Query | Audit |
-|---|---|---|---|---|
-| GET `/api/dispatchers` | List (scoped) | Any active (service scopes) | `?q, teamId, dispatcherId` | — |
-| POST `/api/dispatchers` | Create dispatcher / team lead | Admin or Team Lead (service enforces) | `{ fullName, email, phoneNumber?, teamId, role, status }` | `DISPATCHER_CREATED` / `TEAM_LEAD_CREATED` |
-| PATCH `/api/dispatchers/[id]` | Update | Admin/Team Lead (scoped) | partial dispatcher | `DISPATCHER_UPDATED` (+ `USER_ROLE_ASSIGNED`/`USER_TEAM_ASSIGNED`) |
-| POST `/api/dispatchers/[id]` | Activate/deactivate | Admin/Team Lead | `{ action: "activate"\|"deactivate" }` | `DISPATCHER_REACTIVATED`+`USER_ACTIVATED` / `DISPATCHER_DEACTIVATED`+`USER_DEACTIVATED` |
+| Method · Path                 | Purpose                       | Role                                  | Body / Query                                              | Audit                                                                                   |
+| ----------------------------- | ----------------------------- | ------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| GET `/api/dispatchers`        | List (scoped)                 | Any active (service scopes)           | `?q, teamId, dispatcherId`                                | —                                                                                       |
+| POST `/api/dispatchers`       | Create dispatcher / team lead | Admin or Team Lead (service enforces) | `{ fullName, email, phoneNumber?, teamId, role, status }` | `DISPATCHER_CREATED` / `TEAM_LEAD_CREATED`                                              |
+| PATCH `/api/dispatchers/[id]` | Update                        | Admin/Team Lead (scoped)              | partial dispatcher                                        | `DISPATCHER_UPDATED` (+ `USER_ROLE_ASSIGNED`/`USER_TEAM_ASSIGNED`)                      |
+| POST `/api/dispatchers/[id]`  | Activate/deactivate           | Admin/Team Lead                       | `{ action: "activate"\|"deactivate" }`                    | `DISPATCHER_REACTIVATED`+`USER_ACTIVATED` / `DISPATCHER_DEACTIVATED`+`USER_DEACTIVATED` |
 
 ### 7.6 Carriers
 
-| Method · Path | Purpose | Role | Body / Query | Audit |
-|---|---|---|---|---|
-| GET `/api/carriers` | List (rich filters) | Any active (scoped) | `?q, teamId(s), dispatcherId(s), carrierId, truckType(s), status(es)` | — |
-| POST `/api/carriers` | Create carrier (incl. notes) | Admin/Team Lead | `{ carrierName, driverName, mcNumber, dispatchFeePercentage?, truckType, teamId, dispatcherId, status="ACTIVE", notes? }` | `CARRIER_CREATED` |
-| PATCH `/api/carriers/[id]` | Update | Admin/Team Lead | partial carrier | `CARRIER_UPDATED` (+ `_ACTIVATED`/`_DEACTIVATED`) |
-| POST `/api/carriers/[id]/reassign` | Reassign team/dispatcher | Admin/Team Lead | `{ teamId, dispatcherId, notes? }` | `CARRIER_REASSIGNED` |
+| Method · Path                      | Purpose                      | Role                | Body / Query                                                                                                              | Audit                                             |
+| ---------------------------------- | ---------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| GET `/api/carriers`                | List (rich filters)          | Any active (scoped) | `?q, teamId(s), dispatcherId(s), carrierId, truckType(s), status(es)`                                                     | —                                                 |
+| POST `/api/carriers`               | Create carrier (incl. notes) | Admin/Team Lead     | `{ carrierName, driverName, mcNumber, dispatchFeePercentage?, truckType, teamId, dispatcherId, status="ACTIVE", notes? }` | `CARRIER_CREATED`                                 |
+| PATCH `/api/carriers/[id]`         | Update                       | Admin/Team Lead     | partial carrier                                                                                                           | `CARRIER_UPDATED` (+ `_ACTIVATED`/`_DEACTIVATED`) |
+| POST `/api/carriers/[id]/reassign` | Reassign team/dispatcher     | Admin/Team Lead     | `{ teamId, dispatcherId, notes? }`                                                                                        | `CARRIER_REASSIGNED`                              |
 
 ### 7.7 Activities & approval
 
-| Method · Path | Purpose | Role | Body | Audit / Notification |
-|---|---|---|---|---|
-| GET `/api/activities` | List with activity + approval filters | Any active (scoped) | — | — |
-| POST `/api/activities` | Create activity (dispatcher → pending; admin → live) | Any active | `{ activityDate, carrierId, status, notes?, origin?, destination?, totalMiles?, loadAmount?, reason? }` | `ACTIVITY_CREATED` / `ACTIVITY_SUBMITTED`; `notifyNewActivitySubmitted` |
-| PATCH `/api/activities/[id]` | Update; non-admin edit of APPROVED → creates edit request | Any active | partial activity | `ACTIVITY_UPDATED` / `ACTIVITY_PENDING_UPDATED` / `ACTIVITY_EDIT_REQUEST_SUBMITTED`; `notifyEditRequestSubmitted` |
-| POST `/api/activities/[id]/approve` | Approve a pending activity | Admin/Team Lead (inline) | `{ approvalNotes? }` | `ACTIVITY_APPROVED_BY_TEAM_LEAD`/`_ADMIN`; sibling notifications → COMPLETED+read, `notifyFinalApprovalCompleted` |
-| POST `/api/activities/[id]/reject` | Reject / request changes | Admin/Team Lead (inline) | `{ reason, requestChanges?, approvalNotes? }` | `ACTIVITY_REJECTED` / `ACTIVITY_CHANGES_REQUESTED`; `notifyDispatcherOutcome` |
-| GET `/api/activities/pending` | Pending approvals (activities + edit requests) | Admin/Team Lead (inline) | — | — |
-| GET `/api/activities/submissions` | Dispatcher's own submissions | Dispatcher (inline) | — | — |
+| Method · Path                       | Purpose                                                   | Role                     | Body                                                                                                    | Audit / Notification                                                                                              |
+| ----------------------------------- | --------------------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| GET `/api/activities`               | List with activity + approval filters                     | Any active (scoped)      | —                                                                                                       | —                                                                                                                 |
+| POST `/api/activities`              | Create activity (dispatcher → pending; admin → live)      | Any active               | `{ activityDate, carrierId, status, notes?, origin?, destination?, totalMiles?, loadAmount?, reason? }` | `ACTIVITY_CREATED` / `ACTIVITY_SUBMITTED`; `notifyNewActivitySubmitted`                                           |
+| PATCH `/api/activities/[id]`        | Update; non-admin edit of APPROVED → creates edit request | Any active               | partial activity                                                                                        | `ACTIVITY_UPDATED` / `ACTIVITY_PENDING_UPDATED` / `ACTIVITY_EDIT_REQUEST_SUBMITTED`; `notifyEditRequestSubmitted` |
+| POST `/api/activities/[id]/approve` | Approve a pending activity                                | Admin/Team Lead (inline) | `{ approvalNotes? }`                                                                                    | `ACTIVITY_APPROVED_BY_TEAM_LEAD`/`_ADMIN`; sibling notifications → COMPLETED+read, `notifyFinalApprovalCompleted` |
+| POST `/api/activities/[id]/reject`  | Reject / request changes                                  | Admin/Team Lead (inline) | `{ reason, requestChanges?, approvalNotes? }`                                                           | `ACTIVITY_REJECTED` / `ACTIVITY_CHANGES_REQUESTED`; `notifyDispatcherOutcome`                                     |
+| GET `/api/activities/pending`       | Pending approvals (activities + edit requests)            | Admin/Team Lead (inline) | —                                                                                                       | —                                                                                                                 |
+| GET `/api/activities/submissions`   | Dispatcher's own submissions                              | Dispatcher (inline)      | —                                                                                                       | —                                                                                                                 |
 
 ### 7.8 Edit requests
 
-| Method · Path | Purpose | Role | Body | Audit / Notification |
-|---|---|---|---|---|
-| POST `/api/activity-edit-requests/[id]/approve` | Approve edit (applies proposed changes; recomputes financials) | Admin/Team Lead (inline) | `{ approvalNotes? }` | `ACTIVITY_APPROVED_BY_TEAM_LEAD`/`_ADMIN` (entity `ActivityEditRequest`); siblings → COMPLETED+read |
-| POST `/api/activity-edit-requests/[id]/reject` | Reject / request changes | Admin/Team Lead (inline) | `{ reason, requestChanges?, approvalNotes? }` | `ACTIVITY_REJECTED`/`ACTIVITY_CHANGES_REQUESTED`; `notifyDispatcherOutcome` |
+| Method · Path                                   | Purpose                                                        | Role                     | Body                                          | Audit / Notification                                                                                |
+| ----------------------------------------------- | -------------------------------------------------------------- | ------------------------ | --------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| POST `/api/activity-edit-requests/[id]/approve` | Approve edit (applies proposed changes; recomputes financials) | Admin/Team Lead (inline) | `{ approvalNotes? }`                          | `ACTIVITY_APPROVED_BY_TEAM_LEAD`/`_ADMIN` (entity `ActivityEditRequest`); siblings → COMPLETED+read |
+| POST `/api/activity-edit-requests/[id]/reject`  | Reject / request changes                                       | Admin/Team Lead (inline) | `{ reason, requestChanges?, approvalNotes? }` | `ACTIVITY_REJECTED`/`ACTIVITY_CHANGES_REQUESTED`; `notifyDispatcherOutcome`                         |
 
 > Edit-request **submission** happens inside the `PATCH /api/activities/[id]` path (when a non-admin edits an APPROVED activity), not via a dedicated create route.
 
 ### 7.9 Notifications
 
-| Method · Path | Purpose | Role | Audit |
-|---|---|---|---|
-| GET `/api/notifications` | Recipient's notifications (newest 100) + unread count | Any active | — |
-| POST `/api/notifications/[id]/read` | Mark one read (owner only) | Any active | `NOTIFICATION_READ` |
-| POST `/api/notifications/read-all` | Mark all read | Any active | `NOTIFICATION_MARK_ALL_READ` |
+| Method · Path                       | Purpose                                               | Role       | Audit                        |
+| ----------------------------------- | ----------------------------------------------------- | ---------- | ---------------------------- |
+| GET `/api/notifications`            | Recipient's notifications (newest 100) + unread count | Any active | —                            |
+| POST `/api/notifications/[id]/read` | Mark one read (owner only)                            | Any active | `NOTIFICATION_READ`          |
+| POST `/api/notifications/read-all`  | Mark all read                                         | Any active | `NOTIFICATION_MARK_ALL_READ` |
 
 ### 7.10 Dashboards
 
-| Method · Path | Role | Query |
-|---|---|---|
-| GET `/api/dashboard/admin` | Admin | date range/from/to, status(es)/statusKeys, team(s), dispatcher(s), carrier(s), truckType(s) |
-| GET `/api/dashboard/team-lead` | Team Lead | — |
-| GET `/api/dashboard/dispatcher` | Dispatcher | `dateFrom?, dateTo?, status?, carrierId?, truckType?` |
+| Method · Path                   | Role       | Query                                                                                       |
+| ------------------------------- | ---------- | ------------------------------------------------------------------------------------------- |
+| GET `/api/dashboard/admin`      | Admin      | date range/from/to, status(es)/statusKeys, team(s), dispatcher(s), carrier(s), truckType(s) |
+| GET `/api/dashboard/team-lead`  | Team Lead  | —                                                                                           |
+| GET `/api/dashboard/dispatcher` | Dispatcher | `dateFrom?, dateTo?, status?, carrierId?, truckType?`                                       |
 
 ### 7.11 Admin-specific
 
-| Method · Path | Purpose | Role | Audit |
-|---|---|---|---|
-| GET `/api/admin/daily-report` | Live daily snapshot (`?date, teamId, dispatcherId, status`) | Admin | — |
-| GET `/api/admin/logs` | Audit logs list with filters (`?limit, action, entityType, role, status, search, dateFrom, dateTo`) | Admin | — |
-| GET `/api/admin/dispatchers/[dispatcherId]/finance` | Any dispatcher's finance bundle | Admin | `FINANCE_VIEWED` |
-| POST `/api/admin/dispatchers/[dispatcherId]/finance/export` | That dispatcher's finance CSV | Admin | `FINANCE_EXPORTED` |
+| Method · Path                                               | Purpose                                                                                             | Role  | Audit              |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ----- | ------------------ |
+| GET `/api/admin/daily-report`                               | Live daily snapshot (`?date, teamId, dispatcherId, status`)                                         | Admin | —                  |
+| GET `/api/admin/logs`                                       | Audit logs list with filters (`?limit, action, entityType, role, status, search, dateFrom, dateTo`) | Admin | —                  |
+| GET `/api/admin/dispatchers/[dispatcherId]/finance`         | Any dispatcher's finance bundle                                                                     | Admin | `FINANCE_VIEWED`   |
+| POST `/api/admin/dispatchers/[dispatcherId]/finance/export` | That dispatcher's finance CSV                                                                       | Admin | `FINANCE_EXPORTED` |
 
 ### 7.12 Rankings, reports, search
 
-| Method · Path | Purpose | Role | Notes |
-|---|---|---|---|
-| GET `/api/rankings` | `?type=dispatcher\|carrier\|team` | Any active; carrier/team require Admin/Team Lead; dispatcher self-scopes | `assertFilterAccess` |
-| GET `/api/reports` | Report bundle by period | Admin/Team Lead | Audit `REPORT_VIEWED` |
-| POST `/api/reports/export` | CSV export | Admin/Team Lead | Creates `ReportExport` (COMPLETED) + `REPORT_EXPORTED` |
-| GET `/api/search` | `?q=` global search (min 2 chars) | Any active (scoped; dispatcher search admin/TL only) | — |
+| Method · Path              | Purpose                           | Role                                                                     | Notes                                                  |
+| -------------------------- | --------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------ |
+| GET `/api/rankings`        | `?type=dispatcher\|carrier\|team` | Any active; carrier/team require Admin/Team Lead; dispatcher self-scopes | `assertFilterAccess`                                   |
+| GET `/api/reports`         | Report bundle by period           | Admin/Team Lead                                                          | Audit `REPORT_VIEWED`                                  |
+| POST `/api/reports/export` | CSV export                        | Admin/Team Lead                                                          | Creates `ReportExport` (COMPLETED) + `REPORT_EXPORTED` |
+| GET `/api/search`          | `?q=` global search (min 2 chars) | Any active (scoped; dispatcher search admin/TL only)                     | —                                                      |
 
 ### 7.13 Settings
 
-| Method · Path | Purpose | Role | Audit |
-|---|---|---|---|
-| GET `/api/settings` | Read org settings | Admin | — |
-| PATCH `/api/settings` | Update settings | Admin | `SETTINGS_UPDATED` (+ `_DISPATCH_FEE_RULES_`/`_TRUCK_TYPES_`/`_STATUS_REASONS_`/`_DIRECT_APPROVAL_UPDATED`) |
-| GET `/api/settings/status-reasons` | Active status reason labels | Any active | — |
-| GET `/api/settings/dispatch-fee-rules` | Fee calculation rules | Any active | — |
+| Method · Path                          | Purpose                     | Role       | Audit                                                                                                       |
+| -------------------------------------- | --------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------- |
+| GET `/api/settings`                    | Read org settings           | Admin      | —                                                                                                           |
+| PATCH `/api/settings`                  | Update settings             | Admin      | `SETTINGS_UPDATED` (+ `_DISPATCH_FEE_RULES_`/`_TRUCK_TYPES_`/`_STATUS_REASONS_`/`_DIRECT_APPROVAL_UPDATED`) |
+| GET `/api/settings/status-reasons`     | Active status reason labels | Any active | —                                                                                                           |
+| GET `/api/settings/dispatch-fee-rules` | Fee calculation rules       | Any active | —                                                                                                           |
 
 ### 7.14 Finance (dispatcher self-service)
 
-| Method · Path | Purpose | Role | Audit |
-|---|---|---|---|
-| GET `/api/dispatcher/finance` | Own finance bundle (`?dateRange, dateFrom, dateTo, carrierId, status`) | Dispatcher | `FINANCE_VIEWED` |
-| POST `/api/dispatcher/finance/export` | Own finance CSV | Dispatcher | `FINANCE_EXPORTED` |
+| Method · Path                         | Purpose                                                                | Role       | Audit              |
+| ------------------------------------- | ---------------------------------------------------------------------- | ---------- | ------------------ |
+| GET `/api/dispatcher/finance`         | Own finance bundle (`?dateRange, dateFrom, dateTo, carrierId, status`) | Dispatcher | `FINANCE_VIEWED`   |
+| POST `/api/dispatcher/finance/export` | Own finance CSV                                                        | Dispatcher | `FINANCE_EXPORTED` |
 
 ### 7.15 Audit export beacon
 
-| Method · Path | Purpose | Role | Audit |
-|---|---|---|---|
+| Method · Path                   | Purpose                                                                 | Role                                             | Audit                                                                                |
+| ------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------ |
 | POST `/api/audit/export-events` | Client beacon recording an export happened (does NOT generate the file) | Any active; `AUDIT_LOGS_EXPORTED` requires Admin | Writes `ACTIVITY_EXPORTED` / `CARRIER_EXPORTED` / `AUDIT_LOGS_EXPORTED` per `action` |
 
 Body: `{ action, entityType, entityId?, entityName?, format("csv"\|"pdf"), rowCount?, filters?, metadata? }`; `entityType` must match `action` (`ACTIVITY_EXPORTED→DailyActivity`, `CARRIER_EXPORTED→Carrier`, `AUDIT_LOGS_EXPORTED→AuditLog`).
@@ -592,7 +593,7 @@ Body: `{ action, entityType, entityId?, entityName?, format("csv"\|"pdf"), rowCo
 
 1. Dispatcher opens `/dispatcher/activities`, clicks **Add Activity** (`ActivityModal` → `DailyActivityForm`).
 2. Status `DELIVERED` requires `origin`, `destination`, `totalMiles > 0`, `loadAmount > 0`; other statuses require a `reason` from the active `StatusReason` list.
-3. `POST /api/activities` → `createActivity`: `assertCarrierAccess` (dispatcher can only log for carriers where `carrier.dispatcherId === scope.dispatcherId`), duplicate guard `(carrierId, activityDate)`, snapshots stored on the row, financials computed for DELIVERED.
+3. `POST /api/activities` → `createActivity`: `assertCarrierAccess` (dispatcher can only log for carriers where `carrier.dispatcherId === scope.dispatcherId`), snapshots stored on the row, financials computed for DELIVERED. Multiple activities for the same carrier/date are allowed and each insert creates a separate `DailyActivity` row.
 4. Approval status set by role: Admin → `APPROVED` (live, `ACTIVITY_CREATED`, `upsertDailySubmission`); Team Lead → `PENDING_ADMIN_APPROVAL`; Dispatcher → `PENDING_TEAM_LEAD_APPROVAL` (or `PENDING_ADMIN_APPROVAL` when `directAdminApprovalMode`).
 5. For pending submissions: `ACTIVITY_SUBMITTED` audit + `notifyNewActivitySubmitted` (team lead + all admins in parallel).
 
@@ -667,33 +668,33 @@ Implemented exactly as below (`approvals.service.ts`, `activities.service.ts`, `
 
 The `AuditAction` enum defines **50 values**. Every value is emitted somewhere (no truly dead enum value found). Writers by source:
 
-| Source | Actions |
-|--------|---------|
-| `auth.service.ts` | `USER_LOGGED_IN`, `USER_LOGGED_OUT`, `USER_LOGIN_FAILED`, `USER_PASSWORD_CHANGED` |
-| `users.service.ts` | `USER_MANUALLY_CREATED` (+`TEAM_LEAD_CREATED`), `USER_PASSWORD_RESET`, `USER_APPROVED`, `USER_REJECTED`, `USER_ROLE_ASSIGNED` (+`TEAM_LEAD_ASSIGNED`, `USER_TEAM_ASSIGNED`) |
-| `teams.service.ts` | `TEAM_CREATED`, `TEAM_UPDATED`, `TEAM_ACTIVATED`, `TEAM_DEACTIVATED`, `TEAM_LEAD_ASSIGNED` |
-| `dispatchers.service.ts` | `DISPATCHER_CREATED`/`TEAM_LEAD_CREATED`, `DISPATCHER_UPDATED`, `USER_ROLE_ASSIGNED`, `USER_TEAM_ASSIGNED`, `DISPATCHER_REACTIVATED`+`USER_ACTIVATED`, `DISPATCHER_DEACTIVATED`+`USER_DEACTIVATED` |
-| `carriers.service.ts` | `CARRIER_CREATED`/`_UPDATED`/`_ACTIVATED`/`_DEACTIVATED`/`_REASSIGNED` |
-| `activities.service.ts` | `ACTIVITY_CREATED`/`ACTIVITY_SUBMITTED`, `ACTIVITY_UPDATED`/`ACTIVITY_PENDING_UPDATED`, `ACTIVITY_APPROVED_BY_TEAM_LEAD`/`_ADMIN`, `ACTIVITY_REJECTED`/`ACTIVITY_CHANGES_REQUESTED` |
-| `activity-edit-requests.service.ts` | `ACTIVITY_EDIT_REQUEST_SUBMITTED`, `ACTIVITY_APPROVED_BY_TEAM_LEAD`/`_ADMIN`, `ACTIVITY_REJECTED`/`ACTIVITY_CHANGES_REQUESTED` |
-| `notifications.service.ts` | `NOTIFICATION_READ`, `NOTIFICATION_MARK_ALL_READ` |
-| `reports.service.ts` | `REPORT_VIEWED`, `REPORT_EXPORTED` |
-| `dispatcher-finance.service.ts` | `FINANCE_VIEWED`, `FINANCE_EXPORTED` |
-| `settings.service.ts` | `SETTINGS_UPDATED`, `SETTINGS_DISPATCH_FEE_RULES_UPDATED`, `SETTINGS_TRUCK_TYPES_UPDATED`, `SETTINGS_STATUS_REASONS_UPDATED`, `SETTINGS_DIRECT_APPROVAL_UPDATED` |
-| `api/audit/export-events` | `ACTIVITY_EXPORTED`, `CARRIER_EXPORTED`, `AUDIT_LOGS_EXPORTED` (client beacon) |
+| Source                              | Actions                                                                                                                                                                                            |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auth.service.ts`                   | `USER_LOGGED_IN`, `USER_LOGGED_OUT`, `USER_LOGIN_FAILED`, `USER_PASSWORD_CHANGED`                                                                                                                  |
+| `users.service.ts`                  | `USER_MANUALLY_CREATED` (+`TEAM_LEAD_CREATED`), `USER_PASSWORD_RESET`, `USER_APPROVED`, `USER_REJECTED`, `USER_ROLE_ASSIGNED` (+`TEAM_LEAD_ASSIGNED`, `USER_TEAM_ASSIGNED`)                        |
+| `teams.service.ts`                  | `TEAM_CREATED`, `TEAM_UPDATED`, `TEAM_ACTIVATED`, `TEAM_DEACTIVATED`, `TEAM_LEAD_ASSIGNED`                                                                                                         |
+| `dispatchers.service.ts`            | `DISPATCHER_CREATED`/`TEAM_LEAD_CREATED`, `DISPATCHER_UPDATED`, `USER_ROLE_ASSIGNED`, `USER_TEAM_ASSIGNED`, `DISPATCHER_REACTIVATED`+`USER_ACTIVATED`, `DISPATCHER_DEACTIVATED`+`USER_DEACTIVATED` |
+| `carriers.service.ts`               | `CARRIER_CREATED`/`_UPDATED`/`_ACTIVATED`/`_DEACTIVATED`/`_REASSIGNED`                                                                                                                             |
+| `activities.service.ts`             | `ACTIVITY_CREATED`/`ACTIVITY_SUBMITTED`, `ACTIVITY_UPDATED`/`ACTIVITY_PENDING_UPDATED`, `ACTIVITY_APPROVED_BY_TEAM_LEAD`/`_ADMIN`, `ACTIVITY_REJECTED`/`ACTIVITY_CHANGES_REQUESTED`                |
+| `activity-edit-requests.service.ts` | `ACTIVITY_EDIT_REQUEST_SUBMITTED`, `ACTIVITY_APPROVED_BY_TEAM_LEAD`/`_ADMIN`, `ACTIVITY_REJECTED`/`ACTIVITY_CHANGES_REQUESTED`                                                                     |
+| `notifications.service.ts`          | `NOTIFICATION_READ`, `NOTIFICATION_MARK_ALL_READ`                                                                                                                                                  |
+| `reports.service.ts`                | `REPORT_VIEWED`, `REPORT_EXPORTED`                                                                                                                                                                 |
+| `dispatcher-finance.service.ts`     | `FINANCE_VIEWED`, `FINANCE_EXPORTED`                                                                                                                                                               |
+| `settings.service.ts`               | `SETTINGS_UPDATED`, `SETTINGS_DISPATCH_FEE_RULES_UPDATED`, `SETTINGS_TRUCK_TYPES_UPDATED`, `SETTINGS_STATUS_REASONS_UPDATED`, `SETTINGS_DIRECT_APPROVAL_UPDATED`                                   |
+| `api/audit/export-events`           | `ACTIVITY_EXPORTED`, `CARRIER_EXPORTED`, `AUDIT_LOGS_EXPORTED` (client beacon)                                                                                                                     |
 
 ### Export behavior (which exports actually write audit logs)
 
-| Export | Audit logged? | How |
-|--------|---------------|-----|
-| Reports CSV | ✓ `REPORT_EXPORTED` | server-side in `exportReportCsv` |
-| Finance CSV (dispatcher & admin) | ✓ `FINANCE_EXPORTED` | server-side in `exportDispatcherFinanceCsv` |
-| Activities PDF (daily activities) | ✓ `ACTIVITY_EXPORTED` | client beacon `recordAuditExportEvent` → `/api/audit/export-events` |
-| Carrier activity PDF | ✓ `CARRIER_EXPORTED` | client beacon |
-| Audit Logs PDF/CSV | ✓ `AUDIT_LOGS_EXPORTED` | client beacon |
-| Invoice PDF/CSV | ✓ `INVOICE_EXPORTED` | server on export endpoints + client PDF generation |
-| Activity detail PDF | ✗ no audit | PDF button only, no beacon. `Status: No audit on export` |
-| Performance report PDF | ✗ no audit | PDF button only, no beacon. `Status: No audit on export` |
+| Export                            | Audit logged?           | How                                                                 |
+| --------------------------------- | ----------------------- | ------------------------------------------------------------------- |
+| Reports CSV                       | ✓ `REPORT_EXPORTED`     | server-side in `exportReportCsv`                                    |
+| Finance CSV (dispatcher & admin)  | ✓ `FINANCE_EXPORTED`    | server-side in `exportDispatcherFinanceCsv`                         |
+| Activities PDF (daily activities) | ✓ `ACTIVITY_EXPORTED`   | client beacon `recordAuditExportEvent` → `/api/audit/export-events` |
+| Carrier activity PDF              | ✓ `CARRIER_EXPORTED`    | client beacon                                                       |
+| Audit Logs PDF/CSV                | ✓ `AUDIT_LOGS_EXPORTED` | client beacon                                                       |
+| Invoice PDF/CSV                   | ✓ `INVOICE_EXPORTED`    | server on export endpoints + client PDF generation                  |
+| Activity detail PDF               | ✗ no audit              | PDF button only, no beacon. `Status: No audit on export`            |
+| Performance report PDF            | ✗ no audit              | PDF button only, no beacon. `Status: No audit on export`            |
 
 ---
 
@@ -709,27 +710,29 @@ The `AuditAction` enum defines **50 values**. Every value is emitted somewhere (
 
 ### Export inventory & design
 
-| Export | Type | Mechanism | Shared `pdf-theme`? | Logo | Badges | Audit |
-|--------|------|-----------|:-------:|:----:|:------:|-------|
-| Reports CSV | CSV | server (`reports.service`) | n/a | n/a | n/a | `REPORT_EXPORTED` |
-| Finance CSV | CSV | server (`dispatcher-finance.service`) | n/a | n/a | n/a | `FINANCE_EXPORTED` |
-| Finance PDF | PDF | **`window.print()`** (no jsPDF module) | n/a | browser | n/a | none |
-| Daily Activities PDF | PDF | client jsPDF (`export-daily-activities-pdf.ts`) | ✓ | ✓ | ✓ status/approval | `ACTIVITY_EXPORTED` |
-| Carrier Activity PDF | PDF | client jsPDF (`export-carrier-activity-pdf.ts`) | ✓ | ✓ | ✓ status/approval | `CARRIER_EXPORTED` |
-| Activity Detail PDF | PDF | client jsPDF (`export-activity-detail-pdf.ts`) | ✓ | ✓ | ✓ status/approval | none |
-| Performance Report PDF | PDF | client jsPDF (`export-performance-report-pdf.ts`) | ✓ | ✓ | text only | none |
-| Audit Logs PDF | PDF | client jsPDF (`export-audit-logs-pdf.ts`) | ✗ self-contained styling | ✗ | text only (readable `formatAuditData`) | `AUDIT_LOGS_EXPORTED` |
-| Invoice PDF (single) | PDF | client jsPDF (`lib/invoices/export-invoice-pdf.ts`) | ✓ | ✓ | n/a | `INVOICE_EXPORTED` (API) |
-| Invoice list PDF | PDF | client jsPDF (`lib/invoices/export-invoice-list-pdf.ts`) | ✓ | ✓ | n/a | `INVOICE_EXPORTED` (admin list export) |
-| Invoice list CSV | CSV | server (`invoices.service`) | n/a | n/a | n/a | `INVOICE_EXPORTED` |
+| Export                 | Type | Mechanism                                                |   Shared `pdf-theme`?    |  Logo   |                 Badges                 | Audit                                  |
+| ---------------------- | ---- | -------------------------------------------------------- | :----------------------: | :-----: | :------------------------------------: | -------------------------------------- |
+| Reports CSV            | CSV  | server (`reports.service`)                               |           n/a            |   n/a   |                  n/a                   | `REPORT_EXPORTED`                      |
+| Finance CSV            | CSV  | server (`dispatcher-finance.service`)                    |           n/a            |   n/a   |                  n/a                   | `FINANCE_EXPORTED`                     |
+| Finance PDF            | PDF  | **`window.print()`** (no jsPDF module)                   |           n/a            | browser |                  n/a                   | none                                   |
+| Daily Activities PDF   | PDF  | client jsPDF (`export-daily-activities-pdf.ts`)          |            ✓             |    ✓    |           ✓ status/approval            | `ACTIVITY_EXPORTED`                    |
+| Carrier Activity PDF   | PDF  | client jsPDF (`export-carrier-activity-pdf.ts`)          |            ✓             |    ✓    |           ✓ status/approval            | `CARRIER_EXPORTED`                     |
+| Activity Detail PDF    | PDF  | client jsPDF (`export-activity-detail-pdf.ts`)           |            ✓             |    ✓    |           ✓ status/approval            | none                                   |
+| Performance Report PDF | PDF  | client jsPDF (`export-performance-report-pdf.ts`)        |            ✓             |    ✓    |               text only                | none                                   |
+| Audit Logs PDF         | PDF  | client jsPDF (`export-audit-logs-pdf.ts`)                | ✗ self-contained styling |    ✗    | text only (readable `formatAuditData`) | `AUDIT_LOGS_EXPORTED`                  |
+| Invoice PDF (single)   | PDF  | client jsPDF (`lib/invoices/export-invoice-pdf.ts`)      |            ✓             |    ✓    |                  n/a                   | `INVOICE_EXPORTED` (API)               |
+| Invoice list PDF       | PDF  | client jsPDF (`lib/invoices/export-invoice-list-pdf.ts`) |            ✓             |    ✓    |                  n/a                   | `INVOICE_EXPORTED` (admin list export) |
+| Invoice list CSV       | CSV  | server (`invoices.service`)                              |           n/a            |   n/a   |                  n/a                   | `INVOICE_EXPORTED`                     |
 
 **Activities page PDF exports (two entry points, verified):**
+
 - **Admin/Team Lead/Dispatcher → Activities → Export PDF:** `ActivitiesPdfExportButton` → `exportDailyActivitiesPdf` (`export-daily-activities-pdf.ts`) — landscape letter, report summary + activity history table, optional approval column when `includeApprovalDetails`.
 - **View Activity modal → Print / Export → Download PDF:** `activity-modal.tsx` → `exportActivityDetailPdf` (`export-activity-detail-pdf.ts`) — single-activity report with sections (basic info, load/work, notes, timeline, rejection feedback).
 
 **Carrier export (admin only):** Carriers table three-dot menu → **Export** → `exportCarrierActivityPdf` — A4 portrait carrier activity report (carrier details, monthly summary, full history).
 
 **Shared PDF theme (`src/lib/reports/pdf-theme.ts`), verified:**
+
 - **Palette:** `PRIMARY_BLUE [37,99,235]`, `DARK_NAVY [15,23,42]`, `TABLE_NAVY [11,31,58]`, muted/border/light-blue/light-gray/white.
 - **Status badges:** Delivered → green, Not Booked → orange, Cancelled → red, Not Working → gray. **Approval badges:** Approved → green, Rejected → red, Pending → amber.
 - **Logo:** `loadLogo()` fetches **`/pdf_logo.jpeg`** (from `public/`), preserves aspect ratio in the top-right; text fallback "Dispatcher Performance" if missing.
@@ -745,11 +748,11 @@ The `AuditAction` enum defines **50 values**. Every value is emitted somewhere (
 
 All dashboards count **only `approvalStatus = APPROVED`** (pending/rejected excluded). Verified per service.
 
-| Role | Route | API | Service | Data |
-|------|-------|-----|---------|------|
-| Admin | `/admin/dashboard` | `GET /api/dashboard/admin` | `getAdminDashboardBundle` | KPI section, growth vs previous period, per-dispatcher revenue/loads charts, notifications card, top performers, load status trend, active dispatchers, secondary metrics, revenue comparison, loads by team, status donut, recent activities |
-| Team Lead | `/team-lead/dashboard` | `GET /api/dashboard/team-lead` | `getTeamLeadMetrics` (+ bundle delegates to admin bundle, team-scoped) | revenue, total/delivered loads, avg rate/mile, active dispatchers, overview table |
-| Dispatcher | `/dispatcher/dashboard` | `GET /api/dashboard/dispatcher` | `getDispatcherDashboardBundle` | MTD revenue, delivered loads, avg rate/mile, assigned carriers, today completion, pending carriers, charts, recent activities |
+| Role       | Route                   | API                             | Service                                                                | Data                                                                                                                                                                                                                                          |
+| ---------- | ----------------------- | ------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Admin      | `/admin/dashboard`      | `GET /api/dashboard/admin`      | `getAdminDashboardBundle`                                              | KPI section, growth vs previous period, per-dispatcher revenue/loads charts, notifications card, top performers, load status trend, active dispatchers, secondary metrics, revenue comparison, loads by team, status donut, recent activities |
+| Team Lead  | `/team-lead/dashboard`  | `GET /api/dashboard/team-lead`  | `getTeamLeadMetrics` (+ bundle delegates to admin bundle, team-scoped) | revenue, total/delivered loads, avg rate/mile, active dispatchers, overview table                                                                                                                                                             |
+| Dispatcher | `/dispatcher/dashboard` | `GET /api/dashboard/dispatcher` | `getDispatcherDashboardBundle`                                         | MTD revenue, delivered loads, avg rate/mile, assigned carriers, today completion, pending carriers, charts, recent activities                                                                                                                 |
 
 ### Admin dashboard layout (`admin-dashboard-page.tsx` + `admin-kpi-section.tsx`)
 
@@ -767,6 +770,7 @@ Verified current card order (June 2026):
 Heavy chart components in the admin dashboard (`AdminKpiSection`, `RevenueTrendChart`, `LoadsByTeamChart`, `LoadStatusDonutChart`, `MonthlyGrowthMetricCard`) use `next/dynamic` with `{ ssr: false }` to defer **recharts** off the initial JS bundle.
 
 **Calculations (verified):**
+
 - **Revenue** = Σ `loadAmount` where `status === DELIVERED`, rounded to cents.
 - **On-time / delivery rate** = `delivered / totalLoads × 100`.
 - **Top performers** = DELIVERED revenue grouped by `dispatcherNameSnapshot`, sorted desc, top 3.
@@ -778,6 +782,7 @@ Heavy chart components in the admin dashboard (`AdminKpiSection`, `RevenueTrendC
 **Role-based visibility:** scope filters narrow the same queries — admin = company-wide, team lead = own team, dispatcher = own records. Admin dashboard persists filters to the URL; the dispatcher dashboard uses local state only.
 
 **Client performance (dashboard-related):**
+
 - **Team Lead dashboard** reuses `useEntityOptions()` for carriers/dispatchers instead of duplicate `/api/carriers` + `/api/dispatchers` calls.
 - **Dispatcher performance page** reuses `useEntityOptions()` for carriers.
 - **Entity options lazy load:** pages without a `useEntityOptions()` consumer (admin dashboard, daily report, settings, audit logs, finance, notifications, teams list, account) issue **zero** `/api/teams|dispatchers|carriers` requests on initial load.
@@ -796,6 +801,7 @@ Implemented in `dispatcher-finance.service.ts`. **Approved-only** (`.eq("approva
 - **Payment tracking:** invoice payments are recorded through the Invoice module. The legacy dispatcher finance summary remains activity-derived and period-based. `Status: Partially integrated`.
 
 **Views & permissions:**
+
 - Dispatcher (self): `/dispatcher/finance` → `GET /api/dispatcher/finance` (`FINANCE_VIEWED`), CSV via `POST /api/dispatcher/finance/export` (`FINANCE_EXPORTED`).
 - Admin (any dispatcher): `/admin/dispatchers/[dispatcherId]/finance` → `GET …/finance` (`FINANCE_VIEWED`), CSV via `POST …/finance/export` (`FINANCE_EXPORTED`).
 - Team Lead: **no** finance route.
@@ -817,16 +823,16 @@ flowchart LR
 
 Implemented in `notifications.service.ts`:
 
-| Function | Trigger | Recipient(s) | Status | Read |
-|----------|---------|--------------|--------|------|
-| `notifyNewActivitySubmitted` | new/resubmitted pending activity | team lead (if TL-pending) + all active admins | `TEAM_LEAD_APPROVAL_REQUIRED` / `ADMIN_APPROVAL_REQUIRED` | unread |
-| `notifyEditRequestSubmitted` | pending edit request | team lead (if TL-pending) + all admins | same | unread |
-| `notifyDispatcherOutcome` | reject / request-changes | the activity's dispatcher | `REJECTED` / `CHANGES_REQUESTED` | unread |
-| `notifyFinalApprovalCompleted` | approval finalized | the dispatcher | `COMPLETED` ("now live", appends approver role/name) | unread |
-| `updateEntityNotificationStatuses` | bulk update on approve/reject | existing notifications for the entity | target status; **sets `readAt` only when COMPLETED** | see [§9](#9-activity-approval-flow) |
-| `markNotificationRead` / `markAllNotificationsRead` | user action | self | unchanged | sets `readAt` (+ audit) |
-| `countUnreadNotifications` | badge | self | n/a | counts `readAt is null` |
-| `listNotifications` | inbox | self (team leads also see team-scoped via `metadata.teamId`) | n/a | newest-first, limit 100 |
+| Function                                            | Trigger                          | Recipient(s)                                                 | Status                                                    | Read                                |
+| --------------------------------------------------- | -------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------- | ----------------------------------- |
+| `notifyNewActivitySubmitted`                        | new/resubmitted pending activity | team lead (if TL-pending) + all active admins                | `TEAM_LEAD_APPROVAL_REQUIRED` / `ADMIN_APPROVAL_REQUIRED` | unread                              |
+| `notifyEditRequestSubmitted`                        | pending edit request             | team lead (if TL-pending) + all admins                       | same                                                      | unread                              |
+| `notifyDispatcherOutcome`                           | reject / request-changes         | the activity's dispatcher                                    | `REJECTED` / `CHANGES_REQUESTED`                          | unread                              |
+| `notifyFinalApprovalCompleted`                      | approval finalized               | the dispatcher                                               | `COMPLETED` ("now live", appends approver role/name)      | unread                              |
+| `updateEntityNotificationStatuses`                  | bulk update on approve/reject    | existing notifications for the entity                        | target status; **sets `readAt` only when COMPLETED**      | see [§9](#9-activity-approval-flow) |
+| `markNotificationRead` / `markAllNotificationsRead` | user action                      | self                                                         | unchanged                                                 | sets `readAt` (+ audit)             |
+| `countUnreadNotifications`                          | badge                            | self                                                         | n/a                                                       | counts `readAt is null`             |
+| `listNotifications`                                 | inbox                            | self (team leads also see team-scoped via `metadata.teamId`) | n/a                                                       | newest-first, limit 100             |
 
 - **Deep links:** notifications carry `activityId`/`editRequestId` columns + `metadata` (carrier name, activity date, dispatcher/editor name, reason, teamId). `getNotificationHref()` routes each notification to the right page per role (Pending Approvals for approvers, My Submissions for dispatchers) with `?activityId=`/`?editRequestId=` that auto-open the detail modal.
 - **Surfaces:** `NotificationsDropdown` (top-nav bell, unread badge, optional beep via `use-notification-sound`) and the `/{role}/notifications` page (search + status/carrier/date filters + client-side pagination, 8/page).
@@ -841,13 +847,13 @@ Real routes (verified from `src/app/**/page.tsx`). Most authenticated pages set 
 
 ### Public / auth
 
-| URL | File | Purpose |
-|-----|------|---------|
-| `/` | `app/page.tsx` | Portal picker (3 sign-in cards) |
-| `/session-expired` | `app/session-expired/page.tsx` | Expired session screen |
-| `/auth/reset-password` | `app/auth/reset-password/page.tsx` | Forgot-password form |
-| `/auth/update-password` | `app/auth/update-password/page.tsx` | Set new password |
-| `/auth/callback` | `app/auth/callback/route.ts` | Code exchange handler |
+| URL                     | File                                | Purpose                         |
+| ----------------------- | ----------------------------------- | ------------------------------- |
+| `/`                     | `app/page.tsx`                      | Portal picker (3 sign-in cards) |
+| `/session-expired`      | `app/session-expired/page.tsx`      | Expired session screen          |
+| `/auth/reset-password`  | `app/auth/reset-password/page.tsx`  | Forgot-password form            |
+| `/auth/update-password` | `app/auth/update-password/page.tsx` | Set new password                |
+| `/auth/callback`        | `app/auth/callback/route.ts`        | Code exchange handler           |
 
 ### Admin (`/admin/*`)
 
@@ -876,27 +882,27 @@ Sidebar nav per role is defined in `src/lib/auth/roles.ts` (`ADMIN_NAV_ITEMS`, `
 
 ## 16. Module-by-Module Explanation
 
-| Module | Purpose | Main files | APIs | Tables | Roles | Key rules |
-|--------|---------|-----------|------|--------|-------|-----------|
-| **Auth** | Sign in/out, session, password | `auth.service.ts`, `session.ts`, `require-auth.ts`, `auth/*` routes, `auth/*` components | `/api/auth/*` | User | All | expectedRole match + ACTIVE; JWKS-cached `getClaims`; login audit |
-| **Users / Requests** | Registration approval + managed users | `users.service.ts`, `user-requests-page-content.tsx` | `/api/users*`, `/api/users/requests*` | User, RegistrationRequest, Dispatcher | Admin | Provisions Supabase user; assigns role/team; one-time credentials |
-| **Teams** | Team CRUD | `teams.service.ts`, teams page | `/api/teams*` | Team, User | Admin (mutations), TL (read) | Cannot deactivate with active dispatchers/carriers |
-| **Dispatchers** | Dispatcher/TL CRUD | `dispatchers.service.ts`, dispatchers page | `/api/dispatchers*` | Dispatcher, User | Admin/TL | Only admin assigns TEAM_LEAD; TL scoped to own team |
-| **Carriers** | Carrier CRUD + reassign | `carriers.service.ts`, carriers page, forms | `/api/carriers*` | Carrier, CarrierAssignmentHistory | Admin/TL (write), Dispatcher (read) | Unique MC; allowed truck type; reassign keeps history |
-| **Activities** | Daily load logging | `activities.service.ts`, activities components, `daily-activity-form.tsx` | `/api/activities*` | DailyActivity, DailySubmission | All (scoped) | One per carrier/date; DELIVERED requires load fields; financial calc |
-| **Approvals** | Parallel approval | `approvals.service.ts`, `pending-approvals-page-content.tsx` | `/api/activities/{pending,[id]/approve,[id]/reject}` | DailyActivity, Notification | Admin/TL | First approver finalizes; concurrency guard |
-| **Edit Requests** | Edits to approved activities | `activity-edit-requests.service.ts`, `activity-change-comparison.tsx` | `/api/activity-edit-requests/[id]/*` | ActivityEditRequest, DailyActivity | Dispatcher/TL submit, Admin/TL approve | proposedChanges applied + financials recomputed |
-| **Dashboards** | Role KPIs/charts | `admin-dashboard.service.ts`, `dashboard.service.ts`, `dispatcher-dashboard.service.ts` | `/api/dashboard/*` | DailyActivity, Dispatcher | All (scoped) | Approved-only |
-| **Daily Report** | Live single-day snapshot | `admin-daily-report.service.ts`, `daily-report/*`, `use-daily-report-realtime.ts` | `/api/admin/daily-report` | DailyActivity | Admin | Realtime (debounced 400ms, unique channel); approved-only |
-| **Reports** | Period reports + CSV | `reports.service.ts`, `reports-page-content.tsx` | `/api/reports*` | DailyActivity, ReportExport | Admin/TL | Approved-only; csvMaxRows; export audit |
-| **Finance** | Revenue/fee views | `dispatcher-finance.service.ts`, `finance/*` | `/api/dispatcher/finance*`, `/api/admin/dispatchers/[id]/finance*` | DailyActivity, Dispatcher, Carrier | Dispatcher (self), Admin (any) | Approved-only; FINANCE_VIEWED/EXPORTED |
-| **Rankings** | Leaderboards | `rankings.service.ts`, `rankings-page-content.tsx` | `/api/rankings` | DailyActivity, Dispatcher, Carrier, Team | Admin/TL (all), Dispatcher (self) | Activity rankings approved-only |
-| **Notifications** | In-app alerts | `notifications.service.ts`, `notifications/*` | `/api/notifications*` | Notification | All | Realtime; deep links; read nuance |
-| **Audit** | Action history | `audit.service.ts`, `audit-logs.service.ts`, `audit-log-format.ts`, `admin-logs-page-content.tsx` | `/api/admin/logs`, `/api/audit/export-events` | AuditLog | Admin | Sanitized; readable formatting; never throws |
-| **Settings** | Org config | `settings.service.ts`, `settings-page-content.tsx` | `/api/settings*` | OrganizationSettings, StatusReason, Organization | Admin (write), all (fee rules/status reasons read) | Fee rules; truck types; status reasons; directAdminApprovalMode |
-| **Search** | Global search | `search.service.ts`, `global-search.tsx` | `/api/search` | Carrier, Dispatcher, DailyActivity | All (scoped) | Min 2 chars; role-aware deep links |
-| **Invoices** | Payable/receivable invoices + payments | `invoices.service.ts`, `components/invoices/*`, `lib/invoices/*` | `/api/invoices*`, `/api/dispatcher/invoices*`, `/api/team-lead/invoices*` | Invoice, InvoiceItem, InvoicePayment, DailyActivity | Admin (all), TL (team), Dispatcher (own payable) | Approved activities only; duplicate period blocked |
-| **Daily Submissions** | Per-day roll-up | `daily-submissions.service.ts` | (internal) | DailySubmission | — | Counts approved activities/carriers per dispatcher/day |
+| Module                | Purpose                                | Main files                                                                                        | APIs                                                                      | Tables                                              | Roles                                              | Key rules                                                                              |
+| --------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| **Auth**              | Sign in/out, session, password         | `auth.service.ts`, `session.ts`, `require-auth.ts`, `auth/*` routes, `auth/*` components          | `/api/auth/*`                                                             | User                                                | All                                                | expectedRole match + ACTIVE; JWKS-cached `getClaims`; login audit                      |
+| **Users / Requests**  | Registration approval + managed users  | `users.service.ts`, `user-requests-page-content.tsx`                                              | `/api/users*`, `/api/users/requests*`                                     | User, RegistrationRequest, Dispatcher               | Admin                                              | Provisions Supabase user; assigns role/team; one-time credentials                      |
+| **Teams**             | Team CRUD                              | `teams.service.ts`, teams page                                                                    | `/api/teams*`                                                             | Team, User                                          | Admin (mutations), TL (read)                       | Cannot deactivate with active dispatchers/carriers                                     |
+| **Dispatchers**       | Dispatcher/TL CRUD                     | `dispatchers.service.ts`, dispatchers page                                                        | `/api/dispatchers*`                                                       | Dispatcher, User                                    | Admin/TL                                           | Only admin assigns TEAM_LEAD; TL scoped to own team                                    |
+| **Carriers**          | Carrier CRUD + reassign                | `carriers.service.ts`, carriers page, forms                                                       | `/api/carriers*`                                                          | Carrier, CarrierAssignmentHistory                   | Admin/TL (write), Dispatcher (read)                | Unique MC; allowed truck type; reassign keeps history                                  |
+| **Activities**        | Daily load logging                     | `activities.service.ts`, activities components, `daily-activity-form.tsx`                         | `/api/activities*`                                                        | DailyActivity, DailySubmission                      | All (scoped)                                       | Multiple rows per carrier/date allowed; DELIVERED requires load fields; financial calc |
+| **Approvals**         | Parallel approval                      | `approvals.service.ts`, `pending-approvals-page-content.tsx`                                      | `/api/activities/{pending,[id]/approve,[id]/reject}`                      | DailyActivity, Notification                         | Admin/TL                                           | First approver finalizes; concurrency guard                                            |
+| **Edit Requests**     | Edits to approved activities           | `activity-edit-requests.service.ts`, `activity-change-comparison.tsx`                             | `/api/activity-edit-requests/[id]/*`                                      | ActivityEditRequest, DailyActivity                  | Dispatcher/TL submit, Admin/TL approve             | proposedChanges applied + financials recomputed                                        |
+| **Dashboards**        | Role KPIs/charts                       | `admin-dashboard.service.ts`, `dashboard.service.ts`, `dispatcher-dashboard.service.ts`           | `/api/dashboard/*`                                                        | DailyActivity, Dispatcher                           | All (scoped)                                       | Approved-only                                                                          |
+| **Daily Report**      | Live single-day snapshot               | `admin-daily-report.service.ts`, `daily-report/*`, `use-daily-report-realtime.ts`                 | `/api/admin/daily-report`                                                 | DailyActivity                                       | Admin                                              | Realtime (debounced 400ms, unique channel); approved-only                              |
+| **Reports**           | Period reports + CSV                   | `reports.service.ts`, `reports-page-content.tsx`                                                  | `/api/reports*`                                                           | DailyActivity, ReportExport                         | Admin/TL                                           | Approved-only; csvMaxRows; export audit                                                |
+| **Finance**           | Revenue/fee views                      | `dispatcher-finance.service.ts`, `finance/*`                                                      | `/api/dispatcher/finance*`, `/api/admin/dispatchers/[id]/finance*`        | DailyActivity, Dispatcher, Carrier                  | Dispatcher (self), Admin (any)                     | Approved-only; FINANCE_VIEWED/EXPORTED                                                 |
+| **Rankings**          | Leaderboards                           | `rankings.service.ts`, `rankings-page-content.tsx`                                                | `/api/rankings`                                                           | DailyActivity, Dispatcher, Carrier, Team            | Admin/TL (all), Dispatcher (self)                  | Activity rankings approved-only                                                        |
+| **Notifications**     | In-app alerts                          | `notifications.service.ts`, `notifications/*`                                                     | `/api/notifications*`                                                     | Notification                                        | All                                                | Realtime; deep links; read nuance                                                      |
+| **Audit**             | Action history                         | `audit.service.ts`, `audit-logs.service.ts`, `audit-log-format.ts`, `admin-logs-page-content.tsx` | `/api/admin/logs`, `/api/audit/export-events`                             | AuditLog                                            | Admin                                              | Sanitized; readable formatting; never throws                                           |
+| **Settings**          | Org config                             | `settings.service.ts`, `settings-page-content.tsx`                                                | `/api/settings*`                                                          | OrganizationSettings, StatusReason, Organization    | Admin (write), all (fee rules/status reasons read) | Fee rules; truck types; status reasons; directAdminApprovalMode                        |
+| **Search**            | Global search                          | `search.service.ts`, `global-search.tsx`                                                          | `/api/search`                                                             | Carrier, Dispatcher, DailyActivity                  | All (scoped)                                       | Min 2 chars; role-aware deep links                                                     |
+| **Invoices**          | Payable/receivable invoices + payments | `invoices.service.ts`, `components/invoices/*`, `lib/invoices/*`                                  | `/api/invoices*`, `/api/dispatcher/invoices*`, `/api/team-lead/invoices*` | Invoice, InvoiceItem, InvoicePayment, DailyActivity | Admin (all), TL (team), Dispatcher (own payable)   | Approved activities only; duplicate period blocked                                     |
+| **Daily Submissions** | Per-day roll-up                        | `daily-submissions.service.ts`                                                                    | (internal)                                                                | DailySubmission                                     | —                                                  | Counts approved activities/carriers per dispatcher/day                                 |
 
 ---
 
@@ -1007,7 +1013,7 @@ flowchart LR
 5. **Parallel approval, first wins.** Team lead + all admins are notified together; the first authorized approver finalizes; concurrency is guarded by `.eq("approvalStatus", current)`.
 6. **Non-admin edits to approved activities go through edit requests.** The original stays live until the edit is approved; financials are recomputed on apply.
 7. **Financial math.** Revenue = Σ DELIVERED `loadAmount`; dispatch fee = `max(loadAmount × pct/100, minimumFee)` (optionally rounded to whole dollars); rate/mile = `loadAmount / totalMiles`. Financials are stored only for DELIVERED with positive miles + amount.
-8. **One activity per carrier per day** (`@@unique([carrierId, activityDate])`).
+8. **Multiple activities per carrier per day are allowed.** A carrier can have multiple `DailyActivity` rows on the same `activityDate`. Each row is a separate operational record with its own status, approval flow, audit log, notifications, financial fields, and invoice line eligibility. Dashboards, reports, finance, invoices, approvals, and audit logs count each activity row separately.
 9. **Audit on important actions.** Every create/update/approve/reject/export/login/settings change writes an audit log (with sensitive-key redaction).
 10. **Clean, readable exports.** Audit metadata renders as `Label: value` (not raw JSON) across table/CSV/PDF; CSV cells are guarded against formula injection; CSV row count capped by `csvMaxRows`.
 11. **Branded PDFs.** Activity, carrier, detail, performance, and invoice PDFs use the shared `pdf-theme.ts` (blue/navy palette, `/pdf_logo.jpeg` logo, status/approval badges where applicable, footer page numbers). Audit-logs PDF uses readable `formatAuditData` lines but self-contained header styling (not full `pdf-theme` shell).
@@ -1162,31 +1168,31 @@ Status: Partially implemented.
 
 ## 19. Known Issues or Missing Items
 
-| Item | Status | Detail |
-|------|--------|--------|
-| **Reject/request-changes leaves sibling notification unread** | Known nuance | `updateEntityNotificationStatuses` sets `readAt` only for `COMPLETED` (approve). On reject/request-changes the sibling approver's notification changes status but stays unread (can inflate the unread badge for an action they can no longer take). Documented as-is. |
-| **`user-requests` page triggers all 3 entity-option APIs** | Known | `user-requests-page-content.tsx` calls `useEntityOptions()` at page level (for create-user team picker), so visiting `/admin/users/requests` still loads teams + dispatchers + carriers via `ensureLoaded()` even though only `teams` is needed. Could defer to modal-only consume to drop to zero on load. |
-| **Duplicate `/api/teams` on dispatchers page** | Fixed | Dispatchers page now reads `teams` from `useEntityOptions()` (same source as the dispatcher form). |
-| **Duplicate entity fetches on Team Lead dashboard** | Fixed | Reuses `useEntityOptions()` for carriers/dispatchers. |
-| **Admin daily report realtime resubscribe churn** | Fixed | `use-daily-report-realtime.ts` holds callback in ref, debounces 400ms, unique channel id. |
-| **recharts eager import on dashboards** | Fixed (partial) | Admin dashboard KPI/charts, dispatcher dashboard charts, and daily report charts use `next/dynamic` `{ ssr: false }`. Other pages with charts may still import recharts eagerly. |
-| **Activity detail PDF / performance report PDF write no audit** | Partially implemented | These PDF buttons do not call the export beacon, so no `ACTIVITY_EXPORTED`/export audit is recorded for them. |
-| **Finance PDF uses `window.print()`** | Partially implemented | No jsPDF finance module; finance "PDF" is browser print. |
-| **Payment tracking** | Implemented | Invoice/payment tables now track invoice payments. Dispatcher finance still presents period earnings independently of invoice filters. |
-| **Dispatcher dashboard avg rate/mile** | Known inconsistency | Plain mean of stored per-row rates vs the weighted Σrevenue/Σmiles used elsewhere. Verify intended formula. |
-| **Same-origin check skipped on GET** | Known | `handleApi(fn)` reads omit `request`, so `assertSameOrigin` runs only on mutations (and manually on login/logout). |
-| **Rate limiting is in-memory** | Known | `rate-limit.ts` uses a per-process Map (20 attempts / 15 min); not shared across instances/deployments. |
-| **Supabase RLS** | Not implemented | No policy files; service-role access only. See `docs/security-hardening.md`. |
-| **`@tanstack/react-table`** | Unused dependency | Installed but not imported; tables are not interactively sortable. |
-| **List pagination (beyond notifications)** | Not implemented | Most list endpoints return full filtered sets; notifications API capped at 100, paginated client-side. |
-| **`EntityFilterBar` search (`q`)** | Partially implemented | APIs accept `q` (ILIKE) but the entity filter bar exposes no search input. |
-| **URL filter persistence** | Partially implemented | Only admin dashboard + approval deep links read/write URL filters; other pages reset on reload. |
-| **`ReportExport` PENDING/FAILED** | Backend model only | Exports are synchronous; only `COMPLETED` rows are written. |
-| **Per-segment `loading.tsx` / `error.tsx`** | Partially implemented | Global error boundary only. |
-| **Activity hard delete** | Not implemented | No delete endpoint. |
-| **Multi-organization UI** | Not implemented | Schema is multi-tenant; bootstrap creates a single org. |
-| **Email delivery** | Not implemented | Notifications are in-app only; no Resend/SMTP in `.env.example`. |
-| **Root `README.md`** | Stale | Default Next.js boilerplate. |
+| Item                                                            | Status                | Detail                                                                                                                                                                                                                                                                                                      |
+| --------------------------------------------------------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Reject/request-changes leaves sibling notification unread**   | Known nuance          | `updateEntityNotificationStatuses` sets `readAt` only for `COMPLETED` (approve). On reject/request-changes the sibling approver's notification changes status but stays unread (can inflate the unread badge for an action they can no longer take). Documented as-is.                                      |
+| **`user-requests` page triggers all 3 entity-option APIs**      | Known                 | `user-requests-page-content.tsx` calls `useEntityOptions()` at page level (for create-user team picker), so visiting `/admin/users/requests` still loads teams + dispatchers + carriers via `ensureLoaded()` even though only `teams` is needed. Could defer to modal-only consume to drop to zero on load. |
+| **Duplicate `/api/teams` on dispatchers page**                  | Fixed                 | Dispatchers page now reads `teams` from `useEntityOptions()` (same source as the dispatcher form).                                                                                                                                                                                                          |
+| **Duplicate entity fetches on Team Lead dashboard**             | Fixed                 | Reuses `useEntityOptions()` for carriers/dispatchers.                                                                                                                                                                                                                                                       |
+| **Admin daily report realtime resubscribe churn**               | Fixed                 | `use-daily-report-realtime.ts` holds callback in ref, debounces 400ms, unique channel id.                                                                                                                                                                                                                   |
+| **recharts eager import on dashboards**                         | Fixed (partial)       | Admin dashboard KPI/charts, dispatcher dashboard charts, and daily report charts use `next/dynamic` `{ ssr: false }`. Other pages with charts may still import recharts eagerly.                                                                                                                            |
+| **Activity detail PDF / performance report PDF write no audit** | Partially implemented | These PDF buttons do not call the export beacon, so no `ACTIVITY_EXPORTED`/export audit is recorded for them.                                                                                                                                                                                               |
+| **Finance PDF uses `window.print()`**                           | Partially implemented | No jsPDF finance module; finance "PDF" is browser print.                                                                                                                                                                                                                                                    |
+| **Payment tracking**                                            | Implemented           | Invoice/payment tables now track invoice payments. Dispatcher finance still presents period earnings independently of invoice filters.                                                                                                                                                                      |
+| **Dispatcher dashboard avg rate/mile**                          | Known inconsistency   | Plain mean of stored per-row rates vs the weighted Σrevenue/Σmiles used elsewhere. Verify intended formula.                                                                                                                                                                                                 |
+| **Same-origin check skipped on GET**                            | Known                 | `handleApi(fn)` reads omit `request`, so `assertSameOrigin` runs only on mutations (and manually on login/logout).                                                                                                                                                                                          |
+| **Rate limiting is in-memory**                                  | Known                 | `rate-limit.ts` uses a per-process Map (20 attempts / 15 min); not shared across instances/deployments.                                                                                                                                                                                                     |
+| **Supabase RLS**                                                | Not implemented       | No policy files; service-role access only. See `docs/security-hardening.md`.                                                                                                                                                                                                                                |
+| **`@tanstack/react-table`**                                     | Unused dependency     | Installed but not imported; tables are not interactively sortable.                                                                                                                                                                                                                                          |
+| **List pagination (beyond notifications)**                      | Not implemented       | Most list endpoints return full filtered sets; notifications API capped at 100, paginated client-side.                                                                                                                                                                                                      |
+| **`EntityFilterBar` search (`q`)**                              | Partially implemented | APIs accept `q` (ILIKE) but the entity filter bar exposes no search input.                                                                                                                                                                                                                                  |
+| **URL filter persistence**                                      | Partially implemented | Only admin dashboard + approval deep links read/write URL filters; other pages reset on reload.                                                                                                                                                                                                             |
+| **`ReportExport` PENDING/FAILED**                               | Backend model only    | Exports are synchronous; only `COMPLETED` rows are written.                                                                                                                                                                                                                                                 |
+| **Per-segment `loading.tsx` / `error.tsx`**                     | Partially implemented | Global error boundary only.                                                                                                                                                                                                                                                                                 |
+| **Activity hard delete**                                        | Not implemented       | No delete endpoint.                                                                                                                                                                                                                                                                                         |
+| **Multi-organization UI**                                       | Not implemented       | Schema is multi-tenant; bootstrap creates a single org.                                                                                                                                                                                                                                                     |
+| **Email delivery**                                              | Not implemented       | Notifications are in-app only; no Resend/SMTP in `.env.example`.                                                                                                                                                                                                                                            |
+| **Root `README.md`**                                            | Stale                 | Default Next.js boilerplate.                                                                                                                                                                                                                                                                                |
 
 > No TODO/FIXME markers of concern surfaced in the service layer during the scan; the items above were derived from real code paths. Mark any not personally re-verified before relying on them as `Needs verification`.
 
@@ -1233,15 +1239,15 @@ Status: Partially implemented.
 
 ### Performance & load-time notes (verified)
 
-| Optimization | Location | Effect |
-|--------------|----------|--------|
-| `getCurrentUser` + `React.cache()` + `getClaims()` + JWKS cache | `session.ts`, `jwks-cache.ts` | One auth resolution per server request; no network round-trip to Supabase auth for JWT verify |
-| Middleware skips session refresh for `/api/*` | `middleware.ts` | API routes avoid redundant cookie refresh |
-| `SessionProvider` fetches `/api/auth/me` once on mount | `session-provider.tsx` | No refetch on client navigation |
-| `useApiData` request-id guard | `use-api-data.ts` | Stale responses cannot overwrite newer data |
-| Lazy `EntityOptionsProvider` | `entity-options-provider.tsx`, `use-entity-options.ts` | Zero entity-list calls on non-consumer pages |
-| Dynamic recharts imports | `admin-dashboard-page.tsx`, `dispatcher-dashboard-page.tsx`, `admin-daily-report-page.tsx` | Smaller initial dashboard JS bundle |
-| In-memory rate limiter sweep | `rate-limit.ts` | Expired buckets evicted periodically |
+| Optimization                                                    | Location                                                                                   | Effect                                                                                        |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| `getCurrentUser` + `React.cache()` + `getClaims()` + JWKS cache | `session.ts`, `jwks-cache.ts`                                                              | One auth resolution per server request; no network round-trip to Supabase auth for JWT verify |
+| Middleware skips session refresh for `/api/*`                   | `middleware.ts`                                                                            | API routes avoid redundant cookie refresh                                                     |
+| `SessionProvider` fetches `/api/auth/me` once on mount          | `session-provider.tsx`                                                                     | No refetch on client navigation                                                               |
+| `useApiData` request-id guard                                   | `use-api-data.ts`                                                                          | Stale responses cannot overwrite newer data                                                   |
+| Lazy `EntityOptionsProvider`                                    | `entity-options-provider.tsx`, `use-entity-options.ts`                                     | Zero entity-list calls on non-consumer pages                                                  |
+| Dynamic recharts imports                                        | `admin-dashboard-page.tsx`, `dispatcher-dashboard-page.tsx`, `admin-daily-report-page.tsx` | Smaller initial dashboard JS bundle                                                           |
+| In-memory rate limiter sweep                                    | `rate-limit.ts`                                                                            | Expired buckets evicted periodically                                                          |
 
 **Pages that still consume entity options on load** (all 3 list APIs fire): activities, carriers, dispatchers, rankings, reports, team-lead dashboard, dispatcher performance, user-requests. **Pages with zero entity-option calls on load:** admin dashboard, daily report, settings, audit logs, finance, notifications, teams, account.
 
@@ -1271,4 +1277,4 @@ Key env vars (names only): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANO
 
 ---
 
-*Last updated: June 30, 2026 — verified against real code (services, routes, schema, auth, exports, dashboard layout, performance optimizations). Models documented: 18. API handlers: ~76 across 65 route files. For role-specific user guides see `docs/admin.md`, `docs/lead.md`, `docs/dispatcher.md`.*
+_Last updated: June 30, 2026 — verified against real code (services, routes, schema, auth, exports, dashboard layout, performance optimizations). Models documented: 18. API handlers: ~76 across 65 route files. For role-specific user guides see `docs/admin.md`, `docs/lead.md`, `docs/dispatcher.md`._
