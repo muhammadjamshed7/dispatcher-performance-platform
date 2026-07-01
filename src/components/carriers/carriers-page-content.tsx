@@ -912,7 +912,7 @@ function SalesFilterPanel({
 
 function SalesKpiGrid({ analytics }: { analytics: SalesAnalytics }) {
   return (
-    <section className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,240px),1fr))] gap-4">
+    <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
       <SalesKpiCard
         title="Total Revenue"
         value={formatCurrencyCompact(analytics.totalRevenue, "$0")}
