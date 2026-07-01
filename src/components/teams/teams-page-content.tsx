@@ -1025,7 +1025,7 @@ function TeamPerformanceTooltip({
       <TooltipLine
         label="Revenue"
         value={formatCurrency(row.revenue, {
-          currency: "PKR",
+          currency: "USD",
           maximumFractionDigits: 0,
         })}
       />
@@ -1205,7 +1205,7 @@ function TeamPerformanceChart({ rows }: { rows: TeamAnalyticsRow[] }) {
             barSize={18}
           />
           <Bar
-            name="Revenue (PKR)"
+            name="Revenue (USD)"
             dataKey="revenueK"
             fill={METRIC_COLORS.revenue}
             radius={[6, 6, 0, 0]}
