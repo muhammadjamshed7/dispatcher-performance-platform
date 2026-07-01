@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 
@@ -25,11 +25,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useApiData } from "@/hooks/use-api-data";
-import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
+import { useNotifications } from "@/hooks/use-notifications";
 import { useSession } from "@/components/auth/session-provider";
 import {
-  fetchNotifications,
   markAllNotificationsReadRequest,
   markNotificationReadRequest,
 } from "@/lib/api/resources";
@@ -89,17 +87,9 @@ function DateTimeCell({ value }: { value: string | null | undefined }) {
 export function NotificationsPageContent() {
   const router = useRouter();
   const { session } = useSession();
-  const loadNotifications = useCallback(() => fetchNotifications(), []);
-  const { data, error, isLoading, isEmpty, reload } = useApiData(
-    loadNotifications,
-    [],
+  const { data, error, isLoading, isEmpty, reload } = useNotifications(
+    Boolean(session),
   );
-  const realtimeTables = useMemo(
-    () => ["Notification", "DailyActivity", "ActivityEditRequest"] as const,
-    [],
-  );
-
-  useRealtimeRefresh(realtimeTables, reload);
 
   const notifications = useMemo<AppNotification[]>(
     () => data?.notifications ?? [],

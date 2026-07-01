@@ -103,7 +103,11 @@ function DispatchersPageState({
   // Reuse the teams already loaded by EntityOptionsProvider (also used by the
   // dispatcher form's team picker) instead of issuing a duplicate /api/teams
   // request here. Only used for name → id lookup on create/edit.
-  const { teams } = useEntityOptions();
+  const { teams } = useEntityOptions({
+    teams: true,
+    dispatchers: false,
+    carriers: false,
+  });
 
   const visibleDispatchers = useMemo(
     () => filterDispatchers(dispatchers),

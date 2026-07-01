@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   Ban,
   Bell,
@@ -19,7 +19,7 @@ import { KpiStatusTrendChart } from "@/components/dashboard/admin/kpi-status-tre
 import { KpiStatCardShell } from "@/components/dashboard/admin/kpi-stat-card-shell";
 import { TopPerformersCard } from "@/components/dashboard/admin/top-performers-card";
 import { Badge } from "@/components/ui/badge";
-import { fetchNotifications } from "@/lib/api/resources";
+import { useNotifications } from "@/hooks/use-notifications";
 import type { AdminDashboardBundle, AppNotification } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { formatCurrencyCompact } from "@/lib/utils/format-currency";
@@ -286,35 +286,12 @@ function formatNotificationTime(value: string) {
 }
 
 function DashboardNotificationsCard({ className }: { className?: string }) {
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadNotifications() {
-      try {
-        const result = await fetchNotifications();
-        if (!active) return;
-        setNotifications(sortNotifications(result.notifications));
-        setUnreadCount(result.unreadCount);
-        setError(null);
-      } catch {
-        if (!active) return;
-        setError("Unable to load notifications.");
-      }
-    }
-
-    loadNotifications();
-    const intervalId = window.setInterval(loadNotifications, 10000);
-
-    return () => {
-      active = false;
-      window.clearInterval(intervalId);
-    };
-  }, []);
-
+  const { data, error } = useNotifications();
+  const notifications = useMemo(
+    () => sortNotifications(data?.notifications ?? []),
+    [data?.notifications],
+  );
+  const unreadCount = data?.unreadCount ?? 0;
   const latest = notifications.slice(0, 5);
 
   return (
@@ -344,7 +321,7 @@ function DashboardNotificationsCard({ className }: { className?: string }) {
               {unreadCount.toLocaleString()}
             </p>
             <p className="mt-2 text-xs text-[#64748B]">
-              Auto-refreshes every 10 seconds
+              Updates with live workflow changes
             </p>
           </div>
         </div>

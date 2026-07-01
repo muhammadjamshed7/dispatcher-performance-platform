@@ -501,7 +501,11 @@ function CarriersPageState({
     teams,
     dispatchers,
     reload: reloadEntityOptions,
-  } = useEntityOptions();
+  } = useEntityOptions({
+    teams: true,
+    dispatchers: true,
+    carriers: false,
+  });
 
   const refreshCarriers = useCallback(async () => {
     await Promise.all([

@@ -35,7 +35,11 @@ export function DispatcherForm({
   readOnly = false,
   onSubmit,
 }: DispatcherFormProps) {
-  const { teams } = useEntityOptions();
+  const { teams } = useEntityOptions({
+    teams: true,
+    dispatchers: false,
+    carriers: false,
+  });
   // Team leads are provisioned through the user-requests approval flow, not this
   // modal — creating a TEAM_LEAD here would make a user with no Dispatcher row
   // that then "disappears" from the dispatcher list. Keep this dispatcher-only.

@@ -194,7 +194,11 @@ export function CarriersExcelFilterControls({
   const buttonRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [draftFilters, setDraftFilters] = useState(appliedFilters);
-  const { teams, dispatchers, isLoading } = useEntityOptions();
+  const { teams, dispatchers, isLoading } = useEntityOptions({
+    teams: true,
+    dispatchers: true,
+    carriers: false,
+  });
 
   const teamOptions = useMemo(
     () => teams.map((team) => ({ value: team.id, label: team.name })),

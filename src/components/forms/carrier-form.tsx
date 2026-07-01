@@ -98,7 +98,11 @@ export function CarrierForm({
   const isCreateMode = defaultValues === undefined;
   const initialValues = defaultValues ?? defaultCarrierFormValues;
   const premium = variant === "premium";
-  const { teams, dispatchers, isLoading } = useEntityOptions();
+  const { teams, dispatchers, isLoading } = useEntityOptions({
+    teams: true,
+    dispatchers: true,
+    carriers: false,
+  });
   const loadDispatchFeeRules = useCallback(() => fetchDispatchFeeRules(), []);
   const { data: dispatchFeeRules } = useApiData(loadDispatchFeeRules, [], {
     enabled: isCreateMode && !readOnly,

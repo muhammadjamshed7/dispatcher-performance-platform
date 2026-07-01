@@ -22,7 +22,11 @@ export function DispatcherFilter({
   onValueChange,
   disabled = false,
 }: DispatcherFilterProps) {
-  const { dispatchers } = useEntityOptions();
+  const { dispatchers } = useEntityOptions({
+    teams: false,
+    dispatchers: true,
+    carriers: false,
+  });
 
   return (
     <FilterField label="Dispatcher">

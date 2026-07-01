@@ -65,7 +65,11 @@ export function DailyActivityForm({
 }: DailyActivityFormProps) {
   const { filterCarriers } = useRoleScope();
   const { carriers: allCarriers, isLoading: carriersLoading } =
-    useEntityOptions();
+    useEntityOptions({
+      teams: false,
+      dispatchers: false,
+      carriers: true,
+    });
   const loadDispatchFeeRules = useCallback(() => fetchDispatchFeeRules(), []);
   const { data: dispatchFeeRules } = useApiData(loadDispatchFeeRules, []);
   const availableCarriers = useMemo(

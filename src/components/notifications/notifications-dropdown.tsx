@@ -1,15 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, Volume2, VolumeX } from "lucide-react";
 
-import { useApiData } from "@/hooks/use-api-data";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
+import { useNotifications } from "@/hooks/use-notifications";
 import { useNotificationSound } from "@/hooks/use-notification-sound";
 import { useSession } from "@/components/auth/session-provider";
 import {
-  fetchNotifications,
   markAllNotificationsReadRequest,
   markNotificationReadRequest,
 } from "@/lib/api/resources";
@@ -33,19 +32,14 @@ export function NotificationsDropdown() {
   const router = useRouter();
   const { session } = useSession();
   const [open, setOpen] = useState(false);
-  const loadNotifications = useCallback(() => fetchNotifications(), []);
-  const { data, reload } = useApiData(
-    loadNotifications,
-    [Boolean(session)],
-    { enabled: Boolean(session) },
-  );
+  const { data, reload } = useNotifications(Boolean(session));
 
   const realtimeTables = useMemo(
     () => ["Notification", "DailyActivity", "ActivityEditRequest"] as const,
     [],
   );
 
-  useRealtimeRefresh(realtimeTables, reload);
+  useRealtimeRefresh(realtimeTables, reload, Boolean(session));
 
   const notifications = useMemo(() => data?.notifications ?? [], [data]);
   const unreadCount = data?.unreadCount ?? 0;

@@ -22,7 +22,11 @@ export function TeamFilter({
   onValueChange,
   disabled = false,
 }: TeamFilterProps) {
-  const { teams } = useEntityOptions();
+  const { teams } = useEntityOptions({
+    teams: true,
+    dispatchers: false,
+    carriers: false,
+  });
 
   return (
     <FilterField label="Team">

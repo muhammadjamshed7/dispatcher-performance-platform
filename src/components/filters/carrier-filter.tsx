@@ -22,7 +22,11 @@ export function CarrierFilter({
   onValueChange,
   disabled = false,
 }: CarrierFilterProps) {
-  const { carriers } = useEntityOptions();
+  const { carriers } = useEntityOptions({
+    teams: false,
+    dispatchers: false,
+    carriers: true,
+  });
 
   return (
     <FilterField label="Carrier">

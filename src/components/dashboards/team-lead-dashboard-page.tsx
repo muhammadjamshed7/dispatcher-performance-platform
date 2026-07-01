@@ -29,7 +29,11 @@ export function TeamLeadDashboardPage() {
     dispatchers: teamDispatchers,
     isLoading: entityLoading,
     reload: reloadEntities,
-  } = useEntityOptions();
+  } = useEntityOptions({
+    teams: false,
+    dispatchers: true,
+    carriers: true,
+  });
 
   const loadMetrics = useCallback(() => fetchTeamLeadDashboard(), []);
   const loadActivities = useCallback(

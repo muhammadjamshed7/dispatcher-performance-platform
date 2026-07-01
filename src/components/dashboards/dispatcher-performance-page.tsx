@@ -49,7 +49,11 @@ export function DispatcherPerformancePage() {
     carriers: assignedCarriers,
     isLoading: carriersLoading,
     reload: reloadCarriers,
-  } = useEntityOptions();
+  } = useEntityOptions({
+    teams: false,
+    dispatchers: false,
+    carriers: true,
+  });
 
   const loadMetrics = useCallback(() => fetchDispatcherDashboard(), []);
   const loadRankings = useCallback(() => fetchRankings("dispatcher"), []);

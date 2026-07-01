@@ -29,7 +29,11 @@ export function CarrierReassignForm({
   defaultValues,
   onSubmit,
 }: CarrierReassignFormProps) {
-  const { teams, dispatchers, isLoading } = useEntityOptions();
+  const { teams, dispatchers, isLoading } = useEntityOptions({
+    teams: true,
+    dispatchers: true,
+    carriers: false,
+  });
   const {
     handleSubmit,
     reset,

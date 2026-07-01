@@ -28,8 +28,52 @@ import type { Role } from "@/lib/constants/roles";
 
 export type { SessionUser };
 
+const REFERENCE_CACHE_TTL_MS = 5 * 60_000;
+
+type CacheEntry<T> = {
+  data: T;
+  updatedAt: number;
+};
+
+const referenceCache = new Map<string, CacheEntry<unknown>>();
+const referenceInflight = new Map<string, Promise<unknown>>();
+
+function cachedGet<T>(path: string, ttlMs = REFERENCE_CACHE_TTL_MS) {
+  const cached = referenceCache.get(path);
+  if (cached && Date.now() - cached.updatedAt < ttlMs) {
+    return Promise.resolve(cached.data as T);
+  }
+
+  const inflight = referenceInflight.get(path);
+  if (inflight) {
+    return inflight as Promise<T>;
+  }
+
+  const request = apiFetch<T>(path)
+    .then((data) => {
+      referenceCache.set(path, { data, updatedAt: Date.now() });
+      return data;
+    })
+    .finally(() => {
+      if (referenceInflight.get(path) === request) {
+        referenceInflight.delete(path);
+      }
+    });
+
+  referenceInflight.set(path, request);
+  return request;
+}
+
+function invalidateReferenceCache(prefixes: string[]) {
+  for (const key of referenceCache.keys()) {
+    if (prefixes.some((prefix) => key.startsWith(prefix))) {
+      referenceCache.delete(key);
+    }
+  }
+}
+
 export function fetchPublicTeams() {
-  return apiFetch<{ id: string; name: string }[]>("/api/public/teams");
+  return cachedGet<{ id: string; name: string }[]>("/api/public/teams");
 }
 
 export function fetchSession() {
@@ -66,10 +110,11 @@ export function registerDispatcherRequest(input: {
 }
 
 export function fetchTeams() {
-  return apiFetch<Team[]>("/api/teams");
+  return cachedGet<Team[]>("/api/teams");
 }
 
 export function createTeamRequest(input: Record<string, unknown>) {
+  invalidateReferenceCache(["/api/teams", "/api/public/teams"]);
   return apiFetch<Team>("/api/teams", {
     method: "POST",
     body: JSON.stringify(input),
@@ -77,6 +122,12 @@ export function createTeamRequest(input: Record<string, unknown>) {
 }
 
 export function updateTeamRequest(id: string, input: Record<string, unknown>) {
+  invalidateReferenceCache([
+    "/api/teams",
+    "/api/public/teams",
+    "/api/dispatchers",
+    "/api/carriers",
+  ]);
   return apiFetch<Team>(`/api/teams/${id}`, {
     method: "PATCH",
     body: JSON.stringify(input),
@@ -85,10 +136,11 @@ export function updateTeamRequest(id: string, input: Record<string, unknown>) {
 
 export function fetchDispatchers(params?: Record<string, string>) {
   const query = params ? `?${new URLSearchParams(params).toString()}` : "";
-  return apiFetch<Dispatcher[]>(`/api/dispatchers${query}`);
+  return cachedGet<Dispatcher[]>(`/api/dispatchers${query}`);
 }
 
 export function createDispatcherRequest(input: Record<string, unknown>) {
+  invalidateReferenceCache(["/api/dispatchers", "/api/teams", "/api/carriers"]);
   return apiFetch<CreateDispatcherResult>("/api/dispatchers", {
     method: "POST",
     body: JSON.stringify(input),
@@ -99,6 +151,7 @@ export function updateDispatcherRequest(
   id: string,
   input: Record<string, unknown>,
 ) {
+  invalidateReferenceCache(["/api/dispatchers", "/api/teams", "/api/carriers"]);
   return apiFetch<Dispatcher>(`/api/dispatchers/${id}`, {
     method: "PATCH",
     body: JSON.stringify(input),
@@ -109,6 +162,7 @@ export function toggleDispatcherStatusRequest(
   id: string,
   action: "activate" | "deactivate",
 ) {
+  invalidateReferenceCache(["/api/dispatchers", "/api/teams", "/api/carriers"]);
   return apiFetch<Dispatcher>(`/api/dispatchers/${id}`, {
     method: "POST",
     body: JSON.stringify({ action }),
@@ -117,10 +171,11 @@ export function toggleDispatcherStatusRequest(
 
 export function fetchCarriers(params?: Record<string, string>) {
   const query = params ? `?${new URLSearchParams(params).toString()}` : "";
-  return apiFetch<Carrier[]>(`/api/carriers${query}`);
+  return cachedGet<Carrier[]>(`/api/carriers${query}`);
 }
 
 export function createCarrierRequest(input: Record<string, unknown>) {
+  invalidateReferenceCache(["/api/carriers", "/api/teams", "/api/dispatchers"]);
   return apiFetch<Carrier>("/api/carriers", {
     method: "POST",
     body: JSON.stringify(input),
@@ -131,6 +186,7 @@ export function updateCarrierRequest(
   id: string,
   input: Record<string, unknown>,
 ) {
+  invalidateReferenceCache(["/api/carriers", "/api/teams", "/api/dispatchers"]);
   return apiFetch<Carrier>(`/api/carriers/${id}`, {
     method: "PATCH",
     body: JSON.stringify(input),
@@ -141,6 +197,7 @@ export function reassignCarrierRequest(
   id: string,
   input: Record<string, unknown>,
 ) {
+  invalidateReferenceCache(["/api/carriers", "/api/teams", "/api/dispatchers"]);
   return apiFetch<Carrier>(`/api/carriers/${id}/reassign`, {
     method: "POST",
     body: JSON.stringify(input),
@@ -320,18 +377,19 @@ export function exportReportRequest(input: Record<string, unknown>) {
 }
 
 export function fetchSettings() {
-  return apiFetch<AppSettings>("/api/settings");
+  return cachedGet<AppSettings>("/api/settings");
 }
 
 export function fetchAllowedStatusReasons() {
-  return apiFetch<string[]>("/api/settings/status-reasons");
+  return cachedGet<string[]>("/api/settings/status-reasons");
 }
 
 export function fetchDispatchFeeRules() {
-  return apiFetch<DispatchFeeRules>("/api/settings/dispatch-fee-rules");
+  return cachedGet<DispatchFeeRules>("/api/settings/dispatch-fee-rules");
 }
 
 export function updateSettingsRequest(input: Record<string, unknown>) {
+  invalidateReferenceCache(["/api/settings"]);
   return apiFetch<AppSettings>("/api/settings", {
     method: "PATCH",
     body: JSON.stringify(input),

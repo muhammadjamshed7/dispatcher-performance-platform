@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -32,12 +33,28 @@ type EntityOptionsContextValue = {
    * they never trigger the /api/teams, /api/dispatchers, or /api/carriers
    * requests.
    */
-  ensureLoaded: () => void;
+  ensureLoaded: (options?: EntityOptionsLoadOptions) => void;
+};
+
+export type EntityOptionsLoadOptions = {
+  teams?: boolean;
+  dispatchers?: boolean;
+  carriers?: boolean;
 };
 
 const EntityOptionsContext = createContext<EntityOptionsContextValue | null>(
   null,
 );
+
+const ENTITY_OPTIONS_STALE_TIME_MS = 5 * 60_000;
+
+type CachedList = {
+  data: unknown[];
+  updatedAt: number;
+};
+
+const listCache = new Map<string, CachedList>();
+const inflightRequests = new Map<string, Promise<unknown[]>>();
 
 /**
  * Lazily loaded list. The fetch is deferred until `ensure()` (or `reload()`)
@@ -45,7 +62,11 @@ const EntityOptionsContext = createContext<EntityOptionsContextValue | null>(
  * `ensure()` is idempotent and synchronously flips `isLoading` so consumers
  * never observe a "ready but empty" frame before the request starts.
  */
-function useLazyList<T>(loader: () => Promise<T[]>, fetchEnabled: boolean) {
+function useLazyList<T>(
+  loader: () => Promise<T[]>,
+  fetchEnabled: boolean,
+  cacheKey: string,
+) {
   const [data, setData] = useState<T[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   // Whether a load has been kicked off for the current enabled session.
@@ -54,24 +75,61 @@ function useLazyList<T>(loader: () => Promise<T[]>, fetchEnabled: boolean) {
   // ignored (mirrors the guard in use-api-data).
   const requestIdRef = useRef(0);
 
-  const load = useCallback(async () => {
+  useEffect(() => {
+    if (!fetchEnabled) {
+      startedRef.current = false;
+      queueMicrotask(() => {
+        setData([]);
+        setIsLoading(false);
+      });
+    }
+  }, [fetchEnabled, cacheKey]);
+
+  const load = useCallback(async (force = false) => {
+    if (!fetchEnabled || !cacheKey) {
+      return;
+    }
+
+    const cached = listCache.get(cacheKey);
+    if (
+      !force &&
+      cached &&
+      Date.now() - cached.updatedAt < ENTITY_OPTIONS_STALE_TIME_MS
+    ) {
+      setData(cached.data as T[]);
+      setIsLoading(false);
+      return;
+    }
+
     const requestId = ++requestIdRef.current;
     setIsLoading(true);
+    let currentRequest: Promise<T[]> | undefined;
 
     try {
-      const next = await loader();
+      let request = inflightRequests.get(cacheKey) as Promise<T[]> | undefined;
+      if (!request || force) {
+        request = loader();
+        inflightRequests.set(cacheKey, request as Promise<unknown[]>);
+      }
+      currentRequest = request;
+
+      const next = await request;
       if (requestId === requestIdRef.current) {
+        listCache.set(cacheKey, { data: next, updatedAt: Date.now() });
         setData(next);
       }
     } catch {
       // The provider only surfaces a combined loading flag (no error state),
       // matching the previous behavior where a failed list resolved to [].
     } finally {
+      if (currentRequest && inflightRequests.get(cacheKey) === currentRequest) {
+        inflightRequests.delete(cacheKey);
+      }
       if (requestId === requestIdRef.current) {
         setIsLoading(false);
       }
     }
-  }, [loader]);
+  }, [cacheKey, fetchEnabled, loader]);
 
   const ensure = useCallback(() => {
     if (startedRef.current || !fetchEnabled) {
@@ -79,7 +137,7 @@ function useLazyList<T>(loader: () => Promise<T[]>, fetchEnabled: boolean) {
     }
 
     startedRef.current = true;
-    void load();
+    void load(false);
   }, [fetchEnabled, load]);
 
   const reload = useCallback(async () => {
@@ -88,7 +146,7 @@ function useLazyList<T>(loader: () => Promise<T[]>, fetchEnabled: boolean) {
     }
 
     startedRef.current = true;
-    await load();
+    await load(true);
   }, [fetchEnabled, load]);
 
   return { data, isLoading, ensure, reload };
@@ -97,6 +155,14 @@ function useLazyList<T>(loader: () => Promise<T[]>, fetchEnabled: boolean) {
 export function EntityOptionsProvider({ children }: { children: ReactNode }) {
   const { session, isLoading: sessionLoading } = useSession();
   const fetchEnabled = !sessionLoading && session?.status === ACTIVE;
+  const cacheScope = session
+    ? [
+        session.userId,
+        session.role,
+        session.teamId ?? "all-teams",
+        session.dispatcherId ?? "all-dispatchers",
+      ].join(":")
+    : "anonymous";
 
   const loadTeams = useCallback(() => fetchTeams(), []);
   const loadDispatchers = useCallback(() => fetchDispatchers(), []);
@@ -107,24 +173,38 @@ export function EntityOptionsProvider({ children }: { children: ReactNode }) {
     isLoading: teamsLoading,
     ensure: ensureTeams,
     reload: reloadTeams,
-  } = useLazyList<Team>(loadTeams, fetchEnabled);
+  } = useLazyList<Team>(loadTeams, fetchEnabled, `${cacheScope}:teams`);
   const {
     data: dispatchers,
     isLoading: dispatchersLoading,
     ensure: ensureDispatchers,
     reload: reloadDispatchers,
-  } = useLazyList<Dispatcher>(loadDispatchers, fetchEnabled);
+  } = useLazyList<Dispatcher>(
+    loadDispatchers,
+    fetchEnabled,
+    `${cacheScope}:dispatchers`,
+  );
   const {
     data: carriers,
     isLoading: carriersLoading,
     ensure: ensureCarriers,
     reload: reloadCarriers,
-  } = useLazyList<Carrier>(loadCarriers, fetchEnabled);
+  } = useLazyList<Carrier>(loadCarriers, fetchEnabled, `${cacheScope}:carriers`);
 
-  const ensureLoaded = useCallback(() => {
-    ensureTeams();
-    ensureDispatchers();
-    ensureCarriers();
+  const ensureLoaded = useCallback((options?: EntityOptionsLoadOptions) => {
+    const shouldLoadTeams = options?.teams ?? true;
+    const shouldLoadDispatchers = options?.dispatchers ?? true;
+    const shouldLoadCarriers = options?.carriers ?? true;
+
+    if (shouldLoadTeams) {
+      ensureTeams();
+    }
+    if (shouldLoadDispatchers) {
+      ensureDispatchers();
+    }
+    if (shouldLoadCarriers) {
+      ensureCarriers();
+    }
   }, [ensureCarriers, ensureDispatchers, ensureTeams]);
 
   const reload = useCallback(async () => {

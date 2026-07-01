@@ -241,7 +241,11 @@ export function UserRequestsPageContent() {
   // Reuse the teams already loaded by EntityOptionsProvider (admin scope = all
   // teams) for the approve/create-user team pickers instead of a duplicate
   // /api/teams request.
-  const { teams } = useEntityOptions();
+  const { teams } = useEntityOptions({
+    teams: true,
+    dispatchers: false,
+    carriers: false,
+  });
   const {
     data: managedUsers = [],
     error: managedUsersError,
