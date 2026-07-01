@@ -244,6 +244,10 @@ function summarizeActivities(
   const loadsByTeamMap = new Map<string, number>();
   const revenueByTeamMap = new Map<string, number>();
   const statusCounts = new Map<LoadActivityStatus, number>();
+  const loadsByDispatcher = new Map<
+    string,
+    { id: string; name: string; team: string; loads: number; revenue: number }
+  >();
   const revenueByDispatcher = new Map<
     string,
     { id: string; name: string; team: string; revenue: number }
@@ -258,6 +262,22 @@ function summarizeActivities(
 
   for (const row of activities) {
     const team = row.teamNameSnapshot || "Unassigned";
+    const dispatcher = dispatcherLookup.get(row.dispatcherId);
+    const dispatcherName =
+      dispatcher?.name || row.dispatcherNameSnapshot || "Unknown Dispatcher";
+    const dispatcherTeam =
+      dispatcher?.team || row.teamNameSnapshot || "Unassigned";
+
+    const dispatcherLoads = loadsByDispatcher.get(row.dispatcherId) ?? {
+      id: row.dispatcherId,
+      name: dispatcherName,
+      team: dispatcherTeam,
+      loads: 0,
+      revenue: 0,
+    };
+    dispatcherLoads.loads += 1;
+    loadsByDispatcher.set(row.dispatcherId, dispatcherLoads);
+
     loadsByTeamMap.set(team, (loadsByTeamMap.get(team) ?? 0) + 1);
     statusCounts.set(row.status, (statusCounts.get(row.status) ?? 0) + 1);
 
@@ -274,12 +294,8 @@ function summarizeActivities(
     totalRevenue += amount;
     revenueByDate.set(dateKey, (revenueByDate.get(dateKey) ?? 0) + amount);
     revenueByTeamMap.set(team, (revenueByTeamMap.get(team) ?? 0) + amount);
+    dispatcherLoads.revenue += amount;
 
-    const dispatcher = dispatcherLookup.get(row.dispatcherId);
-    const dispatcherName =
-      dispatcher?.name || row.dispatcherNameSnapshot || "Unknown Dispatcher";
-    const dispatcherTeam =
-      dispatcher?.team || row.teamNameSnapshot || "Unassigned";
     const existing = revenueByDispatcher.get(row.dispatcherId) ?? {
       id: row.dispatcherId,
       name: dispatcherName,
@@ -332,6 +348,16 @@ function summarizeActivities(
         dispatcherId: entry.id,
         dispatcher: entry.name,
         team: entry.team || "Unassigned",
+        revenue: Math.round(entry.revenue * 100) / 100,
+      })),
+    dispatcherLoads: [...loadsByDispatcher.values()]
+      .filter((entry) => entry.loads > 0)
+      .sort((a, b) => b.loads - a.loads || b.revenue - a.revenue)
+      .map((entry) => ({
+        dispatcherId: entry.id,
+        dispatcher: entry.name,
+        team: entry.team || "Unassigned",
+        loads: entry.loads,
         revenue: Math.round(entry.revenue * 100) / 100,
       })),
     loadsByTeam: [...loadsByTeamMap.entries()]
@@ -701,6 +727,7 @@ export async function getAdminDashboardBundle(
     revenueTrend: current.revenueTrend,
     revenueComparison: current.revenueComparison,
     dispatcherRevenue: current.dispatcherRevenue,
+    dispatcherLoads: current.dispatcherLoads,
     loadsByTeam: current.loadsByTeam,
     statusBreakdown: current.statusBreakdown,
     topPerformers: current.topPerformers,

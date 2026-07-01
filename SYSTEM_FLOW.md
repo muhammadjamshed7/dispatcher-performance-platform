@@ -30,6 +30,7 @@
 18. [Important Business Rules](#18-important-business-rules)
 19. [Known Issues or Missing Items](#19-known-issues-or-missing-items)
 20. [Final Developer Notes](#20-final-developer-notes)
+21. [Invoice Module Overview](#invoice-module-overview) *(extended module — same document)*
 
 ---
 
@@ -96,7 +97,7 @@ dispatcher-performance-platform/
 │   │   ├── admin/                             # Admin portal pages
 │   │   ├── team-lead/                         # Team-lead portal pages
 │   │   ├── dispatcher/                        # Dispatcher portal pages
-│   │   └── api/                               # REST API route handlers (49 route.ts files)
+│   │   └── api/                               # REST API route handlers (65 route.ts files)
 │   ├── components/
 │   │   ├── account/           # Account page + dispatcher finance summary
 │   │   ├── activities/        # Activities page, excel filters, PDF button, approval badge,
@@ -113,6 +114,7 @@ dispatcher-performance-platform/
 │   │   ├── filters/           # Shared filter bars and fields
 │   │   ├── finance/           # Finance page + tables + export
 │   │   ├── forms/             # React Hook Form entity forms
+│   │   ├── invoices/          # Invoice list/detail/generation UI (admin/TL/dispatcher)
 │   │   ├── layout/            # DashboardShell, sidebar, top nav, global search
 │   │   ├── modals/            # Entity CRUD + activity detail modals
 │   │   ├── notifications/     # Notifications dropdown + page
@@ -135,6 +137,7 @@ dispatcher-performance-platform/
 │   │   ├── filters/           # URL/state filter parsing helpers
 │   │   ├── notifications/     # Notification deep-link helpers (+ tests)
 │   │   ├── reports/           # PDF exports + pdf-theme + metrics + filter labels
+│   │   ├── invoices/          # Invoice PDF/CSV export helpers (uses pdf-theme)
 │   │   ├── supabase/          # Browser/server auth clients + edge middleware helpers
 │   │   ├── utils/             # Calculations, formatting, date ranges, csv.ts
 │   │   └── validation/        # Zod schemas (common.ts has idSchema, etc.)
@@ -142,7 +145,7 @@ dispatcher-performance-platform/
 │   │   ├── api/               # request.ts (parse body/query), response.ts (handleApi envelope)
 │   │   ├── auth/              # session.ts (getCurrentUser), jwks-cache.ts, require-auth.ts, auth.service.ts, types.ts
 │   │   ├── mappers/           # DB row → DTO mappers (index.ts)
-│   │   ├── services/          # Business logic per domain (20 files)
+│   │   ├── services/          # Business logic per domain (incl. invoices.service.ts)
 │   │   └── utils/             # scope-filters, approval-workflow, activity-filters,
 │   │                          #   request-security, rate-limit, text-search
 │   ├── generated/prisma/      # Generated Prisma client (gitignored)
@@ -163,7 +166,10 @@ dispatcher-performance-platform/
 | `src/server/api/response.ts` | `handleApi()` envelope + error→status mapping + same-origin check. |
 | `src/lib/db/client.ts` | Supabase service-role client (`db()`) + table name map (`T`). |
 | `src/lib/api/resources.ts` | Frontend → API call map (the "where used in frontend" source). |
-| `src/lib/reports/pdf-theme.ts` | Shared PDF theme (palette, badges, header/footer, logo). |
+| `src/lib/reports/pdf-theme.ts` | Shared PDF theme (palette, badges, header/footer, logo) — used by activity, carrier, audit-adjacent, performance, and invoice PDFs. |
+| `src/lib/invoices/export-invoice-pdf.ts` | Single-invoice branded PDF (shared `pdf-theme`). |
+| `src/lib/invoices/export-invoice-list-pdf.ts` | Invoice list PDF export. |
+| `src/components/providers/entity-options-provider.tsx` | Lazy entity lists (`teams`/`dispatchers`/`carriers`) — fetch-on-first-consume via `ensureLoaded()`. |
 | `src/lib/audit/audit-log-format.ts` | Readable audit data formatting (table/CSV/PDF). |
 | `src/lib/utils/csv.ts` | CSV builder + formula-injection guard. |
 
@@ -310,6 +316,8 @@ Scope (`AccessScope`) is `{ organizationId, role, userId, teamId, dispatcherId, 
 | Approve/reject user registration requests | ✓ | — | — |
 | Create managed users / reset their password | ✓ | — | — |
 | Activities PDF export | ✓ | ✓ | ✓ (incl. approval column) |
+| Carrier PDF export (admin carriers menu) | ✓ | — | — |
+| View invoices / export invoice PDF | ✓ (manage all) | ✓ (team-scoped) | ✓ (own payable, view + PDF) |
 | Global search | ✓ | ✓ | ✓ (scoped) |
 | Rankings — dispatcher | ✓ | ✓ (team) | ✓ (self only) |
 | Rankings — carrier / team | ✓ | ✓ (team) | — |
@@ -327,7 +335,7 @@ Scope (`AccessScope`) is `{ organizationId, role, userId, teamId, dispatcherId, 
 - **Runtime access:** Supabase service-role client (`db()`), table names via `T`.
 - **Row Level Security:** **Not defined in this repo** — authorization is application-layer (service-role bypasses RLS). See `docs/security-hardening.md`. `Status: Not implemented yet (RLS)`.
 
-**15 models** are defined. ER overview:
+**18 models** are defined. ER overview:
 
 ```mermaid
 erDiagram
@@ -344,6 +352,7 @@ erDiagram
   Organization ||--o{ Notification : has
   Organization ||--o{ StatusReason : has
   Organization ||--o{ DailySubmission : has
+  Organization ||--o{ Invoice : has
   Team ||--o{ User : members
   Team ||--o| User : teamLead
   Team ||--o{ Dispatcher : has
@@ -355,6 +364,10 @@ erDiagram
   Dispatcher ||--o{ DailyActivity : records
   Carrier ||--o{ CarrierAssignmentHistory : history
   DailyActivity ||--o{ ActivityEditRequest : editRequests
+  Invoice ||--o{ InvoiceItem : lines
+  Invoice ||--o{ InvoicePayment : payments
+  Dispatcher ||--o{ Invoice : payable
+  Carrier ||--o{ Invoice : receivable
 ```
 
 ### Model reference
@@ -376,6 +389,9 @@ erDiagram
 | **Notification** | In-app notification | `recipientUserId`, `title`, `message`, `notificationStatus`, `activityId?`, `editRequestId?`, `metadata` (JSON), `readAt` | org, `recipient` | Notifications |
 | **AuditLog** | Immutable action log | `actorUserId?`, `action` (`AuditAction`), `entityType`, `entityId?`, `metadata` | org, `actor` | Audit logs |
 | **ReportExport** | Report export job record | `requestedById`, `reportType`, `period`, `filters` (JSON), `status`, `fileName`, `rowCount`, `errorMessage`, `completedAt` | org, `requestedBy` | Reports |
+| **Invoice** | Invoice header (dispatcher payable or carrier receivable) | `invoiceNumber`, `invoiceType`, `invoiceStatus`, `paymentStatus`, `dispatcherId?`, `carrierId?`, `teamId`, period dates, `totalAmount`, `paidAmount`, `pendingAmount`, `issueDate`, `dueDate`, soft delete | org, dispatcher, carrier, team, items, payments | Invoices |
+| **InvoiceItem** | Activity line on an invoice | `dailyActivityId`, route/miles/load/fee snapshots, `amount`, `description` | invoice, activity | Invoices |
+| **InvoicePayment** | Payment against an invoice | `amount`, `paymentDate`, `paymentMethod`, `reference`, `notes`, `recordedById` | invoice | Invoices |
 
 ### Enums
 
@@ -392,7 +408,11 @@ erDiagram
 | `ActivityApprovalStatus` | APPROVED, PENDING_TEAM_LEAD_APPROVAL, PENDING_ADMIN_APPROVAL, REJECTED |
 | `ActivityApprovalType` | NEW_ACTIVITY, EDIT_ACTIVITY |
 | `NotificationStatus` | PENDING, APPROVED, REJECTED, CHANGES_REQUESTED, ADMIN_APPROVAL_REQUIRED, TEAM_LEAD_APPROVAL_REQUIRED, COMPLETED |
-| `AuditAction` | 50 values (see [§10](#10-audit-log-flow)) |
+| `AuditAction` | 50+ values (see [§10](#10-audit-log-flow); invoice actions listed in [Invoice Audit Log Flow](#invoice-audit-log-flow)) |
+| `InvoiceType` | DISPATCHER_PAYABLE, CARRIER_RECEIVABLE |
+| `InvoiceStatus` | DRAFT, ISSUED, PARTIALLY_PAID, PAID, OVERDUE, CANCELLED |
+| `PaymentStatus` | UNPAID, PARTIALLY_PAID, PAID |
+| `InvoicePaymentMethod` | CASH, BANK_TRANSFER, CARD, CHECK, OTHER |
 
 ### Key constraints & indexes
 
@@ -411,7 +431,7 @@ erDiagram
 
 ## 7. Complete API Documentation
 
-**Base URL:** `/api` · **Auth:** Supabase session cookies on protected routes · **Envelope:** `{ ok: true, data }` or `{ ok: false, error }` (`src/server/api/response.ts`). **Total: 56 endpoints across 49 `route.ts` files.**
+**Base URL:** `/api` · **Auth:** Supabase session cookies on protected routes · **Envelope:** `{ ok: true, data }` or `{ ok: false, error }` (`src/server/api/response.ts`). **Total: ~76 HTTP handlers across 65 `route.ts` files** (core platform APIs below + [Invoice APIs](#invoice-api-documentation)).
 
 **Conventions:**
 - `handleApi(fn, request?)` wraps responses. Mutating handlers (POST/PATCH) pass `request`, enforcing `assertSameOrigin`; most GET handlers omit it (no origin check on reads).
@@ -597,7 +617,8 @@ Only `approvalStatus = APPROVED` activities count. **Revenue** = sum of `loadAmo
 ### 8.7 CSV / PDF export
 
 - **CSV:** built server-side via `buildCsv`/`escapeCsvCell` (formula-injection guard), capped by `csvMaxRows`, returned as `{ csv, fileName }` and downloaded as a blob client-side.
-- **PDF:** generated client-side with jsPDF + jspdf-autotable. Branded reports use the shared `pdf-theme.ts` (logo, badges, header/footer with page numbers).
+- **PDF:** generated client-side with jsPDF + jspdf-autotable. Branded reports use the shared `pdf-theme.ts` (logo, navy headers, status/approval badges, footer page numbers). Entry points: Activities page export, View Activity modal, Admin Carriers → Export, Audit Logs, Performance report, Invoice detail/list.
+- **Audit log display/export:** metadata / previous / updated fields render as readable `Label: value` lines via `formatAuditData()` — never raw JSON in the UI, CSV, or audit PDF.
 
 ### 8.8 Notification & audit
 
@@ -670,6 +691,7 @@ The `AuditAction` enum defines **50 values**. Every value is emitted somewhere (
 | Activities PDF (daily activities) | ✓ `ACTIVITY_EXPORTED` | client beacon `recordAuditExportEvent` → `/api/audit/export-events` |
 | Carrier activity PDF | ✓ `CARRIER_EXPORTED` | client beacon |
 | Audit Logs PDF/CSV | ✓ `AUDIT_LOGS_EXPORTED` | client beacon |
+| Invoice PDF/CSV | ✓ `INVOICE_EXPORTED` | server on export endpoints + client PDF generation |
 | Activity detail PDF | ✗ no audit | PDF button only, no beacon. `Status: No audit on export` |
 | Performance report PDF | ✗ no audit | PDF button only, no beacon. `Status: No audit on export` |
 
@@ -696,7 +718,16 @@ The `AuditAction` enum defines **50 values**. Every value is emitted somewhere (
 | Carrier Activity PDF | PDF | client jsPDF (`export-carrier-activity-pdf.ts`) | ✓ | ✓ | ✓ status/approval | `CARRIER_EXPORTED` |
 | Activity Detail PDF | PDF | client jsPDF (`export-activity-detail-pdf.ts`) | ✓ | ✓ | ✓ status/approval | none |
 | Performance Report PDF | PDF | client jsPDF (`export-performance-report-pdf.ts`) | ✓ | ✓ | text only | none |
-| Audit Logs PDF | PDF | client jsPDF (`export-audit-logs-pdf.ts`) | ✗ self-contained | ✗ | text only | `AUDIT_LOGS_EXPORTED` |
+| Audit Logs PDF | PDF | client jsPDF (`export-audit-logs-pdf.ts`) | ✗ self-contained styling | ✗ | text only (readable `formatAuditData`) | `AUDIT_LOGS_EXPORTED` |
+| Invoice PDF (single) | PDF | client jsPDF (`lib/invoices/export-invoice-pdf.ts`) | ✓ | ✓ | n/a | `INVOICE_EXPORTED` (API) |
+| Invoice list PDF | PDF | client jsPDF (`lib/invoices/export-invoice-list-pdf.ts`) | ✓ | ✓ | n/a | `INVOICE_EXPORTED` (admin list export) |
+| Invoice list CSV | CSV | server (`invoices.service`) | n/a | n/a | n/a | `INVOICE_EXPORTED` |
+
+**Activities page PDF exports (two entry points, verified):**
+- **Admin/Team Lead/Dispatcher → Activities → Export PDF:** `ActivitiesPdfExportButton` → `exportDailyActivitiesPdf` (`export-daily-activities-pdf.ts`) — landscape letter, report summary + activity history table, optional approval column when `includeApprovalDetails`.
+- **View Activity modal → Print / Export → Download PDF:** `activity-modal.tsx` → `exportActivityDetailPdf` (`export-activity-detail-pdf.ts`) — single-activity report with sections (basic info, load/work, notes, timeline, rejection feedback).
+
+**Carrier export (admin only):** Carriers table three-dot menu → **Export** → `exportCarrierActivityPdf` — A4 portrait carrier activity report (carrier details, monthly summary, full history).
 
 **Shared PDF theme (`src/lib/reports/pdf-theme.ts`), verified:**
 - **Palette:** `PRIMARY_BLUE [37,99,235]`, `DARK_NAVY [15,23,42]`, `TABLE_NAVY [11,31,58]`, muted/border/light-blue/light-gray/white.
@@ -716,9 +747,24 @@ All dashboards count **only `approvalStatus = APPROVED`** (pending/rejected excl
 
 | Role | Route | API | Service | Data |
 |------|-------|-----|---------|------|
-| Admin | `/admin/dashboard` | `GET /api/dashboard/admin` | `getAdminDashboardBundle` | KPIs, growth vs previous period, revenue trend, loads by team, status donut, top performers (top 3), recent activities |
+| Admin | `/admin/dashboard` | `GET /api/dashboard/admin` | `getAdminDashboardBundle` | KPI section, growth vs previous period, per-dispatcher revenue/loads charts, notifications card, top performers, load status trend, active dispatchers, secondary metrics, revenue comparison, loads by team, status donut, recent activities |
 | Team Lead | `/team-lead/dashboard` | `GET /api/dashboard/team-lead` | `getTeamLeadMetrics` (+ bundle delegates to admin bundle, team-scoped) | revenue, total/delivered loads, avg rate/mile, active dispatchers, overview table |
 | Dispatcher | `/dispatcher/dashboard` | `GET /api/dashboard/dispatcher` | `getDispatcherDashboardBundle` | MTD revenue, delivered loads, avg rate/mile, assigned carriers, today completion, pending carriers, charts, recent activities |
+
+### Admin dashboard layout (`admin-dashboard-page.tsx` + `admin-kpi-section.tsx`)
+
+Verified current card order (June 2026):
+
+1. **Filters** — `AdminDashboardHeader` with filter popover + active filter chips (persisted to URL query params).
+2. **`AdminKpiSection`** (dynamically imported, `ssr: false`):
+   - **Row 1 (full width):** **Total Revenue** — KPI shell + per-dispatcher revenue bar chart (`dispatcherRevenue` from API).
+   - **Row 2 (1 → 2 → 3 columns):** **Number of Loads** (per-dispatcher loads chart `dispatcherLoads`), **Notifications** (latest 5, auto-refresh every 10s via `fetchNotifications`), **Top Performers** (top 3 dispatchers by delivered revenue).
+   - **Row 3 (2 columns on `xl`):** **Load Status Trend** (delivered count + `statusTrend` multi-line chart), **Active Dispatchers** (team breakdown + utilization panel).
+3. **Secondary metrics (2 columns):** On-Time Rate, Monthly Growth.
+4. **Chart grid (2 columns):** Revenue Comparison Trend, Loads by Team, Load Status Breakdown (donut) — three cards in a responsive 2-col grid.
+5. **Recent Activities** table.
+
+Heavy chart components in the admin dashboard (`AdminKpiSection`, `RevenueTrendChart`, `LoadsByTeamChart`, `LoadStatusDonutChart`, `MonthlyGrowthMetricCard`) use `next/dynamic` with `{ ssr: false }` to defer **recharts** off the initial JS bundle.
 
 **Calculations (verified):**
 - **Revenue** = Σ `loadAmount` where `status === DELIVERED`, rounded to cents.
@@ -730,6 +776,11 @@ All dashboards count **only `approvalStatus = APPROVED`** (pending/rejected excl
 - **Rate/mile:** team-lead metrics + finance/reports use **weighted** Σrevenue / Σmiles; the dispatcher dashboard MTD tile uses a **plain mean** of stored per-row `ratePerMile` (delivered rows with rate > 0). `Status: Minor inconsistency` (see [§19](#19-known-issues-or-missing-items)).
 
 **Role-based visibility:** scope filters narrow the same queries — admin = company-wide, team lead = own team, dispatcher = own records. Admin dashboard persists filters to the URL; the dispatcher dashboard uses local state only.
+
+**Client performance (dashboard-related):**
+- **Team Lead dashboard** reuses `useEntityOptions()` for carriers/dispatchers instead of duplicate `/api/carriers` + `/api/dispatchers` calls.
+- **Dispatcher performance page** reuses `useEntityOptions()` for carriers.
+- **Entity options lazy load:** pages without a `useEntityOptions()` consumer (admin dashboard, daily report, settings, audit logs, finance, notifications, teams list, account) issue **zero** `/api/teams|dispatchers|carriers` requests on initial load.
 
 ---
 
@@ -800,15 +851,15 @@ Real routes (verified from `src/app/**/page.tsx`). Most authenticated pages set 
 
 ### Admin (`/admin/*`)
 
-`login`, `dashboard`, `teams`, `dispatchers`, `dispatchers/[dispatcherId]/finance`, `carriers`, `activities`, `activities/pending`, `logs` (Audit Logs), `notifications`, `rankings`, `reports`, `daily-report`, `settings`, `users/requests` (User Requests), `account`.
+`login`, `dashboard`, `teams`, `dispatchers`, `dispatchers/[dispatcherId]/finance`, `carriers`, `activities` (no scope banner or entity filter bar — `showScopeAndFilters={false}`), `activities/pending`, `logs` (Audit Logs), `notifications`, `rankings`, `reports`, `daily-report`, `settings`, `users/requests` (User Requests), `invoices`, `account`.
 
 ### Team Lead (`/team-lead/*`)
 
-`login`, `dashboard`, `dispatchers`, `carriers`, `activities`, `activities/pending`, `notifications`, `rankings`, `reports`, `account`.
+`login`, `dashboard`, `dispatchers`, `carriers`, `activities`, `activities/pending`, `notifications`, `rankings`, `reports`, `invoices`, `account`.
 
 ### Dispatcher (`/dispatcher/*`)
 
-`login`, `register`, `dashboard`, `carriers` (read-only, compact), `activities`, `activities/submissions` (My Submissions), `notifications`, `performance`, `finance`, `account`.
+`login`, `register`, `dashboard`, `carriers` (read-only, compact), `activities`, `activities/submissions` (My Submissions), `notifications`, `performance`, `finance`, `invoices` (My Invoices), `account`.
 
 ### Shared shell
 
@@ -836,7 +887,7 @@ Sidebar nav per role is defined in `src/lib/auth/roles.ts` (`ADMIN_NAV_ITEMS`, `
 | **Approvals** | Parallel approval | `approvals.service.ts`, `pending-approvals-page-content.tsx` | `/api/activities/{pending,[id]/approve,[id]/reject}` | DailyActivity, Notification | Admin/TL | First approver finalizes; concurrency guard |
 | **Edit Requests** | Edits to approved activities | `activity-edit-requests.service.ts`, `activity-change-comparison.tsx` | `/api/activity-edit-requests/[id]/*` | ActivityEditRequest, DailyActivity | Dispatcher/TL submit, Admin/TL approve | proposedChanges applied + financials recomputed |
 | **Dashboards** | Role KPIs/charts | `admin-dashboard.service.ts`, `dashboard.service.ts`, `dispatcher-dashboard.service.ts` | `/api/dashboard/*` | DailyActivity, Dispatcher | All (scoped) | Approved-only |
-| **Daily Report** | Live single-day snapshot | `admin-daily-report.service.ts`, `daily-report/*` | `/api/admin/daily-report` | DailyActivity | Admin | Realtime; approved-only |
+| **Daily Report** | Live single-day snapshot | `admin-daily-report.service.ts`, `daily-report/*`, `use-daily-report-realtime.ts` | `/api/admin/daily-report` | DailyActivity | Admin | Realtime (debounced 400ms, unique channel); approved-only |
 | **Reports** | Period reports + CSV | `reports.service.ts`, `reports-page-content.tsx` | `/api/reports*` | DailyActivity, ReportExport | Admin/TL | Approved-only; csvMaxRows; export audit |
 | **Finance** | Revenue/fee views | `dispatcher-finance.service.ts`, `finance/*` | `/api/dispatcher/finance*`, `/api/admin/dispatchers/[id]/finance*` | DailyActivity, Dispatcher, Carrier | Dispatcher (self), Admin (any) | Approved-only; FINANCE_VIEWED/EXPORTED |
 | **Rankings** | Leaderboards | `rankings.service.ts`, `rankings-page-content.tsx` | `/api/rankings` | DailyActivity, Dispatcher, Carrier, Team | Admin/TL (all), Dispatcher (self) | Activity rankings approved-only |
@@ -844,6 +895,7 @@ Sidebar nav per role is defined in `src/lib/auth/roles.ts` (`ADMIN_NAV_ITEMS`, `
 | **Audit** | Action history | `audit.service.ts`, `audit-logs.service.ts`, `audit-log-format.ts`, `admin-logs-page-content.tsx` | `/api/admin/logs`, `/api/audit/export-events` | AuditLog | Admin | Sanitized; readable formatting; never throws |
 | **Settings** | Org config | `settings.service.ts`, `settings-page-content.tsx` | `/api/settings*` | OrganizationSettings, StatusReason, Organization | Admin (write), all (fee rules/status reasons read) | Fee rules; truck types; status reasons; directAdminApprovalMode |
 | **Search** | Global search | `search.service.ts`, `global-search.tsx` | `/api/search` | Carrier, Dispatcher, DailyActivity | All (scoped) | Min 2 chars; role-aware deep links |
+| **Invoices** | Payable/receivable invoices + payments | `invoices.service.ts`, `components/invoices/*`, `lib/invoices/*` | `/api/invoices*`, `/api/dispatcher/invoices*`, `/api/team-lead/invoices*` | Invoice, InvoiceItem, InvoicePayment, DailyActivity | Admin (all), TL (team), Dispatcher (own payable) | Approved activities only; duplicate period blocked |
 | **Daily Submissions** | Per-day roll-up | `daily-submissions.service.ts` | (internal) | DailySubmission | — | Counts approved activities/carriers per dispatcher/day |
 
 ---
@@ -958,9 +1010,11 @@ flowchart LR
 8. **One activity per carrier per day** (`@@unique([carrierId, activityDate])`).
 9. **Audit on important actions.** Every create/update/approve/reject/export/login/settings change writes an audit log (with sensitive-key redaction).
 10. **Clean, readable exports.** Audit metadata renders as `Label: value` (not raw JSON) across table/CSV/PDF; CSV cells are guarded against formula injection; CSV row count capped by `csvMaxRows`.
-11. **Branded PDFs.** Activity/carrier/detail/performance PDFs use the shared `pdf-theme.ts` (blue/navy palette, `/pdf_logo.jpeg` logo, status/approval badges, footer page numbers). Audit-logs PDF is self-contained.
-12. **Lazy entity options.** `EntityOptionsProvider` is fetch-on-first-consume; pages without a `useEntityOptions()` consumer issue zero `/api/teams|dispatchers|carriers` requests on load.
-13. **Soft delete only.** Core entities deactivate/soft-delete; no hard-delete or activity-delete endpoints.
+11. **Branded PDFs.** Activity, carrier, detail, performance, and invoice PDFs use the shared `pdf-theme.ts` (blue/navy palette, `/pdf_logo.jpeg` logo, status/approval badges where applicable, footer page numbers). Audit-logs PDF uses readable `formatAuditData` lines but self-contained header styling (not full `pdf-theme` shell).
+12. **Lazy entity options.** `EntityOptionsProvider` is **fetch-on-first-consume**: `useEntityOptions()` calls `ensureLoaded()` on mount, which triggers `/api/teams`, `/api/dispatchers`, and `/api/carriers` only when a consumer page mounts. Pages with no consumer issue zero of those three calls on load. Provider data persists across in-dashboard navigation.
+13. **Client fetch deduplication.** Dispatchers page and User Requests page read `teams` from `useEntityOptions()` instead of a separate `fetchTeams()` call. Team Lead dashboard and dispatcher performance page reuse entity options for carriers/dispatchers.
+14. **Realtime debouncing.** `useRealtimeRefresh` and `useDailyReportRealtime` debounce reloads (400ms) and use unique Supabase channel IDs per hook instance.
+15. **Soft delete only.** Core entities deactivate/soft-delete; no hard-delete or activity-delete endpoints.
 
 ---
 
@@ -1111,7 +1165,11 @@ Status: Partially implemented.
 | Item | Status | Detail |
 |------|--------|--------|
 | **Reject/request-changes leaves sibling notification unread** | Known nuance | `updateEntityNotificationStatuses` sets `readAt` only for `COMPLETED` (approve). On reject/request-changes the sibling approver's notification changes status but stays unread (can inflate the unread badge for an action they can no longer take). Documented as-is. |
-| **`user-requests` page still fetches entity options** | Known | `user-requests-page-content.tsx` calls `useEntityOptions()` (for the approve/create team picker), so visiting `/admin/users/requests` triggers `/api/teams`, `/api/dispatchers`, `/api/carriers` despite only teams being needed. |
+| **`user-requests` page triggers all 3 entity-option APIs** | Known | `user-requests-page-content.tsx` calls `useEntityOptions()` at page level (for create-user team picker), so visiting `/admin/users/requests` still loads teams + dispatchers + carriers via `ensureLoaded()` even though only `teams` is needed. Could defer to modal-only consume to drop to zero on load. |
+| **Duplicate `/api/teams` on dispatchers page** | Fixed | Dispatchers page now reads `teams` from `useEntityOptions()` (same source as the dispatcher form). |
+| **Duplicate entity fetches on Team Lead dashboard** | Fixed | Reuses `useEntityOptions()` for carriers/dispatchers. |
+| **Admin daily report realtime resubscribe churn** | Fixed | `use-daily-report-realtime.ts` holds callback in ref, debounces 400ms, unique channel id. |
+| **recharts eager import on dashboards** | Fixed (partial) | Admin dashboard KPI/charts, dispatcher dashboard charts, and daily report charts use `next/dynamic` `{ ssr: false }`. Other pages with charts may still import recharts eagerly. |
 | **Activity detail PDF / performance report PDF write no audit** | Partially implemented | These PDF buttons do not call the export beacon, so no `ACTIVITY_EXPORTED`/export audit is recorded for them. |
 | **Finance PDF uses `window.print()`** | Partially implemented | No jsPDF finance module; finance "PDF" is browser print. |
 | **Payment tracking** | Implemented | Invoice/payment tables now track invoice payments. Dispatcher finance still presents period earnings independently of invoice filters. |
@@ -1143,7 +1201,8 @@ Status: Partially implemented.
 3. **API surface:** `src/lib/api/resources.ts` (frontend → API map) and `src/app/api/**/route.ts`.
 4. **Business logic:** `src/server/services/*` — start with `activities.service.ts`, `approvals.service.ts`, `activity-edit-requests.service.ts`, `notifications.service.ts`.
 5. **Scoping:** `src/server/utils/scope-filters.ts` + `activity-filters.ts`.
-6. **Exports:** `src/lib/reports/*` (PDF) and `src/lib/utils/csv.ts` (CSV).
+6. **Exports:** `src/lib/reports/*` (PDF) and `src/lib/utils/csv.ts` (CSV); `src/lib/invoices/*` for invoice PDFs.
+7. **Performance-sensitive client code:** `entity-options-provider.tsx`, `use-entity-options.ts`, `use-api-data.ts`, `use-realtime-refresh.ts`, `use-daily-report-realtime.ts`, `session-provider.tsx`.
 
 ### Sensitive modules (handle with care)
 
@@ -1168,7 +1227,23 @@ Status: Partially implemented.
 - Financial math for DELIVERED vs non-DELIVERED, and edit-request recomputation.
 - CSV export with values starting `=`/`+`/`-`/`@` and with row counts near `csvMaxRows`.
 - PDF exports render the logo, badges, and footer page numbers; verify which exports write audit logs.
-- Realtime refresh on Activities/Notifications/Edit Requests.
+- Realtime refresh on Activities/Notifications/Edit Requests/Daily Report.
+- Entity-options lazy load: landing on admin dashboard should show **no** `/api/teams|dispatchers|carriers` until navigating to a consumer page (activities, carriers, etc.).
+- Admin dashboard card layout: Top Performers in KPI section row 2; Load Status Trend in KPI section row 3; bottom grid has Revenue/Loads-by-team/Status donut only.
+
+### Performance & load-time notes (verified)
+
+| Optimization | Location | Effect |
+|--------------|----------|--------|
+| `getCurrentUser` + `React.cache()` + `getClaims()` + JWKS cache | `session.ts`, `jwks-cache.ts` | One auth resolution per server request; no network round-trip to Supabase auth for JWT verify |
+| Middleware skips session refresh for `/api/*` | `middleware.ts` | API routes avoid redundant cookie refresh |
+| `SessionProvider` fetches `/api/auth/me` once on mount | `session-provider.tsx` | No refetch on client navigation |
+| `useApiData` request-id guard | `use-api-data.ts` | Stale responses cannot overwrite newer data |
+| Lazy `EntityOptionsProvider` | `entity-options-provider.tsx`, `use-entity-options.ts` | Zero entity-list calls on non-consumer pages |
+| Dynamic recharts imports | `admin-dashboard-page.tsx`, `dispatcher-dashboard-page.tsx`, `admin-daily-report-page.tsx` | Smaller initial dashboard JS bundle |
+| In-memory rate limiter sweep | `rate-limit.ts` | Expired buckets evicted periodically |
+
+**Pages that still consume entity options on load** (all 3 list APIs fire): activities, carriers, dispatchers, rankings, reports, team-lead dashboard, dispatcher performance, user-requests. **Pages with zero entity-option calls on load:** admin dashboard, daily report, settings, audit logs, finance, notifications, teams, account.
 
 ### Common debugging points
 
@@ -1196,4 +1271,4 @@ Key env vars (names only): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANO
 
 ---
 
-*Generated from a full codebase scan, verified against real code (services, routes, schema, auth, exports). Models documented: 15. API endpoints documented: 56 across 49 route files. For role-specific user guides see `docs/admin.md`, `docs/lead.md`, `docs/dispatcher.md`.*
+*Last updated: June 30, 2026 — verified against real code (services, routes, schema, auth, exports, dashboard layout, performance optimizations). Models documented: 18. API handlers: ~76 across 65 route files. For role-specific user guides see `docs/admin.md`, `docs/lead.md`, `docs/dispatcher.md`.*

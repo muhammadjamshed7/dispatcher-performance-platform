@@ -308,6 +308,13 @@ export type AdminDashboardBundle = {
     team: string;
     revenue: number;
   }[];
+  dispatcherLoads: {
+    dispatcherId: string;
+    dispatcher: string;
+    team: string;
+    loads: number;
+    revenue: number;
+  }[];
   loadsByTeam: { team: string; loads: number }[];
   statusBreakdown: {
     name: string;

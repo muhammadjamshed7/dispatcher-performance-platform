@@ -147,6 +147,7 @@ function AdminDashboardPageContent() {
               filterOptions={filterOptions}
               appliedFilters={dashboard.filters}
               dispatcherRevenue={dashboard.dispatcherRevenue}
+              dispatcherLoads={dashboard.dispatcherLoads}
               topPerformers={dashboard.topPerformers}
             />
           ) : null}

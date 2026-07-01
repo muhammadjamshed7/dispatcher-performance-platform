@@ -17,11 +17,19 @@ import {
 } from "@/components/dashboard/admin/kpi-stat-card-shell";
 import {
   computeYAxisMax,
-  type KpiChartPoint,
+  formatKpiCurrencyLabel,
 } from "@/lib/dashboard/kpi-chart-utils";
 
+type DispatcherLoadPoint = {
+  dispatcherId: string;
+  dispatcher: string;
+  team: string;
+  loads: number;
+  revenue: number;
+};
+
 type KpiLoadsBarChartProps = {
-  data: KpiChartPoint[];
+  data: DispatcherLoadPoint[];
   color?: string;
 };
 
@@ -30,38 +38,47 @@ export function KpiLoadsBarChart({
   color = "#8B5CF6",
 }: KpiLoadsBarChartProps) {
   if (data.length === 0) {
-    return <KpiChartEmptyState />;
+    return <KpiChartEmptyState message="No approved loads found" />;
   }
 
-  const yMax = computeYAxisMax(data.map((point) => point.value));
+  const xMax = computeYAxisMax(data.map((point) => point.loads), 1.2);
+  const chartHeight = Math.max(240, data.length * 42);
+  const dispatcherNames = new Map(
+    data.map((point) => [point.dispatcherId, point.dispatcher]),
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="min-h-[240px] w-full flex-1">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="min-h-[240px] w-full flex-1 overflow-y-auto pr-1">
+        <ResponsiveContainer width="100%" height={chartHeight}>
           <BarChart
+            layout="vertical"
             data={data}
-            margin={{ top: 24, right: 8, left: 0, bottom: 0 }}
+            margin={{ top: 12, right: 28, left: 0, bottom: 8 }}
           >
             <CartesianGrid
               stroke="#E2E8F0"
               strokeDasharray="4 4"
-              vertical={false}
+              horizontal={false}
             />
             <XAxis
-              dataKey="date"
-              tick={{ fill: "#64748B", fontSize: 11 }}
-              axisLine={false}
-              tickLine={false}
-              interval="preserveStartEnd"
-            />
-            <YAxis
+              type="number"
               allowDecimals={false}
               tick={{ fill: "#64748B", fontSize: 11 }}
               axisLine={false}
               tickLine={false}
-              width={32}
-              domain={[0, yMax]}
+              domain={[0, xMax]}
+            />
+            <YAxis
+              type="category"
+              dataKey="dispatcherId"
+              tickFormatter={(dispatcherId) =>
+                formatDispatcherName(dispatcherNames.get(dispatcherId) ?? "")
+              }
+              tick={{ fill: "#64748B", fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
+              width={96}
             />
             <Tooltip
               contentStyle={{
@@ -70,17 +87,45 @@ export function KpiLoadsBarChart({
                 borderRadius: 10,
                 fontSize: 12,
               }}
-              formatter={(value) => [Number(value).toLocaleString(), "Loads"]}
+              content={({ active, payload }) => {
+                if (!active || !payload?.length) return null;
+
+                const row = payload[0]?.payload as
+                  | DispatcherLoadPoint
+                  | undefined;
+                if (!row) return null;
+
+                return (
+                  <div className="rounded-[10px] border border-[#E2E8F0] bg-white px-3 py-2 text-xs shadow-sm">
+                    <p className="font-semibold text-[#0F172A]">
+                      {row.dispatcher}
+                    </p>
+                    <p className="mt-0.5 text-[#64748B]">{row.team}</p>
+                    <p className="mt-2 text-[#475569]">
+                      Loads:{" "}
+                      <span className="font-semibold text-[#0F172A]">
+                        {row.loads.toLocaleString()}
+                      </span>
+                    </p>
+                    <p className="mt-1 text-[#475569]">
+                      Revenue:{" "}
+                      <span className="font-semibold text-[#0F172A]">
+                        {formatKpiCurrencyLabel(row.revenue)}
+                      </span>
+                    </p>
+                  </div>
+                );
+              }}
             />
             <Bar
-              dataKey="value"
+              dataKey="loads"
               fill={color}
-              radius={[6, 6, 0, 0]}
-              maxBarSize={28}
+              radius={[0, 8, 8, 0]}
+              maxBarSize={22}
             >
               <LabelList
-                dataKey="value"
-                position="top"
+                dataKey="loads"
+                position="right"
                 offset={8}
                 formatter={(value) => {
                   const count = Number(value);
@@ -92,7 +137,11 @@ export function KpiLoadsBarChart({
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <KpiChartLegend label="Loads" color={color} />
+      <KpiChartLegend label="Approved loads by dispatcher" color={color} />
     </div>
   );
+}
+
+function formatDispatcherName(value: string) {
+  return value.length > 14 ? `${value.slice(0, 13)}...` : value;
 }

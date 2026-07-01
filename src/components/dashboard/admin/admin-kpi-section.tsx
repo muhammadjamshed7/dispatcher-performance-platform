@@ -11,7 +11,6 @@ import { KpiStatCardShell } from "@/components/dashboard/admin/kpi-stat-card-she
 import { TopPerformersCard } from "@/components/dashboard/admin/top-performers-card";
 import { Badge } from "@/components/ui/badge";
 import { fetchNotifications } from "@/lib/api/resources";
-import { buildTrendChartData } from "@/lib/dashboard/kpi-chart-utils";
 import type { AdminDashboardBundle, AppNotification } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { formatCurrencyCompact } from "@/lib/utils/format-currency";
@@ -22,6 +21,7 @@ type AdminKpiSectionProps = {
   filterOptions: AdminDashboardBundle["filterOptions"];
   appliedFilters: AdminDashboardBundle["filters"];
   dispatcherRevenue: AdminDashboardBundle["dispatcherRevenue"];
+  dispatcherLoads: AdminDashboardBundle["dispatcherLoads"];
   topPerformers: AdminDashboardBundle["topPerformers"];
 };
 
@@ -30,14 +30,10 @@ export function AdminKpiSection({
   filterOptions,
   appliedFilters,
   dispatcherRevenue,
+  dispatcherLoads,
   topPerformers,
 }: AdminKpiSectionProps) {
   const growth = metrics.growth;
-
-  const loadsChartData = useMemo(
-    () => buildTrendChartData(metrics.trendDates, metrics.sparklines.loads),
-    [metrics.trendDates, metrics.sparklines.loads],
-  );
 
   const scopedDispatchers = useMemo(() => {
     let dispatchers = filterOptions.dispatchers;
@@ -141,7 +137,7 @@ export function AdminKpiSection({
           iconBackground="#F3E8FF"
           icon={Package}
         >
-          <KpiLoadsBarChart data={loadsChartData} />
+          <KpiLoadsBarChart data={dispatcherLoads} />
         </KpiStatCardShell>
 
         <DashboardNotificationsCard />
