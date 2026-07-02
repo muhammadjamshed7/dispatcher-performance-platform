@@ -48,7 +48,7 @@ export function CarriersTable({
       <CardHeader className="flex flex-col gap-3 border-b border-[#E2E8F0] sm:flex-row sm:items-center sm:justify-between">
         <div>
           <CardTitle className="text-lg font-semibold text-[#0F172A]">
-            Sales
+            Carriers
           </CardTitle>
           <p className="mt-1 text-sm text-[#64748B]">
             Carrier records, assignments and dispatch fee details.
@@ -63,7 +63,7 @@ export function CarriersTable({
             type="button"
             variant="ghost"
             size="icon-sm"
-            aria-label="Sales table options"
+            aria-label="Carriers table options"
           >
             <MoreHorizontal className="size-4" />
           </Button>

@@ -22,7 +22,6 @@ import {
   Filter,
   Info,
   MoreHorizontal,
-  Plus,
   Route,
   Trophy,
 } from "lucide-react";
@@ -51,7 +50,8 @@ import { useApiData } from "@/hooks/use-api-data";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { useRoleScope } from "@/hooks/use-role-scope";
 import { ApiClientError } from "@/lib/api/client";
-import {  entityFiltersToCarrierParams,
+import {
+  entityFiltersToCarrierParams,
   DEFAULT_ENTITY_FILTERS,
   parseEntityFiltersFromSearchParams,
   type EntityFilterValues,
@@ -733,7 +733,7 @@ function CarriersPageState({
   return (
     <>
       <PageShell
-        title="Sales"
+        title="Carriers"
         description="Overview of performance, revenue and carrier activity."
         actions={
           <div className="flex flex-wrap items-center justify-end gap-2">
@@ -746,16 +746,6 @@ function CarriersPageState({
               <Filter className="size-4" />
               Filters
             </Button>
-            {canManageCarriers ? (
-              <Button
-                type="button"
-                className="h-9 rounded-lg bg-[#1D4ED8] px-4 font-semibold text-white shadow-sm hover:bg-[#1E40AF]"
-                onClick={() => openModal("create")}
-              >
-                <Plus className="size-4" />
-                Create Carrier
-              </Button>
-            ) : null}
           </div>
         }
       >
@@ -780,18 +770,14 @@ function CarriersPageState({
           <PageContentGate
             state={pageState}
             onRetry={refreshCarriers}
-            loadingTitle="Loading sales dashboard"
-            emptyTitle="No sales records found"
-            emptyDescription="Create a carrier profile to manage assignments, activity and dispatch fees."
-            emptyActionLabel={canManageCarriers ? "Create Carrier" : undefined}
-            onEmptyAction={
-              canManageCarriers ? () => openModal("create") : undefined
-            }
-            errorTitle="Unable to load sales dashboard"
+            loadingTitle="Loading carriers"
+            emptyTitle="No carriers found"
+            emptyDescription="Carrier profiles, assignments, activity and dispatch fees will appear here."
+            errorTitle="Unable to load carriers"
             errorDescription={
               error ??
               activitiesError ??
-              "Sales records could not be loaded. Try again in a moment."
+              "Carrier records could not be loaded. Try again in a moment."
             }
           >
             <SalesKpiGrid analytics={analytics} />
@@ -854,7 +840,7 @@ function SalesFilterPanel({
         <div>
           <h2 className="text-sm font-semibold text-[#0F172A]">Filters</h2>
           <p className="mt-1 text-xs text-[#64748B]">
-            Refine Sales metrics, charts and table results.
+            Refine carrier metrics, charts and table results.
           </p>
         </div>
         <div className="flex items-center gap-2">

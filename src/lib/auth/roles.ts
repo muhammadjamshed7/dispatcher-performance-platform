@@ -46,7 +46,8 @@ export const ADMIN_NAV_ITEMS: RoleNavItem[] = [
   { label: "Dashboard", href: "/admin/dashboard", iconKey: "dashboard" },
   { label: "Teams", href: "/admin/teams", iconKey: "teams" },
   { label: "Dispatchers", href: "/admin/dispatchers", iconKey: "dispatchers" },
-  { label: "Sales", href: "/admin/carriers", iconKey: "carriers" },
+  { label: "Sales", href: "/admin/sales", iconKey: "sales" },
+  { label: "Carriers", href: "/admin/carriers", iconKey: "carriers" },
   { label: "Activities", href: "/admin/activities", iconKey: "activities" },
   {
     label: "Pending Approvals",
@@ -54,7 +55,11 @@ export const ADMIN_NAV_ITEMS: RoleNavItem[] = [
     iconKey: "pendingApprovals",
   },
   { label: "Audit Logs", href: "/admin/logs", iconKey: "logs" },
-  { label: "Notifications", href: "/admin/notifications", iconKey: "notifications" },
+  {
+    label: "Notifications",
+    href: "/admin/notifications",
+    iconKey: "notifications",
+  },
   { label: "Rankings", href: "/admin/rankings", iconKey: "rankings" },
   { label: "Reports", href: "/admin/reports", iconKey: "reports" },
   { label: "Invoices", href: "/admin/invoices", iconKey: "invoices" },
@@ -75,14 +80,19 @@ export const TEAM_LEAD_NAV_ITEMS: RoleNavItem[] = [
     href: "/team-lead/dispatchers",
     iconKey: "dispatchers",
   },
-  { label: "Sales", href: "/team-lead/carriers", iconKey: "carriers" },
+  { label: "Sales", href: "/team-lead/sales", iconKey: "sales" },
+  { label: "Carriers", href: "/team-lead/carriers", iconKey: "carriers" },
   { label: "Activities", href: "/team-lead/activities", iconKey: "activities" },
   {
     label: "Pending Approvals",
     href: "/team-lead/activities/pending",
     iconKey: "pendingApprovals",
   },
-  { label: "Notifications", href: "/team-lead/notifications", iconKey: "notifications" },
+  {
+    label: "Notifications",
+    href: "/team-lead/notifications",
+    iconKey: "notifications",
+  },
   { label: "Rankings", href: "/team-lead/rankings", iconKey: "rankings" },
   { label: "Reports", href: "/team-lead/reports", iconKey: "reports" },
   { label: "Invoices", href: "/team-lead/invoices", iconKey: "invoices" },
@@ -91,7 +101,8 @@ export const TEAM_LEAD_NAV_ITEMS: RoleNavItem[] = [
 
 export const DISPATCHER_NAV_ITEMS: RoleNavItem[] = [
   { label: "Dashboard", href: "/dispatcher/dashboard", iconKey: "dashboard" },
-  { label: "Sales", href: "/dispatcher/carriers", iconKey: "carriers" },
+  { label: "Sales", href: "/dispatcher/sales", iconKey: "sales" },
+  { label: "Carriers", href: "/dispatcher/carriers", iconKey: "carriers" },
   {
     label: "Daily Activities",
     href: "/dispatcher/activities",

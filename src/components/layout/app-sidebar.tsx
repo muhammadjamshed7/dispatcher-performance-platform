@@ -34,6 +34,7 @@ const NAV_ICONS: Record<string, typeof LayoutDashboard> = {
   carriers: Truck,
   activities: Activity,
   pendingApprovals: ClipboardCheck,
+  sales: BarChart3,
   logs: FileText,
   notifications: Activity,
   rankings: Trophy,

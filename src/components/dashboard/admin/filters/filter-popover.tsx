@@ -1,20 +1,16 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useMemo } from "react";
 
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
+import { SharedFilterPopover } from "@/components/filters/shared-filter-popover";
 import type { AdminDashboardBundle } from "@/lib/types";
 import {
+  ADMIN_DATE_PRESET_OPTIONS,
   DASHBOARD_STATUS_FILTER_OPTIONS,
   DASHBOARD_TRUCK_TYPE_OPTIONS,
+  type AdminDashboardDatePreset,
   type AdminDashboardFilterState,
 } from "@/lib/dashboard/admin-dashboard-filters";
-import { cn } from "@/lib/utils";
-
-import { CheckboxFilterGroup } from "./checkbox-filter-group";
-import { DateRangeFilter } from "./date-range-filter";
 
 type FilterPopoverProps = {
   open: boolean;
@@ -37,23 +33,6 @@ export function FilterPopover({
   onReset,
   onClose,
 }: FilterPopoverProps) {
-  const panelRef = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState({ top: 80, right: 16 });
-
-  useLayoutEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    const anchorRect = anchorRef.current?.getBoundingClientRect();
-    setPosition({
-      top: anchorRect ? anchorRect.bottom + 8 : 80,
-      right: anchorRect
-        ? Math.max(16, window.innerWidth - anchorRect.right)
-        : 16,
-    });
-  }, [anchorRef, open, draftFilters]);
-
   const teamOptions = useMemo(
     () =>
       filterOptions.teams.map((team) => ({ value: team.id, label: team.name })),
@@ -113,35 +92,6 @@ export function FilterPopover({
     [scopedCarriers],
   );
 
-  useEffect(() => {
-    if (!open) return;
-
-    function handlePointerDown(event: MouseEvent) {
-      const target = event.target as Node;
-      if (panelRef.current?.contains(target)) return;
-      if (anchorRef.current?.contains(target)) return;
-      onClose();
-    }
-
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    }
-
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleEscape);
-
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, [anchorRef, onClose, open]);
-
-  if (!open || typeof document === "undefined") {
-    return null;
-  }
-
   function patchDraft(next: Partial<AdminDashboardFilterState>) {
     const merged = { ...draftFilters, ...next };
 
@@ -157,8 +107,9 @@ export function FilterPopover({
       );
 
       const validCarriers = filterOptions.carriers.filter((carrier) => {
-        if (teamIds.length > 0 && !teamIds.includes(carrier.teamId))
+        if (teamIds.length > 0 && !teamIds.includes(carrier.teamId)) {
           return false;
+        }
         if (
           dispatcherIds.length > 0 &&
           (!carrier.dispatcherId ||
@@ -183,100 +134,78 @@ export function FilterPopover({
     onDraftChange(merged);
   }
 
-  return createPortal(
-    <div
-      ref={panelRef}
-      style={{ top: position.top, right: position.right }}
-      className={cn(
-        "fixed z-50 flex max-h-[70vh] w-[min(400px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-[0_20px_50px_rgba(15,23,42,0.15)]",
-      )}
-    >
-      <div className="border-b border-[#F1F5F9] px-5 py-4">
-        <h2 className="text-base font-semibold text-[#0F172A]">
-          Dashboard Filters
-        </h2>
-        <p className="mt-1 text-xs text-[#64748B]">
-          Choose date range and checkbox filters, then apply.
-        </p>
-      </div>
-
-      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4">
-        <DateRangeFilter value={draftFilters} onChange={patchDraft} />
-        <Separator className="bg-[#F1F5F9]" />
-
-        <CheckboxFilterGroup
-          title="Team"
-          searchPlaceholder="Search teams..."
-          options={teamOptions}
-          selectedValues={draftFilters.teamIds}
-          onChange={(teamIds) => patchDraft({ teamIds })}
-        />
-        <Separator className="bg-[#F1F5F9]" />
-
-        <CheckboxFilterGroup
-          title="Dispatcher"
-          searchPlaceholder="Search dispatchers..."
-          options={dispatcherOptions}
-          selectedValues={draftFilters.dispatcherIds}
-          onChange={(dispatcherIds) => patchDraft({ dispatcherIds })}
-        />
-        <Separator className="bg-[#F1F5F9]" />
-
-        <CheckboxFilterGroup
-          title="Carrier"
-          searchPlaceholder="Search carriers..."
-          options={carrierOptions}
-          selectedValues={draftFilters.carrierIds}
-          onChange={(carrierIds) => patchDraft({ carrierIds })}
-        />
-        <Separator className="bg-[#F1F5F9]" />
-
-        <CheckboxFilterGroup
-          title="Truck Type"
-          searchPlaceholder="Search truck types..."
-          options={DASHBOARD_TRUCK_TYPE_OPTIONS.map((option) => ({
+  return (
+    <SharedFilterPopover
+      open={open}
+      anchorRef={anchorRef}
+      title="Dashboard Filters"
+      description="Choose date range and checkbox filters, then apply."
+      dateRange={{
+        name: "dashboard-date-range",
+        value: draftFilters.dateRange,
+        options: ADMIN_DATE_PRESET_OPTIONS,
+        onChange: (dateRange) =>
+          patchDraft({ dateRange: dateRange as AdminDashboardDatePreset }),
+        customDateFrom: draftFilters.customDateFrom,
+        customDateTo: draftFilters.customDateTo,
+        onCustomDateFromChange: (customDateFrom) =>
+          patchDraft({ customDateFrom }),
+        onCustomDateToChange: (customDateTo) => patchDraft({ customDateTo }),
+      }}
+      groups={[
+        {
+          id: "team",
+          title: "Team",
+          searchPlaceholder: "Search teams...",
+          options: teamOptions,
+          selectedValues: draftFilters.teamIds,
+          onChange: (teamIds) => patchDraft({ teamIds }),
+        },
+        {
+          id: "dispatcher",
+          title: "Dispatcher",
+          searchPlaceholder: "Search dispatchers...",
+          options: dispatcherOptions,
+          selectedValues: draftFilters.dispatcherIds,
+          onChange: (dispatcherIds) => patchDraft({ dispatcherIds }),
+        },
+        {
+          id: "carrier",
+          title: "Carrier",
+          searchPlaceholder: "Search carriers...",
+          options: carrierOptions,
+          selectedValues: draftFilters.carrierIds,
+          onChange: (carrierIds) => patchDraft({ carrierIds }),
+        },
+        {
+          id: "truckType",
+          title: "Truck Type",
+          searchPlaceholder: "Search truck types...",
+          options: DASHBOARD_TRUCK_TYPE_OPTIONS.map((option) => ({
             value: option.value,
             label: option.label,
-          }))}
-          selectedValues={draftFilters.truckTypes}
-          onChange={(truckTypes) =>
+          })),
+          selectedValues: draftFilters.truckTypes,
+          onChange: (truckTypes) =>
             patchDraft({
               truckTypes: truckTypes as AdminDashboardFilterState["truckTypes"],
-            })
-          }
-        />
-        <Separator className="bg-[#F1F5F9]" />
-
-        <CheckboxFilterGroup
-          title="Status"
-          searchPlaceholder="Search statuses..."
-          options={DASHBOARD_STATUS_FILTER_OPTIONS.map((option) => ({
+            }),
+        },
+        {
+          id: "status",
+          title: "Status",
+          searchPlaceholder: "Search statuses...",
+          options: DASHBOARD_STATUS_FILTER_OPTIONS.map((option) => ({
             value: option.key,
             label: option.label,
-          }))}
-          selectedValues={draftFilters.statusKeys}
-          onChange={(statusKeys) => patchDraft({ statusKeys })}
-        />
-      </div>
-
-      <div className="flex items-center justify-between gap-3 border-t border-[#F1F5F9] px-5 py-4">
-        <Button
-          type="button"
-          variant="ghost"
-          className="text-[#64748B] hover:bg-[#F8FAFC] hover:text-[#334155]"
-          onClick={onReset}
-        >
-          Reset All
-        </Button>
-        <Button
-          type="button"
-          className="rounded-[10px] bg-[#2563EB] text-white hover:bg-[#1D4ED8]"
-          onClick={onApply}
-        >
-          Apply Filters
-        </Button>
-      </div>
-    </div>,
-    document.body,
+          })),
+          selectedValues: draftFilters.statusKeys,
+          onChange: (statusKeys) => patchDraft({ statusKeys }),
+        },
+      ]}
+      onApply={onApply}
+      onReset={onReset}
+      onClose={onClose}
+    />
   );
 }
