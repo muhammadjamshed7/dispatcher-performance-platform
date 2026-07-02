@@ -19,7 +19,6 @@ import {
 import {
   BadgeDollarSign,
   CircleDollarSign,
-  Filter,
   Info,
   MoreHorizontal,
   Route,
@@ -29,12 +28,7 @@ import {
 import { PageContentGate } from "@/components/feedback/page-content-gate";
 import type { PageContentState } from "@/components/feedback/page-content-gate";
 import { AppToast } from "@/components/feedback/app-toast";
-import { CarrierFilter } from "@/components/filters/carrier-filter";
-import { DateRangeFilter } from "@/components/filters/date-range-filter";
-import { DispatcherFilter } from "@/components/filters/dispatcher-filter";
-import { TeamFilter } from "@/components/filters/team-filter";
-import { TeamStatusFilter } from "@/components/filters/team-status-filter";
-import { TruckTypeFilter } from "@/components/filters/truck-type-filter";
+import { DashboardFilterComponent } from "@/components/filters/dashboard-filter-component";
 import { RoleScopeBanner } from "@/components/layout/role-scope-banner";
 import {
   CarrierModal,
@@ -84,10 +78,8 @@ import {
   formatCurrency,
   formatCurrencyCompact,
 } from "@/lib/utils/format-currency";
-import {
-  formatDateRangeLabel,
-  resolveDateRangePreset,
-} from "@/lib/utils/resolve-date-range-preset";
+import { formatDateRangeLabel } from "@/lib/utils/resolve-date-range-preset";
+import { resolveDateRange } from "@/lib/utils/resolve-date-range";
 import type {
   CarrierFormValues,
   CarrierReassignValues,
@@ -190,6 +182,13 @@ type CarriersPageContentProps = {
   compact?: boolean;
 };
 
+const DEFAULT_CARRIERS_DASHBOARD_FILTERS: EntityFilterValues = {
+  ...DEFAULT_ENTITY_FILTERS,
+  dateRange: "today",
+  customDateFrom: "",
+  customDateTo: "",
+};
+
 function appendFilter(
   params: Record<string, string>,
   key: string,
@@ -200,8 +199,12 @@ function appendFilter(
   }
 }
 
-function getPreviousDateRange(dateRange: string) {
-  const { dateFrom, dateTo } = resolveDateRangePreset(dateRange);
+function getPreviousDateRange(filters: EntityFilterValues) {
+  const { dateFrom, dateTo } = resolveDateRange(filters.dateRange, {
+    customDateFrom: filters.customDateFrom,
+    customDateTo: filters.customDateTo,
+    customIncompleteFallback: "partial",
+  });
   const from = new Date(`${dateFrom}T00:00:00Z`);
   const to = new Date(`${dateTo}T00:00:00Z`);
   const dayMs = 24 * 60 * 60 * 1000;
@@ -222,7 +225,13 @@ function salesActivityParams(
   filters: EntityFilterValues,
   dateRangeOverride?: { dateFrom: string; dateTo: string },
 ): Record<string, string> {
-  const range = dateRangeOverride ?? resolveDateRangePreset(filters.dateRange);
+  const range =
+    dateRangeOverride ??
+    resolveDateRange(filters.dateRange, {
+      customDateFrom: filters.customDateFrom,
+      customDateTo: filters.customDateTo,
+      customIncompleteFallback: "partial",
+    });
   const params: Record<string, string> = {
     dateFrom: range.dateFrom,
     dateTo: range.dateTo,
@@ -430,11 +439,19 @@ function CarriersPageContentInner({
 }: CarriersPageContentProps) {
   const searchParams = useSearchParams();
   const searchParamKey = searchParams.toString();
-  const urlEntityFilters = useMemo(
-    () =>
-      parseEntityFiltersFromSearchParams(new URLSearchParams(searchParamKey)),
-    [searchParamKey],
-  );
+  const urlEntityFilters = useMemo(() => {
+    const params = new URLSearchParams(searchParamKey);
+    const parsed = parseEntityFiltersFromSearchParams(params);
+
+    return {
+      ...parsed,
+      dateRange:
+        params.get("dateRange")?.trim() ||
+        DEFAULT_CARRIERS_DASHBOARD_FILTERS.dateRange,
+      customDateFrom: params.get("customDateFrom")?.trim() ?? "",
+      customDateTo: params.get("customDateTo")?.trim() ?? "",
+    };
+  }, [searchParamKey]);
 
   return (
     <CarriersPageState
@@ -459,7 +476,6 @@ function CarriersPageState({
     useState<EntityFilterValues>(initialEntityFilters);
   const [appliedFilters, setAppliedFilters] =
     useState<EntityFilterValues>(initialEntityFilters);
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<CarrierModalMode>("create");
   const [selectedCarrier, setSelectedCarrier] = useState<Carrier | null>(null);
@@ -477,7 +493,7 @@ function CarriersPageState({
     return fetchActivities(
       salesActivityParams(
         appliedFilters,
-        getPreviousDateRange(appliedFilters.dateRange),
+        getPreviousDateRange(appliedFilters),
       ),
     );
   }, [appliedFilters]);
@@ -500,11 +516,12 @@ function CarriersPageState({
   const {
     teams,
     dispatchers,
+    carriers: optionCarriers,
     reload: reloadEntityOptions,
   } = useEntityOptions({
     teams: true,
     dispatchers: true,
-    carriers: false,
+    carriers: true,
   });
 
   const refreshCarriers = useCallback(async () => {
@@ -550,8 +567,17 @@ function CarriersPageState({
     [filteredActivities, filteredPreviousActivities, visibleCarriers],
   );
   const activeRange = useMemo(
-    () => resolveDateRangePreset(appliedFilters.dateRange),
-    [appliedFilters.dateRange],
+    () =>
+      resolveDateRange(appliedFilters.dateRange, {
+        customDateFrom: appliedFilters.customDateFrom,
+        customDateTo: appliedFilters.customDateTo,
+        customIncompleteFallback: "partial",
+      }),
+    [
+      appliedFilters.customDateFrom,
+      appliedFilters.customDateTo,
+      appliedFilters.dateRange,
+    ],
   );
   const periodLabel = formatDateRangeLabel(
     activeRange.dateFrom,
@@ -737,35 +763,42 @@ function CarriersPageState({
         description="Overview of performance, revenue and carrier activity."
         actions={
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="h-9 rounded-lg border-[#CBD5E1] bg-white px-3 text-[#334155] shadow-sm hover:bg-[#F8FAFC]"
-              onClick={() => setFiltersOpen((open) => !open)}
-            >
-              <Filter className="size-4" />
-              Filters
-            </Button>
+            <DashboardFilterComponent
+              values={draftFilters}
+              defaultValues={DEFAULT_CARRIERS_DASHBOARD_FILTERS}
+              onApplyFilters={(nextFilters) => {
+                setDraftFilters(nextFilters);
+                setAppliedFilters(nextFilters);
+              }}
+              allowedFilters={{
+                team: true,
+                dispatcher: true,
+                carrier: true,
+              }}
+              teamOptions={teams.map((team) => ({
+                value: team.id,
+                label: team.name,
+              }))}
+              dispatcherOptions={dispatchers.map((dispatcher) => ({
+                value: dispatcher.id,
+                label: dispatcher.fullName,
+                teamId: teams.find((team) => team.name === dispatcher.teamName)
+                  ?.id,
+              }))}
+              carrierOptions={optionCarriers.map((carrier) => ({
+                value: carrier.id,
+                label: carrier.carrierName,
+                teamId: carrier.assignedTeamId,
+                dispatcherId: carrier.assignedDispatcherId,
+              }))}
+              title="Carrier Dashboard Filters"
+              description="Choose the date range and optional carrier scope."
+            />
           </div>
         }
       >
         <div className="-m-4 space-y-6 bg-[#F6F8FB] p-4 md:-m-6 md:p-6 lg:-m-8 lg:p-8">
           {showScopeBanner ? <RoleScopeBanner /> : null}
-
-          {filtersOpen ? (
-            <SalesFilterPanel
-              values={draftFilters}
-              onChange={setDraftFilters}
-              onApply={() => {
-                setAppliedFilters(draftFilters);
-                setFiltersOpen(false);
-              }}
-              onReset={() => {
-                setDraftFilters(DEFAULT_ENTITY_FILTERS);
-                setAppliedFilters(DEFAULT_ENTITY_FILTERS);
-              }}
-            />
-          ) : null}
 
           <PageContentGate
             state={pageState}
@@ -808,94 +841,6 @@ function CarriersPageState({
         onDismiss={() => setToastMessage(null)}
       />
     </>
-  );
-}
-
-function SalesFilterPanel({
-  values,
-  onChange,
-  onApply,
-  onReset,
-}: {
-  values: EntityFilterValues;
-  onChange: (values: EntityFilterValues) => void;
-  onApply: () => void;
-  onReset: () => void;
-}) {
-  function updateField<K extends keyof EntityFilterValues>(
-    field: K,
-    value: EntityFilterValues[K],
-  ) {
-    onChange({
-      ...values,
-      activityId: undefined,
-      q: undefined,
-      [field]: value,
-    });
-  }
-
-  return (
-    <section className="rounded-2xl border border-[#E2E8F0] bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold text-[#0F172A]">Filters</h2>
-          <p className="mt-1 text-xs text-[#64748B]">
-            Refine carrier metrics, charts and table results.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={onReset}>
-            Reset
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            className="bg-[#1D4ED8] text-white hover:bg-[#1E40AF]"
-            onClick={onApply}
-          >
-            Apply filters
-          </Button>
-        </div>
-      </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <DateRangeFilter
-          value={values.dateRange}
-          onValueChange={(value) => {
-            if (value) updateField("dateRange", value);
-          }}
-        />
-        <TeamFilter
-          value={values.teamId}
-          onValueChange={(value) => {
-            if (value) updateField("teamId", value);
-          }}
-        />
-        <DispatcherFilter
-          value={values.dispatcherId}
-          onValueChange={(value) => {
-            if (value) updateField("dispatcherId", value);
-          }}
-        />
-        <CarrierFilter
-          value={values.carrierId}
-          onValueChange={(value) => {
-            if (value) updateField("carrierId", value);
-          }}
-        />
-        <TeamStatusFilter
-          value={values.status}
-          onValueChange={(value) => {
-            if (value) updateField("status", value);
-          }}
-        />
-        <TruckTypeFilter
-          value={values.truckType}
-          onValueChange={(value) => {
-            if (value) updateField("truckType", value);
-          }}
-        />
-      </div>
-    </section>
   );
 }
 

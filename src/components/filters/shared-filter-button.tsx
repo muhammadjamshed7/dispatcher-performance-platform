@@ -9,6 +9,7 @@ type SharedFilterButtonProps = {
   open: boolean;
   onClick: () => void;
   className?: string;
+  label?: string;
 };
 
 export function SharedFilterButton({
@@ -16,6 +17,7 @@ export function SharedFilterButton({
   open,
   onClick,
   className,
+  label = "Filters",
 }: SharedFilterButtonProps) {
   return (
     <Button
@@ -30,7 +32,7 @@ export function SharedFilterButton({
       )}
     >
       <Filter className="size-4" />
-      Filters
+      {label}
       {activeCount > 0 ? (
         <Badge className="ml-1 rounded-full bg-[#2563EB] px-1.5 py-0 text-[10px] text-white hover:bg-[#2563EB]">
           {activeCount}

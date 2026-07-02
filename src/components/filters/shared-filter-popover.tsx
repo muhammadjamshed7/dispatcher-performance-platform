@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -42,6 +43,7 @@ type SharedFilterPopoverProps = {
   title: string;
   description: string;
   dateRange?: SharedDateRangeConfig;
+  children?: ReactNode;
   groups: SharedFilterGroup[];
   onApply: () => void;
   onReset: () => void;
@@ -55,6 +57,7 @@ export function SharedFilterPopover({
   title,
   description,
   dateRange,
+  children,
   groups,
   onApply,
   onReset,
@@ -125,8 +128,16 @@ export function SharedFilterPopover({
         {dateRange ? (
           <>
             <SharedDateRangeFilter {...dateRange} />
-            {groups.length > 0 ? <Separator className="bg-[#F1F5F9]" /> : null}
+            {children || groups.length > 0 ? (
+              <Separator className="bg-[#F1F5F9]" />
+            ) : null}
           </>
+        ) : null}
+
+        {children}
+
+        {children && groups.length > 0 ? (
+          <Separator className="bg-[#F1F5F9]" />
         ) : null}
 
         {groups.map((group, index) => (

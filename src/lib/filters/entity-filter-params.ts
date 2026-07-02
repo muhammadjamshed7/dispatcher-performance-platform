@@ -3,6 +3,8 @@ import { resolveDateRangePreset } from "@/lib/utils/resolve-date-range-preset";
 
 export type EntityFilterValues = {
   dateRange: string;
+  customDateFrom?: string;
+  customDateTo?: string;
   teamId: string;
   dispatcherId: string;
   carrierId: string;
@@ -14,6 +16,8 @@ export type EntityFilterValues = {
 
 export const DEFAULT_ENTITY_FILTERS: EntityFilterValues = {
   dateRange: "last-30-days",
+  customDateFrom: "",
+  customDateTo: "",
   teamId: FILTER_ALL,
   dispatcherId: FILTER_ALL,
   carrierId: FILTER_ALL,
@@ -64,6 +68,8 @@ export function parseEntityFiltersFromSearchParams(
   return {
     dateRange:
       params.get("dateRange")?.trim() || DEFAULT_ENTITY_FILTERS.dateRange,
+    customDateFrom: readOptionalParam(params, "customDateFrom") ?? "",
+    customDateTo: readOptionalParam(params, "customDateTo") ?? "",
     teamId: readFilterParam(params, "teamId"),
     dispatcherId: readFilterParam(params, "dispatcherId"),
     carrierId: readFilterParam(params, "carrierId"),

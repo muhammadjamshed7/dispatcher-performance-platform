@@ -7,10 +7,7 @@ import { DollarSign, PackageCheck, Route, Truck } from "lucide-react";
 import { DashboardMetricCard } from "@/components/dashboard/admin/dashboard-metric-card";
 import { AssignedCarrierPerformanceTable } from "@/components/dashboard/dispatcher/assigned-carrier-performance-table";
 import { DispatcherDashboardHeader } from "@/components/dashboard/dispatcher/dispatcher-dashboard-header";
-import {
-  DEFAULT_DISPATCHER_FILTERS,
-  DispatcherFilterBar,
-} from "@/components/dashboard/dispatcher/dispatcher-filter-bar";
+import { DashboardFilterComponent } from "@/components/filters/dashboard-filter-component";
 import { DispatcherRecentActivitiesTable } from "@/components/dashboard/dispatcher/dispatcher-recent-activities-table";
 import { PendingCarrierEntriesCard } from "@/components/dashboard/dispatcher/pending-carrier-entries-card";
 import { TodayEntryCompletionCard } from "@/components/dashboard/dispatcher/today-entry-completion-card";
@@ -18,7 +15,10 @@ import { PageContentGate } from "@/components/feedback/page-content-gate";
 import type { PageContentState } from "@/components/feedback/page-content-gate";
 import { useApiData } from "@/hooks/use-api-data";
 import { fetchDispatcherDashboard } from "@/lib/api/resources";
-import { dispatcherDashboardFiltersToParams } from "@/lib/dashboard/dispatcher-filter-params";
+import {
+  DEFAULT_DISPATCHER_DASHBOARD_FILTERS,
+  dispatcherDashboardFiltersToParams,
+} from "@/lib/dashboard/dispatcher-filter-params";
 import type { DispatcherDashboardFilterValues } from "@/lib/dashboard/dispatcher-filter-params";
 import { formatCurrencyCompact } from "@/lib/utils/format-currency";
 import { formatRatePerMile } from "@/lib/utils/format-rate-per-mile";
@@ -43,7 +43,7 @@ const PersonalRevenueTrendChart = dynamic(
 
 export function DispatcherDashboardPage() {
   const [filters, setFilters] = useState<DispatcherDashboardFilterValues>(
-    DEFAULT_DISPATCHER_FILTERS,
+    DEFAULT_DISPATCHER_DASHBOARD_FILTERS,
   );
 
   const loadDashboard = useCallback(
@@ -65,12 +65,6 @@ export function DispatcherDashboardPage() {
       : "ready";
 
   const metrics = dashboard?.metrics;
-  const filterOptions = dashboard?.filterOptions ?? {
-    carriers: [],
-    truckTypes: [],
-    statuses: [],
-  };
-
   const totalFilteredLoads = useMemo(() => {
     return (
       dashboard?.statusBreakdown.reduce((sum, item) => sum + item.value, 0) ?? 0
@@ -153,11 +147,12 @@ export function DispatcherDashboardPage() {
             carriers={dashboard?.pendingCarriers ?? []}
           />
 
-          <DispatcherFilterBar
+          <DashboardFilterComponent
             values={filters}
-            filterOptions={filterOptions}
-            onChange={setFilters}
-            onReset={() => setFilters(DEFAULT_DISPATCHER_FILTERS)}
+            defaultValues={DEFAULT_DISPATCHER_DASHBOARD_FILTERS}
+            onApplyFilters={setFilters}
+            title="Dispatcher Dashboard Filters"
+            description="Choose the reporting date range."
           />
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">

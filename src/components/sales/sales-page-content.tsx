@@ -1,12 +1,15 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Suspense, useCallback, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
+  ComposedChart,
+  Legend,
+  Line,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -35,8 +38,7 @@ import {
 import { AppToast } from "@/components/feedback/app-toast";
 import { PageContentGate } from "@/components/feedback/page-content-gate";
 import type { PageContentState } from "@/components/feedback/page-content-gate";
-import { SharedFilterButton } from "@/components/filters/shared-filter-button";
-import { SharedFilterPopover } from "@/components/filters/shared-filter-popover";
+import { DashboardFilterComponent } from "@/components/filters/dashboard-filter-component";
 import { PageShell } from "@/components/layout/page-shell";
 import {
   CarrierModal,
@@ -73,20 +75,14 @@ import { APPROVED } from "@/lib/constants/activity-approval";
 import { FILTER_ALL } from "@/lib/constants/filters";
 import { ADMIN, DISPATCHER, TEAM_LEAD } from "@/lib/constants/roles";
 import { DELIVERED } from "@/lib/constants/statuses";
-import {
-  TEAM_STATUSES,
-  TEAM_STATUS_ACTIVE,
-} from "@/lib/constants/team-statuses";
-import { TRUCK_TYPES } from "@/lib/constants/truck-types";
+import { TEAM_STATUS_ACTIVE } from "@/lib/constants/team-statuses";
 import { isValidCarrierAutoActivityStatus } from "@/lib/carriers/activity-based-status";
 import type { Carrier, DailyActivity } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format-currency";
 import { formatDate, formatDateShort } from "@/lib/utils/format-date";
-import {
-  formatDateRangeLabel,
-  resolveDateRangePreset,
-} from "@/lib/utils/resolve-date-range-preset";
+import { resolveDateRange } from "@/lib/utils/resolve-date-range";
+import { formatDateRangeLabel } from "@/lib/utils/resolve-date-range-preset";
 import type { CarrierFormValues } from "@/lib/validation/carrier-form";
 
 const ACTIVATION_WINDOW_HOURS = 72;
@@ -125,11 +121,22 @@ const REQUEST_META = {
   Rejected: "border-[#FECACA] bg-[#FEE2E2] text-[#B91C1C]",
 } as const;
 
+const ACTIVATION_BAR_COLORS = [
+  "#2563EB",
+  "#22C55E",
+  "#F97316",
+  "#8B5CF6",
+  "#06B6D4",
+  "#EC4899",
+] as const;
+
 type LifecycleStatus = keyof typeof LIFECYCLE_META;
 type ExtensionStatus = keyof typeof REQUEST_META;
 
 type SalesFilters = {
   dateRange: string;
+  customDateFrom?: string;
+  customDateTo?: string;
   teamId: string;
   dispatcherId: string;
   carrierId: string;
@@ -205,7 +212,9 @@ type SalesAnalytics = {
 
 function getDefaultSalesFilters(): SalesFilters {
   return {
-    dateRange: "last-30-days",
+    dateRange: "today",
+    customDateFrom: "",
+    customDateTo: "",
     teamId: FILTER_ALL,
     dispatcherId: FILTER_ALL,
     carrierId: FILTER_ALL,
@@ -215,21 +224,6 @@ function getDefaultSalesFilters(): SalesFilters {
     extensionStatus: FILTER_ALL,
     createdBy: FILTER_ALL,
   };
-}
-
-function filterValueToSelection(value: string): string[] {
-  return value === FILTER_ALL ? [] : [value];
-}
-
-function selectionToFilterValue(values: string[]): string {
-  return values[0] ?? FILTER_ALL;
-}
-
-function formatOptionLabel(value: string): string {
-  return value
-    .replaceAll("_", " ")
-    .toLowerCase()
-    .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -464,12 +458,7 @@ function SalesPageContentInner() {
   const { role, user } = useRoleScope();
   const canManageCarriers = role !== DISPATCHER;
   const canReviewExtensions = role === ADMIN || role === TEAM_LEAD;
-  const filterButtonRef = useRef<HTMLDivElement>(null);
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const [filters, setFilters] = useState<SalesFilters>(getDefaultSalesFilters);
-  const [draftFilters, setDraftFilters] = useState<SalesFilters>(
-    getDefaultSalesFilters,
-  );
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<CarrierModalMode>("create");
   const [selectedCarrier, setSelectedCarrier] = useState<Carrier | null>(null);
@@ -489,8 +478,13 @@ function SalesPageContentInner() {
   const [page, setPage] = useState(1);
 
   const activeRange = useMemo(
-    () => resolveDateRangePreset(filters.dateRange),
-    [filters.dateRange],
+    () =>
+      resolveDateRange(filters.dateRange, {
+        customDateFrom: filters.customDateFrom,
+        customDateTo: filters.customDateTo,
+        customIncompleteFallback: "partial",
+      }),
+    [filters.customDateFrom, filters.customDateTo, filters.dateRange],
   );
   const periodLabel = formatDateRangeLabel(
     activeRange.dateFrom,
@@ -563,8 +557,9 @@ function SalesPageContentInner() {
   const {
     teams,
     dispatchers,
+    carriers: optionCarriers,
     reload: reloadEntityOptions,
-  } = useEntityOptions({ teams: true, dispatchers: true, carriers: false });
+  } = useEntityOptions({ teams: true, dispatchers: true, carriers: true });
 
   const refresh = useCallback(async () => {
     await Promise.all([
@@ -644,153 +639,6 @@ function SalesPageContentInner() {
   const pendingExtensionCount = extensionRequests.filter(
     (request) => request.status === "Pending",
   ).length;
-  const activeFilterCount = useMemo(() => {
-    const defaults = getDefaultSalesFilters();
-    return (Object.keys(defaults) as Array<keyof SalesFilters>).reduce(
-      (count, key) => count + (filters[key] !== defaults[key] ? 1 : 0),
-      0,
-    );
-  }, [filters]);
-  const salesFilterGroups = useMemo(() => {
-    const scopedDispatchers =
-      draftFilters.teamId === FILTER_ALL
-        ? dispatchers
-        : dispatchers.filter(
-            (dispatcher) =>
-              dispatcher.teamName ===
-              teams.find((team) => team.id === draftFilters.teamId)?.name,
-          );
-    const scopedCarriers = carriers.filter((carrier) => {
-      if (
-        draftFilters.teamId !== FILTER_ALL &&
-        carrier.assignedTeamId !== draftFilters.teamId
-      ) {
-        return false;
-      }
-
-      if (
-        draftFilters.dispatcherId !== FILTER_ALL &&
-        carrier.assignedDispatcherId !== draftFilters.dispatcherId
-      ) {
-        return false;
-      }
-
-      return true;
-    });
-
-    return [
-      {
-        id: "team",
-        title: "Team",
-        searchPlaceholder: "Search teams...",
-        options: teams.map((team) => ({ value: team.id, label: team.name })),
-        selectedValues: filterValueToSelection(draftFilters.teamId),
-        onChange: (values: string[]) =>
-          setDraftFilters((current) => ({
-            ...current,
-            teamId: selectionToFilterValue(values),
-            dispatcherId: FILTER_ALL,
-            carrierId: FILTER_ALL,
-          })),
-      },
-      {
-        id: "dispatcher",
-        title: "Dispatcher",
-        searchPlaceholder: "Search dispatchers...",
-        options: scopedDispatchers.map((dispatcher) => ({
-          value: dispatcher.id,
-          label: dispatcher.fullName,
-        })),
-        selectedValues: filterValueToSelection(draftFilters.dispatcherId),
-        onChange: (values: string[]) =>
-          setDraftFilters((current) => ({
-            ...current,
-            dispatcherId: selectionToFilterValue(values),
-            carrierId: FILTER_ALL,
-          })),
-      },
-      {
-        id: "carrier",
-        title: "Carrier",
-        searchPlaceholder: "Search carriers...",
-        options: scopedCarriers.map((carrier) => ({
-          value: carrier.id,
-          label: carrier.carrierName,
-        })),
-        selectedValues: filterValueToSelection(draftFilters.carrierId),
-        onChange: (values: string[]) =>
-          setDraftFilters((current) => ({
-            ...current,
-            carrierId: selectionToFilterValue(values),
-          })),
-      },
-      {
-        id: "truckType",
-        title: "Truck Type",
-        searchPlaceholder: "Search truck types...",
-        options: TRUCK_TYPES.map((truckType) => ({
-          value: truckType,
-          label: formatOptionLabel(truckType),
-        })),
-        selectedValues: filterValueToSelection(draftFilters.truckType),
-        onChange: (values: string[]) =>
-          setDraftFilters((current) => ({
-            ...current,
-            truckType: selectionToFilterValue(values),
-          })),
-      },
-      {
-        id: "status",
-        title: "Status",
-        searchPlaceholder: "Search statuses...",
-        options: TEAM_STATUSES.map((status) => ({
-          value: status,
-          label: formatOptionLabel(status),
-        })),
-        selectedValues: filterValueToSelection(draftFilters.status),
-        onChange: (values: string[]) =>
-          setDraftFilters((current) => ({
-            ...current,
-            status: selectionToFilterValue(values),
-          })),
-      },
-      {
-        id: "lifecycle",
-        title: "Lifecycle",
-        searchPlaceholder: "Search lifecycle statuses...",
-        options: (Object.keys(LIFECYCLE_META) as LifecycleStatus[]).map(
-          (status) => ({
-            value: status,
-            label: status,
-          }),
-        ),
-        selectedValues: filterValueToSelection(draftFilters.lifecycleStatus),
-        onChange: (values: string[]) =>
-          setDraftFilters((current) => ({
-            ...current,
-            lifecycleStatus: selectionToFilterValue(values),
-          })),
-      },
-      {
-        id: "extensionStatus",
-        title: "Extension Status",
-        searchPlaceholder: "Search extension statuses...",
-        options: (Object.keys(REQUEST_META) as ExtensionStatus[]).map(
-          (status) => ({
-            value: status,
-            label: status,
-          }),
-        ),
-        selectedValues: filterValueToSelection(draftFilters.extensionStatus),
-        onChange: (values: string[]) =>
-          setDraftFilters((current) => ({
-            ...current,
-            extensionStatus: selectionToFilterValue(values),
-          })),
-      },
-    ];
-  }, [carriers, dispatchers, draftFilters, teams]);
-
   const pageState: PageContentState =
     carriersLoading || activitiesLoading
       ? "loading"
@@ -928,25 +776,6 @@ function SalesPageContentInner() {
     showToast(`Extension request ${status.toLowerCase()}.`);
   }
 
-  function openFilterPopover() {
-    setDraftFilters(filters);
-    setFiltersOpen((open) => !open);
-  }
-
-  function applyDraftFilters() {
-    setFilters(draftFilters);
-    setPage(1);
-    setFiltersOpen(false);
-  }
-
-  function resetFilters() {
-    const reset = getDefaultSalesFilters();
-    setDraftFilters(reset);
-    setFilters(reset);
-    setPage(1);
-    setFiltersOpen(false);
-  }
-
   return (
     <>
       <PageShell
@@ -954,14 +783,37 @@ function SalesPageContentInner() {
         description="Track carrier lifecycle, activation performance, extensions, and revenue impact."
         actions={
           <div className="flex w-full flex-wrap items-center justify-end gap-2 lg:w-auto">
-            <div ref={filterButtonRef}>
-              <SharedFilterButton
-                activeCount={activeFilterCount}
-                open={filtersOpen}
-                onClick={openFilterPopover}
-                className="h-10 rounded-xl border-[#D9E2EF] px-4 text-[#0F172A] shadow-sm"
-              />
-            </div>
+            <DashboardFilterComponent
+              values={filters}
+              defaultValues={getDefaultSalesFilters()}
+              onApplyFilters={(nextFilters) => {
+                setFilters(nextFilters);
+                setPage(1);
+              }}
+              allowedFilters={{
+                team: true,
+                dispatcher: true,
+                carrier: true,
+              }}
+              teamOptions={teams.map((team) => ({
+                value: team.id,
+                label: team.name,
+              }))}
+              dispatcherOptions={dispatchers.map((dispatcher) => ({
+                value: dispatcher.id,
+                label: dispatcher.fullName,
+                teamId: teams.find((team) => team.name === dispatcher.teamName)
+                  ?.id,
+              }))}
+              carrierOptions={optionCarriers.map((carrier) => ({
+                value: carrier.id,
+                label: carrier.carrierName,
+                teamId: carrier.assignedTeamId,
+                dispatcherId: carrier.assignedDispatcherId,
+              }))}
+              title="Carrier Dashboard Filters"
+              description="Choose the date range and optional carrier scope."
+            />
             <Button
               type="button"
               variant="outline"
@@ -1082,29 +934,6 @@ function SalesPageContentInner() {
           </PageContentGate>
         </div>
       </PageShell>
-
-      <SharedFilterPopover
-        open={filtersOpen}
-        anchorRef={filterButtonRef}
-        title="Sales Filters"
-        description="Choose lifecycle, assignment, equipment, and date filters, then apply."
-        dateRange={{
-          name: "sales-date-range",
-          value: draftFilters.dateRange,
-          options: [
-            { value: "today", label: "Today" },
-            { value: "this-week", label: "This Week" },
-            { value: "this-month", label: "This Month" },
-            { value: "last-30-days", label: "Last 30 Days" },
-          ],
-          onChange: (dateRange) =>
-            setDraftFilters((current) => ({ ...current, dateRange })),
-        }}
-        groups={salesFilterGroups}
-        onApply={applyDraftFilters}
-        onReset={resetFilters}
-        onClose={() => setFiltersOpen(false)}
-      />
 
       <CarrierModal
         open={modalOpen}
@@ -1359,11 +1188,11 @@ function ActivationBarChart({
   }
 
   return (
-    <div className="h-[250px] min-w-0">
+    <div className="h-[310px] min-w-0">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart
+        <ComposedChart
           data={data}
-          margin={{ top: 18, right: 12, left: 0, bottom: 18 }}
+          margin={{ top: 18, right: 16, left: 0, bottom: 34 }}
         >
           <CartesianGrid stroke="#E5E7EB" vertical={false} />
           <XAxis
@@ -1375,8 +1204,14 @@ function ActivationBarChart({
             angle={-12}
             textAnchor="end"
             height={62}
+            tickFormatter={(value) =>
+              typeof value === "string" && value.length > 16
+                ? `${value.slice(0, 14)}...`
+                : value
+            }
           />
           <YAxis
+            yAxisId="left"
             allowDecimals={false}
             tick={{ fill: "#64748B", fontSize: 11 }}
             tickLine={false}
@@ -1389,14 +1224,65 @@ function ActivationBarChart({
               fontSize: 11,
             }}
           />
+          <YAxis
+            yAxisId="right"
+            orientation="right"
+            tick={{ fill: "#64748B", fontSize: 11 }}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(value) => `$${Number(value) / 1000}k`}
+            label={{
+              value: "Revenue (USD)",
+              angle: 90,
+              position: "insideRight",
+              fill: "#334155",
+              fontSize: 11,
+            }}
+          />
           <Tooltip content={<SalesBarTooltip />} cursor={{ fill: "#F1F5F9" }} />
+          <Legend
+            verticalAlign="bottom"
+            align="center"
+            iconType="circle"
+            wrapperStyle={{
+              bottom: 0,
+              color: "#475569",
+              fontSize: 12,
+              fontWeight: 600,
+            }}
+          />
           <Bar
+            yAxisId="left"
+            name="Activated Carriers"
             dataKey="value"
-            fill="#2563EB"
             radius={[5, 5, 0, 0]}
             barSize={36}
+          >
+            {data.map((row, index) => (
+              <Cell
+                key={row.name}
+                fill={
+                  ACTIVATION_BAR_COLORS[index % ACTIVATION_BAR_COLORS.length]
+                }
+              />
+            ))}
+          </Bar>
+          <Line
+            yAxisId="right"
+            name="Revenue"
+            type="monotone"
+            dataKey="revenue"
+            stroke="#F97316"
+            strokeWidth={3}
+            dot={{ r: 4, fill: "#F97316", stroke: "#FFFFFF", strokeWidth: 2 }}
+            activeDot={{
+              r: 6,
+              fill: "#F97316",
+              stroke: "#FFFFFF",
+              strokeWidth: 2,
+            }}
           />
-        </BarChart>
+        </ComposedChart>
       </ResponsiveContainer>
     </div>
   );

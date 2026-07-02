@@ -1,8 +1,10 @@
 import { FILTER_ALL } from "@/lib/constants/filters";
-import { resolveDateRangePreset } from "@/lib/utils/resolve-date-range-preset";
+import { resolveDateRange } from "@/lib/utils/resolve-date-range";
 
 export type DispatcherDashboardFilterValues = {
   dateRange: string;
+  customDateFrom?: string;
+  customDateTo?: string;
   carrierId: string;
   truckType: string;
   status: string;
@@ -10,7 +12,9 @@ export type DispatcherDashboardFilterValues = {
 
 export const DEFAULT_DISPATCHER_DASHBOARD_FILTERS: DispatcherDashboardFilterValues =
   {
-    dateRange: "this-month",
+    dateRange: "today",
+    customDateFrom: "",
+    customDateTo: "",
     carrierId: FILTER_ALL,
     truckType: FILTER_ALL,
     status: FILTER_ALL,
@@ -19,7 +23,11 @@ export const DEFAULT_DISPATCHER_DASHBOARD_FILTERS: DispatcherDashboardFilterValu
 export function dispatcherDashboardFiltersToParams(
   filters: DispatcherDashboardFilterValues,
 ): Record<string, string> {
-  const { dateFrom, dateTo } = resolveDateRangePreset(filters.dateRange);
+  const { dateFrom, dateTo } = resolveDateRange(filters.dateRange, {
+    customDateFrom: filters.customDateFrom,
+    customDateTo: filters.customDateTo,
+    customIncompleteFallback: "partial",
+  });
   const params: Record<string, string> = { dateFrom, dateTo };
 
   if (filters.carrierId !== FILTER_ALL) {
